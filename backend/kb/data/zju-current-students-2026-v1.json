@@ -1,0 +1,88 @@
+{
+  "id": "zju_current_students_2026",
+  "revision": 1,
+  "title": "Notice on Tuition Payment for Current International Students for the 2026–2027 Academic Year",
+  "publisher": "International College, Zhejiang University",
+  "source_url": "https://iczu.zju.edu.cn/iczuen/2026/0808/c63325a3194084/page.htm",
+  "published_on": "2026-08-08",
+  "reviewed_on": "2026-10-17",
+  "review_status": "REVIEWED_DRAFT",
+  "reviewed_by": "DEV_A_AGENT",
+  "review_scope": "Reviewed sections I–V of this notice. Targeted official-domain search and the first official notice-list page were also inspected; this was not an exhaustive supersession check. The linked payment-instructions PDF and authenticated platform were not reviewed. Stored paraphrases exclude bank accounts, routing details and personal contact addresses. Revision is Rantau's local record revision, not an official document version.",
+  "scope": {
+    "jurisdiction": "CN",
+    "university_id": "zju",
+    "academic_year": "2026-2027",
+    "audience": "Current international undergraduate, master's and doctoral students enrolling in fall 2026; not an admissions or China-wide policy."
+  },
+  "payment_period": {"start": "2026-08-10", "end": "2026-09-10"},
+  "effective_period": null,
+  "applicability": "RECHECK_REQUIRED",
+  "usage": "PROCEDURAL_REFERENCE_ONLY",
+  "synthetic": false,
+  "claims": [
+    {
+      "key": "online_authentication",
+      "support": "EXPLICIT",
+      "value": "Use the International Student Service Platform and select ZJU Unified Identity Authentication.",
+      "locator": "III. Online Payment Method",
+      "conditions": "Online tuition payment for the notice's stated student cohort and payment period."
+    },
+    {
+      "key": "transfer_references",
+      "support": "EXPLICIT",
+      "value": ["student ID", "full name"],
+      "locator": "IV. Alternative Payment Method, opening paragraph",
+      "conditions": "Bank or wire transfer offered to students unable to pay online; include these in reference/remarks."
+    },
+    {
+      "key": "transfer_receipt_upload",
+      "support": "EXPLICIT",
+      "value": "Upload the bank transfer receipt to the International Student Service Platform after transferring.",
+      "locator": "IV. Alternative Payment Method, opening paragraph",
+      "conditions": "Evidence submission for the alternative transfer method; an uploaded receipt does not prove tuition posting."
+    },
+    {
+      "key": "receipt_collection",
+      "support": "EXPLICIT",
+      "value": "Online payers retrieve the electronic receipt through the platform; bank/wire payers request a payment receipt by emailing the listed university contact.",
+      "locator": "V. Receipt Collection, subsections 1 and 2",
+      "conditions": "Receipt retrieval differs by payment method; it is distinct from uploading the bank transfer receipt."
+    },
+    {
+      "key": "posting_window_hours",
+      "support": "NOT_STATED",
+      "value": null,
+      "locator": "Sections I–V reviewed; no posting-duration guarantee found",
+      "conditions": "No inference from receipt submission or the payment period."
+    },
+    {
+      "key": "partial_payment_allowed",
+      "support": "NOT_STATED",
+      "value": null,
+      "locator": "Sections I–V reviewed; no partial-payment rule found",
+      "conditions": "Unknown does not mean disallowed."
+    },
+    {
+      "key": "topup_allowed",
+      "support": "NOT_STATED",
+      "value": null,
+      "locator": "Sections I–V reviewed; no top-up rule found",
+      "conditions": "Unknown does not mean disallowed."
+    },
+    {
+      "key": "idr_cny_route",
+      "support": "NOT_STATED",
+      "value": null,
+      "locator": "Sections I–V reviewed; no IDR-to-CNY provider route specified",
+      "conditions": "Bank/wire instructions do not establish a supported corridor, provider, fee or exchange rate."
+    },
+    {
+      "key": "posting_api",
+      "support": "NOT_STATED",
+      "value": null,
+      "locator": "Sections I–V reviewed; no public ledger-posting API specified",
+      "conditions": "A student platform link is not evidence of an integration API."
+    }
+  ]
+}

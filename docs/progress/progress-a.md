@@ -1,12 +1,12 @@
 # Dev A progress
 
-Owner: Agent, knowledge base and student chat; lead for S-01/S-02. Updated: 2026-10-16.
+Owner: Agent, knowledge base and student chat; lead for S-01/S-02. Updated: 2026-10-17.
 Scope and acceptance: [MVP](../../Rantau-MVP-Spec.md) and [roadmap](../../Rantau-3Dev-Roadmap.md).
 Workflow: [AGENTS.md section 7](../../AGENTS.md#7-mandatory-progress-workflow-and-documentation-limits).
 
 `[x]` means implementation and required available checks passed; review/merge status stays separate.
 Keep the actual change details in `Desc` and validation/limitations in `Status / evidence`.
-Evidence below comes from the 2026-10-16 implementation; documentation consolidation does not constitute a new application test run.
+Evidence is dated per row; earlier results are historical unless a fresh run is explicitly recorded.
 
 | Check | Ticket | Task | Desc | Status / evidence | Updated |
 |---|---|---|---|---|---|
@@ -16,7 +16,7 @@ Evidence below comes from the 2026-10-16 implementation; documentation consolida
 | [x] | DOC-01 | Consolidated owner progress workflow | User-requested documentation task, 2026-10-16: consolidated work notes into three English owner files with task descriptions/checks; required same-commit updates and limited new Markdown files through `AGENTS.md`; replaced the former foundation notes/plan and repaired README/contribution links. | Awaiting review: [PR #8](https://github.com/hsbu/rantau/pull/8). Docs checks passed: all 25 roadmap tasks appear once under the correct owner, local links resolve and removed-note references are gone. Application tests were not rerun for this docs-only change. | 2026-10-16 |
 | [x] | DOC-02 | Conventional branch and PR naming | User-requested naming correction, 2026-10-16: renamed local/remote branches to feat/agent-contracts, build/app-skeleton, feat/agent-routing and docs/team-progress; retained Conventional Commit PR titles, source commits and stack dependencies. Added mandatory naming rules to AGENTS.md/CONTRIBUTING.md and updated active progress links. | Awaiting review: [PR #8](https://github.com/hsbu/rantau/pull/8). Naming, source-SHA, stack, local/remote tracking, link and roadmap-coverage checks passed. Active PRs #5–#8 replace closed PRs #1–#4; earlier history remains linked from the replacements. No manual application test rerun for these naming/documentation changes. | 2026-10-16 |
 | [x] | DOC-03 | Local commits before publication | User-requested workflow change, 2026-10-16: default to validated local commits; require a fresh explicit instruction before pushing changes or creating/synchronizing PRs. Update AGENTS.md, CONTRIBUTING.md and progress status guidance. | Local commit — awaiting push/PR instruction. Publication-gate, gated-example, Markdown-link/fence checks and staged hygiene passed. No manual application test rerun for this docs-only change. | 2026-10-16 |
-| [ ] | A-02 | University KB and quote explanation | Add versioned synthetic `uni_cn_01` policy, dated provenance and cited ZJU procedural guidance; explain exact quote fees and currency units without claiming live rates. | No completion evidence recorded. Depends on S-01. | — |
+| [ ] | A-02 | University KB and quote explanation | In progress: delivered internal typed claim/provenance records, sanitized ZJU source data and a separately labelled synthetic `uni_cn_01` policy with an offline loader in `backend/kb/`; kept shared contracts and approved fixture values unchanged. Quote explanation and agent integration remain. | Partial implementation; Local commit — awaiting push/PR instruction. `uv run pytest tests/test_kb.py -q`: 26 passed; `uv run pytest tests -q`: 86 passed; `uv run mypy`: 22 files passed; `uv run ruff check .` and `git diff --check`: passed. Reviewed draft, awaiting team review; no live university/provider integration or current-policy guarantee. See the claim review below. | 2026-10-17 |
 | [ ] | A-03 | Tuition intent and clarification | Build an intent/quote/verified-payee preview; ask only for missing essential details and never transfer before current owner authorization. | No completion evidence recorded. Depends on A-01 and typed fake ports. | — |
 | [ ] | A-04 | Approval wait/resume | On student check/continue, reload server approval bound to current terms; show `AWAITING_APPROVAL` until valid and call only the protected executor. Reject pasted approvals. | No completion evidence recorded. Depends on A-03 and B-03. | — |
 | [ ] | A-05 | Recovery investigator | Investigate missing-reference, delayed-posting and shortfall evidence; create/submit scoped cases, recheck unknown outcomes and verify ledger evidence without direct posting or blind repayment. | No completion evidence recorded. Depends on A-01 and C-06. | — |
@@ -34,6 +34,24 @@ Evidence below comes from the 2026-10-16 implementation; documentation consolida
 - Current agent runs are single-turn; `conversation_id` is reserved for later storage. Tracking recognizes synthetic `transfer_...` references. Verified payment-to-obligation linkage, full tuition dialogue, approval resumption, recovery execution and the chat UI remain later work; do not infer those features from the foundation demo.
 - Generated OpenAPI/TS, environments, caches and temporary PR bodies stay ignored. Lockfiles are committed. ESLint 10/TypeScript ESLint replaces the Next-specific preset after its transitive glob dependency audit finding; Next compilation/types still run separately.
 
+## A-02 source review and simulation boundary
+
+The requester approved this first records-only slice on 2026-10-17. Dev A's agent read the [ZJU current-student tuition notice](https://iczu.zju.edu.cn/iczuen/2026/0808/c63325a3194084/page.htm), published 2026-08-08, on 2026-10-17. The stored record is a reviewed draft awaiting team review. Its audience is current international degree students enrolling in fall 2026; it does not establish admissions or China-wide rules.
+
+| Claim / field | Evidence and scope | Stored treatment |
+|---|---|---|
+| Payment period | Section II: 2026-08-10 through 2026-09-10 | Separate date window; effective policy dates remain unknown. A past payment period establishes neither revocation nor current applicability. |
+| Online authentication | Section III: student platform using ZJU unified identity | Explicit procedural guidance for the notice's cohort/period. |
+| Transfer references | Section IV: student ID and full name for bank/wire payments when online payment is unavailable | Explicit, method-conditional claim; only procedural inspiration for the fictional policy. |
+| Transfer evidence and receipt collection | Section IV: upload bank receipt; section V: platform receipt for online payment or request a receipt through the listed contact for bank/wire | Separate procedures; submitting evidence does not establish verified tuition posting. |
+| Posting duration, partial payments, top-ups, IDR→CNY route, posting API | Not stated in the reviewed notice | `NOT_STATED` with null values; never inferred as false, supported or integrated. |
+
+Review covered sections I–V, a targeted official-domain search and the first [official notice-list page](https://iczu.zju.edu.cn/iczuen/wwwwww_63325/list.htm). Supersession/current applicability were not exhaustively established; the linked instructions PDF and authenticated platform were not inspected. Bank account/routing details and personal contact addresses are excluded from the stored paraphrases. Record revisions identify Rantau edits, not official notice versions.
+
+The separate `uni_cn_01` record preserves `cn_demo_v1`: 48 elapsed hours, partial payments/top-ups disabled, synthetic November verification clock and October–December validity. These are authored simulation choices, not ZJU rules; the placeholder policy URL deliberately differs from the official citation. Claim links validate source ID, revision and explicit support without activating a policy or authorization adapter. The source record cannot validate as an executable `UniversityPolicy`.
+
+Next: research current guidance and unresolved rules with method/cohort-specific evidence; retain unknowns where evidence is unavailable. Complete exact simulated quote explanations and scoped agent integration before checking A-02 complete. Any later financial-policy/shared-contract change still requires owner agreement.
+
 ## Recorded validation commands
 
 Run setup and service commands from [README.md](../../README.md). Update this section in place when checks change; record a new date and actual result rather than copying an earlier pass.
@@ -43,5 +61,6 @@ Run setup and service commands from [README.md](../../README.md). Update this se
 | S-01 | `uv run pytest tests/contracts tests/test_hygiene.py -q`; `uv run mypy backend/contracts scripts tests/fixtures --strict`; `uv run ruff check backend/contracts scripts tests/contracts tests/fixtures tests/test_hygiene.py`; `uv run python -m scripts.export_openapi` | 31 tests passed; mypy passed for 11 source files; lint/export passed. |
 | S-02 | `uv run pytest tests/contracts tests/test_hygiene.py tests/test_application.py -q`; `uv run mypy backend/main.py backend/config.py backend/dependencies.py backend/contracts scripts --strict`; `docker compose config --quiet` | 34 tests passed; mypy passed for 11 source files; Compose config valid. No Docker runtime/DB verification. |
 | A-01/full backend | `uv run pytest tests -q`; `uv run mypy`; `uv run ruff check .`; `uv run python -m backend.agent.demo --fake-classifier` | 60 tests passed; mypy passed for 19 source files; lint and six forced offline routes passed. Mocked transport covers model/schema, redaction, refusal, malformed/incomplete output, HTTP error and timeout. |
+| A-02 records, 2026-10-17 | `uv run pytest tests/test_kb.py -q`; `uv run pytest tests -q`; `uv run mypy`; `uv run ruff check .`; `git diff --check` | 26 focused / 86 total backend tests passed; mypy passed for 22 files; lint/diff checks passed. Covers unknown-vs-false, source scope/dates, duplicate claims, invalid citation revisions, synthetic/official separation, fixture validity/expiry and sanitized data. No live integration or frontend behavior changed. |
 | Frontend | From `frontend/`: `npm ci`; `npm run generate:contracts`; `npm run typecheck`; `npm run lint`; `npm run build`; `npm audit --audit-level=high` | Locked install, type generation/check, lint and standalone build passed; audit reported zero vulnerabilities. Standalone HTML/CSS returned HTTP 200. |
 | Repository | `python scripts/check_repo_hygiene.py` before each commit | Passed against each staged index. |
