@@ -24,6 +24,18 @@ PR title examples: `feat(agent): add tuition clarification loop`; `fix(authz): r
 
 Every PR must link a roadmap ticket if available, describe behavior, list impacted API schemas, provide test evidence, and explain security implications. Check the PR template.
 
+Write repository documentation, implementation notes, commits and PR descriptions
+in English. Product-required localized UI content and original-language quotations
+remain allowed; describe their purpose in English.
+
+Maintain task status in the existing owner file under `docs/progress/`:
+[Dev A](docs/progress/progress-a.md), [Dev B](docs/progress/progress-b.md),
+[Dev C](docs/progress/progress-c.md). Update the task's `Desc`, evidence, date and
+checkbox in the same commit/PR as the implementation. A checked row records
+implementation completion; review and merge remain separate explicit states.
+Do not create a separate Markdown plan, report or progress log for each task.
+Follow `AGENTS.md` section 7 for the complete workflow and file-creation limits.
+
 ## 2. Ownership and change coordination
 
 | Area | Default owner |

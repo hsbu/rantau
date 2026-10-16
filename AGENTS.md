@@ -9,6 +9,8 @@ These rules apply to all AI coding agents and human contributors in this reposit
 - **Stack:** Python / FastAPI / LangGraph, PostgreSQL, Next.js / TypeScript.
 - **Reality boundary:** All payments, exchange quotes, provider responses, and university ledgers are **simulated**. Never claim a real payment happened or that an undocumented provider/university API is available.
 - **Source of truth:** the approved MVP specification and roadmap in `docs/` if present, plus versioned API contracts in `backend/contracts/` and frontend generated types. If source docs are not yet checked in, ask for their location rather than inventing requirements.
+- **Repository language:** Write documentation, progress notes, code identifiers/comments, commit messages and PR descriptions in English. Preserve product-required localized UI text, bilingual fixtures and quoted source material in their original language; document their purpose in English.
+- **Progress tracking:** Use only `docs/progress/progress-a.md`, `docs/progress/progress-b.md`, and `docs/progress/progress-c.md` for ongoing work notes. Follow section 7; do not create a new Markdown report for each task or session.
 
 ## 1. Mandatory Git workflow
 
@@ -70,6 +72,7 @@ If an action cannot be safely verified, return a typed pending/held/escalated st
 - No secrets, generated files, `print` debugging, broken mocks, or privileged bypasses left behind.
 - Payment and reconciliation changes assert **database state**, not only assistant text.
 - Relevant docs and `.env.example` updated when config or behavior changes.
+- The owner's progress file is updated in the same commit/PR with the task checkbox, `Desc`, validation evidence, review state and update date. Follow section 7 before claiming implementation completion.
 - CI is green; another developer reviews; merge via PR only.
 
 ## 6. Communication / avoiding blocking
@@ -79,3 +82,14 @@ If an action cannot be safely verified, return a typed pending/held/escalated st
 - Describe blockers concretely with expected schema/error and a sample payload.
 - Prioritize: authorized tuition payment → secure sponsor approval → provider/university state verification → missing-reference recovery → attacks → polish.
 - Before deadline, prefer a passing end-to-end vertical slice over unrelated enhancements. Do not add credit building or real banking connections to this MVP.
+
+## 7. Mandatory progress workflow and documentation limits
+
+- **One file per owner:** [Dev A](docs/progress/progress-a.md), [Dev B](docs/progress/progress-b.md), [Dev C](docs/progress/progress-c.md). Read your file and relevant dependencies before starting. The roadmap defines scope and acceptance; the progress files record execution status.
+- **Keep one row per task:** Use `Check`, `Ticket`, `Task`, `Desc`, `Status / evidence`, and `Updated` columns. Reuse roadmap IDs; assign a stable local ID for additional authorized work and explain its source. Record shared tickets under their lead owner and link to them instead of duplicating completion claims.
+- **Start or resume:** Set the row to `In progress` and update `Desc` with the concrete change and affected modules. For a blocker, record the dependency, expected interface/error and next action, with sensitive data redacted.
+- **Finish implementation:** Change `[ ]` to `[x]` only after the ticket's implementation and required available checks pass. Update `Desc` with the actual delivered behavior and affected paths; record exact test commands/results, PR link, limitations and date. If a required acceptance condition is unmet, leave the checkbox unchecked and explain the gap. Never mark another owner's work complete without evidence.
+- **Separate implementation from review:** A checked row means implementation and its required checks are complete; it does not mean the PR is approved or merged. Keep `Awaiting review`, `Changes requested` or `Merged` explicit in `Status / evidence`. The full definition of done in section 5 still requires green CI, another developer's review and PR merge.
+- **Maintain evidence honestly:** Update the row in the same commit/PR as its implementation, and update review/merge status when it changes. Preserve the validation date and distinguish an earlier verified result from a fresh run. Record unavailable optional checks as unverified; never treat a mock run as real auth, financial, provider or university verification.
+- **Keep notes compact:** Put task detail, decisions, check results and follow-up work in the appropriate owner's existing file. Update the existing row or a short section in that file rather than creating per-task specs, plans, findings, session logs or progress reports. Larger changes still require the existing shared-interface approval process; record the agreed decision in the relevant progress file and versioned contracts.
+- **Reuse permanent references:** Keep `README.md` for setup, `CONTRIBUTING.md`/`AGENTS.md` for workflow, and the existing MVP specification/roadmap for product scope. Add a new Markdown file only when the user explicitly requests a separate artifact or it is an essential permanent reference that cannot reasonably fit an existing file; explain that need before adding it. Temporary exports/PR bodies stay ignored and never become committed documentation.

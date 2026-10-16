@@ -54,5 +54,8 @@ docker compose config --quiet
 The offline demo forces six classifications and uses isolated synthetic adapters;
 it demonstrates graph routing, not live model quality or real payments. The OpenAI
 adapter uses a configurable model with structured output and safe failure handling.
-Live API access requires separate verification. See [Dev A notes](docs/dev-a-foundation.md)
-and the [approved implementation plan](specs/spec-dev-a-foundation/spec.md).
+Live API access requires separate verification. Keep task updates in the shared
+progress folder: [Dev A](docs/progress/progress-a.md),
+[Dev B](docs/progress/progress-b.md), and [Dev C](docs/progress/progress-c.md).
+Each owner updates their task checkboxes, descriptions and validation evidence in
+the same commit/PR as the work. See `AGENTS.md` section 7 for the full workflow.
