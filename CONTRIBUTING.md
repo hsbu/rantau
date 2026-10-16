@@ -1,6 +1,9 @@
 # Contributing to Rantau
 
-This repository uses **PR-only development** for all human and AI contributors.
+This repository uses **PR-only merging** for all human and AI contributors.
+By default, validate changes and commit locally. Push changes and create or
+synchronize PRs only when the user explicitly instructs you to do so; implementation
+or commit approval does not grant publication permission for future changes.
 
 ## 1. Branch and PR workflow
 
@@ -14,6 +17,12 @@ git add <explicit-paths>  # avoid git add -A until you've inspected changes
 python scripts/check_repo_hygiene.py
 git diff --cached --name-only
 git commit -m "feat(finance): implement payment intents"
+# Stop here until the user explicitly instructs you to push/open a PR.
+```
+
+Only after the user's publication instruction:
+
+```bash
 git push -u origin feat/finance-payment-intents
 # Open a pull request to main; request a review from a different developer.
 ```
@@ -36,7 +45,9 @@ remain allowed; describe their purpose in English.
 Maintain task status in the existing owner file under `docs/progress/`:
 [Dev A](docs/progress/progress-a.md), [Dev B](docs/progress/progress-b.md),
 [Dev C](docs/progress/progress-c.md). Update the task's `Desc`, evidence, date and
-checkbox in the same commit/PR as the implementation. A checked row records
+checkbox in the same commit as the implementation, and include it in the PR once
+publication is authorized. Until then, record `Local commit — awaiting push/PR instruction`
+instead of a PR link. A checked row records
 implementation completion; review and merge remain separate explicit states.
 Do not create a separate Markdown plan, report or progress log for each task.
 Follow `AGENTS.md` section 7 for the complete workflow and file-creation limits.

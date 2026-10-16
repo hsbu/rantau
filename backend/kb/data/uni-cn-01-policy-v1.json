@@ -1,0 +1,31 @@
+{
+  "id": "uni_cn_01_simulation",
+  "revision": 1,
+  "synthetic": true,
+  "usage": "ISOLATED_SIMULATION_ONLY",
+  "operational_values": "AUTHORED_SIMULATION",
+  "policy": {
+    "id": "cn_demo_v1",
+    "university_id": "uni_cn_01",
+    "term_id": "term_demo_2026",
+    "version": "cn_demo_v1",
+    "required_references": ["student ID", "full name"],
+    "posting_window_hours": 48,
+    "partial_payment_allowed": false,
+    "topup_allowed": false,
+    "source_url": "https://example.invalid/rantau/synthetic-policy",
+    "verified_at": "2026-11-01T09:00:00Z",
+    "effective_from": "2026-10-31T09:00:00Z",
+    "effective_to": "2026-12-31T09:00:00Z",
+    "certainty": "SYNTHETIC",
+    "synthetic": true
+  },
+  "assumptions": "Preserves the approved cn_demo_v1 fixture without changing financial policy. All operational values are authored simulation choices. The 48 elapsed hours, disallowed partial payments/top-ups, fictional university, term and validity are not ZJU claims. The two reference labels have procedural inspiration only. verified_at and validity use the fictional November scenario clock, not the October source-review date. This record grants no authorization and is not installed in the integrated app.",
+  "procedural_inspiration": [
+    {
+      "reference_id": "zju_current_students_2026",
+      "reference_revision": 1,
+      "claim_key": "transfer_references"
+    }
+  ]
+}
