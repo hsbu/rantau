@@ -1,0 +1,23 @@
+{
+  "money": {"currency": "CNY", "amount_minor": 2000000},
+  "approval_required": {
+    "status": "REQUIRES_APPROVAL", "reason_code": "FUNDING_OWNER_APPROVAL_REQUIRED",
+    "resource_id": "intent_001", "message": "Sponsor approval is required.",
+    "retryable": false, "next_action": "WAIT_FOR_APPROVAL", "audit_event_id": "audit_002"
+  },
+  "held": {
+    "status": "HELD", "reason_code": "SECURITY_HOLD", "resource_id": "intent_001",
+    "message": "Trusted review is required.", "retryable": false,
+    "next_action": "SECURITY_REVIEW", "audit_event_id": "audit_003"
+  },
+  "expired_quote": {
+    "status": "ERROR", "reason_code": "QUOTE_EXPIRED", "resource_id": "quote_001",
+    "message": "The quote has expired.", "retryable": false,
+    "next_action": "REQUEST_NEW_QUOTE", "audit_event_id": "audit_004"
+  },
+  "provider_unknown": {
+    "status": "PENDING", "reason_code": "PROVIDER_OUTCOME_UNKNOWN", "resource_id": "transfer_001",
+    "message": "Recheck the original provider reference.", "retryable": false,
+    "next_action": "CHECK_STATUS", "audit_event_id": "audit_005"
+  }
+}
