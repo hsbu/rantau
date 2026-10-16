@@ -22,6 +22,11 @@ git push -u origin feat/finance-payment-intents
 
 PR title examples: `feat(agent): add tuition clarification loop`; `fix(authz): reject stale approvals`; `test(finance): cover duplicate transfers`.
 
+Branches use `<type>/<kebab-case-topic>`, such as `feat/agent-contracts`,
+`build/app-skeleton` or `docs/team-progress`. Use the types listed in `AGENTS.md`
+section 1; agent/tool names must not be branch prefixes. Commit messages and PR
+titles use Conventional Commits (`<type>(<scope>): <summary>`, scope optional).
+
 Every PR must link a roadmap ticket if available, describe behavior, list impacted API schemas, provide test evidence, and explain security implications. Check the PR template.
 
 Write repository documentation, implementation notes, commits and PR descriptions

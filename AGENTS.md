@@ -15,10 +15,10 @@ These rules apply to all AI coding agents and human contributors in this reposit
 ## 1. Mandatory Git workflow
 
 1. **Never commit or push directly to `main`.** Create a short-lived branch from the latest `main`.
-2. Suggested branches: `feat/agent-<topic>`, `feat/security-<topic>`, `feat/finance-<topic>`, `fix/<topic>`, `test/<topic>`, `docs/<topic>`, `chore/<topic>`.
+2. Use conventional branch names: `<type>/<kebab-case-topic>`, where type is `feat`, `fix`, `build`, `ci`, `docs`, `test`, `chore`, `perf`, `refactor`, or `style`. Examples: `feat/agent-contracts`, `build/app-skeleton`, `feat/agent-routing`, `docs/team-progress`. Do not use agent/tool names as branch prefixes.
 3. Keep each change focused. Open a **Pull Request** for every change, including docs/config/hotfixes; use a **draft PR** if unfinished.
 4. Do **not** merge your own PR without a review from another developer. Never bypass required checks, force-push `main`, rewrite shared history, or auto-merge a failing PR.
-5. Use conventional commit messages, e.g. `feat(finance): add idempotent transfer execution`, `fix(authz): reject stale approval`.
+5. Use Conventional Commits for both commit messages and PR titles: `<type>(<scope>): <summary>` (scope optional), e.g. `feat(finance): add idempotent transfer execution`, `fix(authz): reject stale approval`. Put ticket IDs in the PR description; do not prefix titles with agent/tool names.
 6. In every PR include ticket ID, summary, touched modules/contracts, tests run, security impact, and demo evidence when applicable.
 7. **Approval to write code is not approval to change product scope.** Ask before making breaking contract or financial-policy changes.
 
