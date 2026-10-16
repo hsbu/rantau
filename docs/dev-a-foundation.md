@@ -68,3 +68,40 @@ Both local HTTP services started: frontend returned 200 with Rantau branding;
 backend /health returned 200 with simulation=true; /ready correctly returned 503
 with unavailable dependency flags. This is process/startup evidence, not financial
 integration or PostgreSQL runtime evidence.
+
+## Agent foundation (A-01)
+
+The fixed LangGraph routes ASK_POLICY, TUITION, ALLOWANCE, TRACK, RECOVER and
+VERIFY_MESSAGE. Structured OpenAI classification interprets a request; it cannot
+choose tools, change actor identity or supply an approval. Ambiguous requests ask
+clarification. Refusals, invalid/incomplete output, timeouts and API failures yield
+an unavailable result without mutations. Model selection is `OPENAI_MODEL` on the
+server; the adapter uses bounded retries/output and `store=False`.
+
+Only the user message, with common sensitive identifiers redacted, reaches the
+classifier. Server actor context, session data, balances and domain responses are
+not passed to it. The current adapter handles classification only; deterministic
+responses use selected typed fields. Full conversational generation is not claimed.
+
+The graph receives only `AgentReadPort`, not `PaymentPort`, an approval writer or
+university operator. Delivery remains distinct from posting, and unknown outcomes
+request rechecking the original provider reference. References currently accept
+the synthetic `transfer_...` form; broader entity resolution belongs to later
+conversation work. Payment-to-obligation linkage must be verified by the finance
+adapter before reporting posting for a specific payment; A-01 does not guess it.
+
+The two agent HTTP paths exist but remain closed to requests until Dev B supplies
+`verified_actor` and trusted domain services replace `agent_services`. The run
+repository is a typed integration seam; the test implementation checks tenant,
+actor and session. There is no global production fake or in-memory finance ledger.
+`conversation_id` is reserved for later conversation storage, not authority or an
+existing durable session. A-01 runs are single-turn.
+
+Final local validation: 60 Python tests passed, strict mypy passed for 19 source
+files, Ruff passed, and the isolated six-intent harness completed. Mocked OpenAI
+transport verifies configured-model/schema use, redaction, refusal, malformed and
+incomplete responses, HTTP failure and timeout. No API key/model is configured,
+so live model access, intent accuracy and latency have not been measured.
+The standalone frontend and its CSS returned HTTP 200; an adversarial HTTP agent
+request still returned 503 AUTHENTICATION_NOT_CONFIGURED. These checks are not an
+end-to-end authenticated financial demo.

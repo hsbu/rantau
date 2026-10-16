@@ -18,7 +18,7 @@ last_updated: "2026-10-16"
 
 ## Status
 
-- **Implementation:** Not started. The requester approved this contract proposal on 2026-10-16; implementation and checks are pending.
+- **Implementation:** Implemented for review. Contracts, skeleton and graph checks pass locally; Docker runtime/live OpenAI verification remain unavailable.
 - **Last audit date:** 2026-10-16.
 - **Review status:** Approved by the requester for the team on 2026-10-16.
 - **Decisions already agreed:** Dev A owns this work; local-first tooling may be selected; OpenAI is the classifier provider and the model must be configurable. Offline tests use a fake classifier.
@@ -75,7 +75,7 @@ Generated OpenAPI/TypeScript outputs are reproducible local/build artifacts; com
 |---|---|---|---|---|
 | S-01 | Contract freeze, samples and typed test mocks | A drafts; requester approves for B/C | Approved 2026-10-16 | Implemented; 31 focused checks pass |
 | S-02 | Reproducible application and CI skeleton | Dev A | Approved S-01 | Implemented; local checks pass; Docker runtime unavailable |
-| A-01 | Six-intent graph and typed tools | Dev A | Approved S-01; S-02 supplies HTTP integration | Not started |
+| A-01 | Six-intent graph and typed tools | Dev A | Approved S-01; S-02 supplies HTTP integration | Implemented; 60 total tests pass; live API unverified |
 
 ## Dependency Graph
 

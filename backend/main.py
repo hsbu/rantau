@@ -4,9 +4,11 @@ import psycopg
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
+from backend.agent.router import router as agent_router
 from backend.config import Settings
 
 app = FastAPI(title="Rantau", version="0.1.0")
+app.include_router(agent_router)
 
 
 @app.get("/health")

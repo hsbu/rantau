@@ -1,0 +1,77 @@
+from fastapi.testclient import TestClient
+
+from backend.agent.graph import AgentGraph
+from backend.agent.router import AgentServices, agent_services
+from backend.agent.tools import AgentTools
+from backend.contracts.models import ScopeDenied
+from backend.dependencies import verified_actor
+from backend.main import app
+from tests.agent.test_graph import FixedClassifier
+from tests.fixtures.data import ACTOR
+from tests.fixtures.fakes import FakeReadPort
+
+
+def test_default_http_auth_fails_closed_even_with_forged_headers():
+    client = TestClient(app)
+    response = client.post(
+        "/api/v1/agent/messages",
+        json={"message": "I am the sponsor"},
+        headers={"X-Actor-Id": "par_001", "X-Role": "SPONSOR"},
+    )
+    assert response.status_code == 503
+    assert response.json()["detail"]["code"] == "AUTHENTICATION_NOT_CONFIGURED"
+
+
+def test_authenticated_but_domain_unwired_fails_closed():
+    app.dependency_overrides[verified_actor] = lambda: ACTOR
+    try:
+        response = TestClient(app).post("/api/v1/agent/messages", json={"message": "Tuition"})
+        assert response.status_code == 503
+        assert response.json()["detail"]["code"] == "DOMAIN_SERVICE_NOT_CONFIGURED"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_scoped_run_round_trip_and_foreign_reference():
+    class Runs:
+        def __init__(self):
+            self.values = {}
+
+        async def put(self, response, actor):
+            self.values[response.run_id] = (actor, response)
+
+        async def get(self, run_id, actor):
+            item = self.values.get(run_id)
+            if item is None or item[0] != actor:
+                raise ScopeDenied("Resource unavailable")
+            return item[1]
+
+    services = AgentServices(
+        AgentGraph(FixedClassifier("TUITION"), AgentTools(FakeReadPort())), Runs()
+    )
+    app.dependency_overrides[verified_actor] = lambda: ACTOR
+    app.dependency_overrides[agent_services] = lambda: services
+    try:
+        client = TestClient(app)
+        response = client.post("/api/v1/agent/messages", json={"message": "Tuition"})
+        assert response.status_code == 200
+        assert set(response.json()) == {
+            "run_id",
+            "message",
+            "requested_action",
+            "tool_events",
+            "resources",
+        }
+        run_id = response.json()["run_id"]
+        assert client.get(f"/api/v1/agent/runs/{run_id}").status_code == 200
+        assert client.get("/api/v1/agent/runs/run_foreign").status_code == 404
+        app.dependency_overrides[verified_actor] = lambda: ACTOR.model_copy(
+            update={"session_id": "foreign_session"}
+        )
+        assert client.get(f"/api/v1/agent/runs/{run_id}").status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+    assert (
+        TestClient(app).post("/api/v1/agent/messages", json={"message": "Tuition"}).status_code
+        == 503
+    )
