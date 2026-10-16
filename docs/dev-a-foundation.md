@@ -40,3 +40,31 @@ S-01 local validation: 31 contract/hygiene tests passed; strict mypy passed for
 contracts, scripts and typed fixtures; Ruff passed; schema export succeeded.
 The hygiene checker, ignore rules and Python dependency bootstrap ship with S-01
 so this first source commit is itself reproducible and checked.
+
+## Application skeleton (S-02)
+
+Use the commands in the root README. Python 3.12/uv and Node 22.13+/npm are locked;
+generated frontend types are rebuilt from the shared catalogue before checking.
+The home page is a development status shell, not the later A-06 student chat.
+
+`/health` reports liveness. `/ready` probes PostgreSQL connectivity without writing
+schema and reports authentication/domain integration as unavailable. It remains
+503 until real integrations are connected. `compose.yaml` uses service DNS for
+PostgreSQL, loopback-bound host ports and explicitly synthetic local credentials.
+No migration, finance table or mock gate is installed.
+
+Local validation: Python contract/hygiene/application tests, strict mypy and Ruff;
+locked frontend install, schema/type generation, TypeScript, ESLint and production
+build; dependency audit reports zero vulnerabilities. Docker Compose configuration
+validates. The Docker engine is unavailable, so container build/start and live
+PostgreSQL connectivity have not been verified. CI repeats the available checks.
+
+The lint setup uses ESLint 10 and TypeScript ESLint. The Next-specific shared lint
+preset was omitted because its transitive glob dependency has an unpatched high
+severity advisory. Next production compilation/type checks still run independently.
+
+S-02 targeted tests: 34 passed. Strict mypy passed for 11 source files.
+Both local HTTP services started: frontend returned 200 with Rantau branding;
+backend /health returned 200 with simulation=true; /ready correctly returned 503
+with unavailable dependency flags. This is process/startup evidence, not financial
+integration or PostgreSQL runtime evidence.

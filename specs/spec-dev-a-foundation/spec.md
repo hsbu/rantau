@@ -74,7 +74,7 @@ Generated OpenAPI/TypeScript outputs are reproducible local/build artifacts; com
 | Ticket | Title | Owner | Dependency | Status |
 |---|---|---|---|---|
 | S-01 | Contract freeze, samples and typed test mocks | A drafts; requester approves for B/C | Approved 2026-10-16 | Implemented; 31 focused checks pass |
-| S-02 | Reproducible application and CI skeleton | Dev A | Approved S-01 | Not started |
+| S-02 | Reproducible application and CI skeleton | Dev A | Approved S-01 | Implemented; local checks pass; Docker runtime unavailable |
 | A-01 | Six-intent graph and typed tools | Dev A | Approved S-01; S-02 supplies HTTP integration | Not started |
 
 ## Dependency Graph
