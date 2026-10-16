@@ -1,10 +1,10 @@
-# TuitionRelay / TraceBack — Implementation Roadmap & Tickets
+# Rantau — Implementation Roadmap & Tickets
 
 > **Version:** 1.0 — 16 October 2026  
 > **Deadline:** 20 October 2026, 23:59 Beijing time = **22:59 WIB**  
 > **Team:** 3 developers, full time until deadline  
-> **Source of truth:** `TuitionRelay-MVP-Spec.md` (product scope and detailed domain semantics).  
-> **Name:** TuitionRelay is provisional; TraceBack remains a working codename.  
+> **Source of truth:** `Rantau-MVP-Spec.md` (product scope and detailed domain semantics).  
+> **Name:** Rantau (confirmed by the team).  
 > **Geography:** Indonesia → mainland China primary simulation; Southeast Asia → China architecture extensible.  
 > **Non-negotiable:** All payments, university records, quotes, policies, and identities in the demo are **synthetic**. No claimed access to live bank or Chinese university APIs.
 
@@ -235,4 +235,4 @@ flowchart TD
 
 ---
 
-*Source basis:* The approved `TuitionRelay-MVP-Spec.md` (v1.0); excludes real remittance provider integrations and real Chinese university API access. Estimates and milestone dates are execution recommendations, not claims from external sources.
+*Source basis:* The approved `Rantau-MVP-Spec.md` (v1.0); excludes real remittance provider integrations and real Chinese university API access. Estimates and milestone dates are execution recommendations, not claims from external sources.

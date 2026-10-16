@@ -1,8 +1,8 @@
-# TuitionRelay — Fintechathon 2026 Topic C: MVP Specification
+# Rantau — Fintechathon 2026 Topic C: MVP Specification
 
 > **Status:** Product scope locked on 16 October 2026; implementation specification v1.0  
-> **Working codename:** TraceBack  
-> **Suggested product name:** TuitionRelay (final branding pending team choice)  
+> **Product name:** Rantau  
+> **Branding:** Rantau (confirmed by the team)  
 > **Audience:** Three full-time developers preparing for the 20 October 2026 submission  
 > **Primary corridor:** Indonesia → mainland China  
 > **Regional design:** Students from Southeast Asia studying in China  
@@ -25,7 +25,7 @@
 
 **Supporting capabilities:** versioned university payment-policy KB, transparent FX/fee calculator using *simulated quotes*, official-source procedural guidance, essential clarifications, language flexibility, and safe fallback.
 
-**Distinctive hypothesis:** Existing products frequently handle payment initiation/tracking, and some handle parent user permissions. TuitionRelay aims to close the **gap between provider-delivered funds and institution-confirmed student-account credit**, coordinating sponsor permissions and safe recovery. This is a product hypothesis, **not** an established claim that payment platforms cannot already solve these cases.
+**Distinctive hypothesis:** Existing products frequently handle payment initiation/tracking, and some handle parent user permissions. Rantau aims to close the **gap between provider-delivered funds and institution-confirmed student-account credit**, coordinating sponsor permissions and safe recovery. This is a product hypothesis, **not** an established claim that payment platforms cannot already solve these cases.
 
 **Evaluation intent (organizer rubric):** 40% scripted task completion; 30% security/compliance; 30% innovation/interaction. We aim to provide testable traces for all three, not just a polished assistant response.
 
@@ -536,9 +536,13 @@ expected_extra_debits: 0
 class AuthorizationPort(Protocol):
     async def evaluate(self, actor: ActorContext, action: ActionIntent) -> PolicyDecision: ...
 
+
 class PaymentPort(Protocol):
-    async def execute(self, intent_id: str, idempotency_key: str, actor: ActorContext) -> PaymentResult: ...
+    async def execute(
+        self, intent_id: str, idempotency_key: str, actor: ActorContext
+    ) -> PaymentResult: ...
     async def status(self, payment_id: str, actor: ActorContext) -> PaymentResult: ...
+
 
 class UniversityPort(Protocol):
     async def obligation(self, obligation_id: str, actor: ActorContext) -> TuitionState: ...

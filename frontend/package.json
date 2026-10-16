@@ -1,0 +1,20 @@
+{
+  "name": "rantau-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "generate:contracts": "openapi-typescript ../.generated/openapi.json -o lib/api-contracts/generated.d.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "build": "next build && node scripts/copy-static.mjs",
+    "start": "node .next/standalone/server.js"
+  },
+  "dependencies": {"next": "16.4.2", "react": "19.3.1", "react-dom": "19.3.1"},
+  "devDependencies": {
+    "typescript": "^5.9.0", "@types/node": "^22", "@types/react": "^19",
+    "@types/react-dom": "^19", "eslint": "^10.13.0", "@eslint/js": "^10.0.1",
+    "typescript-eslint": "^8.71.2",
+    "openapi-typescript": "7.13.0"
+  }
+}
