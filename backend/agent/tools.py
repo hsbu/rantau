@@ -4,16 +4,35 @@ import re
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from backend.contracts.enums import Intent, PaymentState, TuitionState
+from pydantic import ValidationError
+
+from backend.agent.explanations import comparable_quotes, explain_quotes, explain_tuition_record
+from backend.contracts.enums import Currency, Intent, PaymentState, TuitionState
 from backend.contracts.http import AgentResponse, ResourceReference, ToolEvent
-from backend.contracts.models import ActorContext, ScopeDenied, ServiceUnavailable
+from backend.contracts.models import ActorContext, Money, ScopeDenied, ServiceUnavailable
 from backend.contracts.ports import AgentReadPort
+from backend.kb.catalog import load_bundle
+from backend.kb.guidance import UNKNOWN_POLICY, explain_policy, known_policy
+from backend.kb.records import KnowledgeBundle
 
 
 class AgentTools:
-    def __init__(self, port: AgentReadPort, clock: Callable[[], datetime] | None = None) -> None:
+    def __init__(
+        self,
+        port: AgentReadPort,
+        clock: Callable[[], datetime] | None = None,
+        *,
+        kb_loader: Callable[[], KnowledgeBundle] = load_bundle,
+    ) -> None:
         self.port = port
         self.clock = clock or (lambda: datetime.now(UTC))
+        self.kb_loader = kb_loader
+
+    def knowledge(self) -> KnowledgeBundle | None:
+        try:
+            return self.kb_loader()
+        except (OSError, UnicodeError, ValidationError):
+            return None
 
     async def handle(self, intent: Intent, message: str, actor: ActorContext) -> AgentResponse:
         prefix = "Simulated Rantau guidance. "
@@ -21,19 +40,15 @@ class AgentTools:
         resources: tuple[ResourceReference, ...] = ()
         if intent == Intent.ASK_POLICY:
             policy = await self.port.policy(actor)
-            events = (ToolEvent(tool="get_university_payment_policy", status="OK"),)
-            if not policy.usable_at(self.clock()):
-                text = (
-                    "University policy is unknown or expired. Verify it before planning a payment."
-                )
-            else:
-                # Use only known structured values, never execute free-form KB text.
-                text = (
-                    f"The fictional policy {policy.version} has "
-                    f"{len(policy.required_references)} required reference fields. "
-                    f"Its synthetic posting window is {policy.posting_window_hours} hours. "
-                    "These are fictional demo rules, not official university terms."
-                )
+            bundle = self.knowledge()
+            now = self.clock()
+            events = (
+                ToolEvent(
+                    tool="get_university_payment_policy",
+                    status="OK" if known_policy(policy, bundle, now) else "PENDING",
+                ),
+            )
+            text = explain_policy(policy, bundle, now)
             resources = (ResourceReference(kind="policy", id=policy.id),)
         elif intent == Intent.TUITION:
             obligations = await self.port.obligations(actor)
@@ -42,13 +57,53 @@ class AgentTools:
                 text = "Select the tuition obligation you want to review."
             else:
                 obligation = obligations[0]
-                text = (
-                    f"Verified tuition balance: CNY {obligation.balance_minor // 100:,}."
-                    f"{obligation.balance_minor % 100:02d}. "
-                    "Next, review an eligible funding account, verified beneficiary and quote. "
-                    "No payment has been requested or executed."
-                )
+                if obligation.student_id != actor.actor_id:
+                    raise ScopeDenied("Resource unavailable")
+                balance = Money(currency=Currency.CNY, amount_minor=obligation.balance_minor)
+                text = explain_tuition_record(obligation) + " "
                 resources = (ResourceReference(kind="obligation", id=obligation.id),)
+                if obligation.balance_minor == 0:
+                    text += "No outstanding tuition balance; no payment is needed."
+                elif obligation.state != TuitionState.UNPAID:
+                    text += (
+                        "Review the existing payment and reconciliation evidence before "
+                        "planning another payment. Tuition completion remains unverified."
+                    )
+                else:
+                    policy = await self.port.policy(actor)
+                    bundle = self.knowledge()
+                    if (
+                        not known_policy(policy, bundle, self.clock())
+                        or policy.id != obligation.policy_id
+                        or policy.university_id != obligation.university_id
+                    ):
+                        events += (
+                            ToolEvent(tool="get_university_payment_policy", status="PENDING"),
+                        )
+                        text += UNKNOWN_POLICY
+                    else:
+                        quotes = await self.port.quotes(obligation.id, actor)
+                        now = self.clock()
+                        if not known_policy(policy, bundle, now):
+                            events += (
+                                ToolEvent(tool="get_university_payment_policy", status="PENDING"),
+                                ToolEvent(tool="get_fx_quotes", status="PENDING"),
+                            )
+                            text += UNKNOWN_POLICY
+                        else:
+                            events += (
+                                ToolEvent(tool="get_university_payment_policy", status="OK"),
+                                ToolEvent(
+                                    tool="get_fx_quotes",
+                                    status=(
+                                        "OK"
+                                        if comparable_quotes(quotes, balance, now)
+                                        else "PENDING"
+                                    ),
+                                ),
+                            )
+                            text += explain_quotes(quotes, balance, now)
+                text += " No payment has been requested or executed."
         elif intent == Intent.ALLOWANCE:
             permissions = await self.port.permissions(actor)
             events = (ToolEvent(tool="get_account_permissions", status="OK"),)

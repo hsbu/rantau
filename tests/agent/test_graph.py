@@ -61,9 +61,12 @@ async def test_ambiguity_or_api_failure_calls_no_tools(classifier):
 async def test_chat_cannot_grant_authority_even_with_adversarial_classification(attack):
     port = FakeReadPort()
     before = ACTOR.model_dump()
-    await AgentGraph(FixedClassifier(Intent.TUITION), AgentTools(port)).run(attack, ACTOR)
+    result = await AgentGraph(
+        FixedClassifier(Intent.TUITION), AgentTools(port, clock=lambda: NOW)
+    ).run(attack, ACTOR)
     assert ACTOR.model_dump() == before
-    assert port.calls == ["obligations"]
+    assert set(port.calls) <= {"obligations", "policy", "obligation", "quotes"}
+    assert "No payment has been requested or executed" in result.message
 
 
 async def test_provider_unknown_never_queries_posting_or_retries():
