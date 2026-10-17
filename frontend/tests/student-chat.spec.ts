@@ -1,5 +1,90 @@
 import { test, expect } from "@playwright/test";
 
+test("dark mode follows the system and retains a manual choice across views and reloads", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/student/chat");
+  const toggle = page.getByRole("button", { name: "Dark mode", exact: true });
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await page.getByRole("navigation", { name: "Chat views" }).getByRole("link", { name: "Scenarios", exact: true }).click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await page.reload();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await toggle.click();
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await page.reload();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+});
+
+test("theme control still works when browser preference storage is blocked", async ({ page }) => {
+  await page.addInitScript(() => {
+    Storage.prototype.getItem = () => { throw new Error("Storage blocked in test"); };
+    Storage.prototype.setItem = () => { throw new Error("Storage blocked in test"); };
+  });
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.goto("/student/chat");
+  const toggle = page.getByRole("button", { name: "Dark mode", exact: true });
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+});
+
+test("page scroll chains past the transcript and new replies do not pull readers away from history", async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 720 });
+  let release: (() => void) | undefined;
+  let calls = 0;
+  await page.route("**/student/chat/api", async route => {
+    if (++calls === 4) await new Promise<void>(resolve => { release = resolve; });
+    await route.fulfill({ json: {
+      run_id: "run_scroll", requested_action: "TUITION", tool_events: [], resources: [],
+      message: Array.from({ length: 22 }, (_, index) => `Payment detail line ${index + 1}: review the original terms.`).join("\n"),
+    } });
+  });
+  await page.goto("/student/chat");
+  const log = page.getByRole("log");
+  // Loading the workspace must not scroll the document down to its composer.
+  await expect(page.getByRole("heading", { name: "One step at a time." })).toBeVisible();
+  expect(await page.evaluate(() => scrollY)).toBe(0);
+  for (let turn = 0; turn < 3; turn++) {
+    await page.getByLabel("Message Rantau").fill(`Check ${turn}`);
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect(page.getByLabel("Message Rantau")).toBeEnabled();
+  }
+  await page.getByLabel("Message Rantau").fill("Another check");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect.poll(() => calls).toBe(4);
+  await log.hover();
+  await page.mouse.wheel(0, -10000);
+  await expect.poll(() => log.evaluate(element => element.scrollTop)).toBe(0);
+  await expect(page.getByRole("button", { name: "Latest messages" })).toBeVisible();
+  release?.();
+  await expect(page.getByLabel("Message Rantau")).toBeEnabled();
+  expect(await log.evaluate(element => element.scrollTop)).toBe(0);
+  await page.getByRole("button", { name: "Latest messages" }).click();
+  await expect.poll(() => log.evaluate(element => element.scrollHeight - element.scrollTop - element.clientHeight)).toBeLessThan(2);
+  await page.evaluate(() => scrollTo(0, 0));
+  await log.hover();
+  await page.mouse.wheel(0, 1500);
+  // A native wheel gesture can first consume fractional space at the inner edge.
+  await expect.poll(async () => {
+    await page.mouse.wheel(0, 500);
+    return page.evaluate(() => scrollY);
+  }).toBeGreaterThan(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => scrollTo(0, 0));
+  await log.evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await log.hover();
+  await page.mouse.wheel(0, 1500);
+  await expect.poll(async () => {
+    await page.mouse.wheel(0, 500);
+    return page.evaluate(() => scrollY);
+  }).toBeGreaterThan(0);
+});
+
 test("Chat and Scenarios tabs switch views without sharing fixture state", async ({ page }) => {
   await page.goto("/student/chat/preview");
   const tabs = page.getByRole("navigation", { name: "Chat views" });
