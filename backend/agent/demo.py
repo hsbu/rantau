@@ -10,6 +10,7 @@ from backend.agent.openrouter_classifier import OpenRouterIntentClassifier
 from backend.agent.tools import AgentTools
 from backend.config import Settings
 from backend.contracts.enums import Intent
+from backend.kb.research import OfficialSourceLookup, explain_research
 
 
 class DemoClassifier:
@@ -49,7 +50,7 @@ async def demo() -> None:
         )
 
 
-async def live_demo(messages: list[str]) -> None:
+async def live_demo(messages: list[str], *, web_guidance: bool = False) -> None:
     """Explicit local harness: live interpretation, synthetic reads, no financial execution."""
     from tests.fixtures.data import ACTOR, NOW
     from tests.fixtures.fakes import FakeReadPort
@@ -66,6 +67,7 @@ async def live_demo(messages: list[str]) -> None:
             FakeReadPort(),
             clock=lambda: NOW,
             beneficiary_map={"uni_cn_01": "benef_uni_cn_01"},
+            research=OfficialSourceLookup() if web_guidance else None,
         ),
     )
     print(
@@ -101,13 +103,29 @@ def main() -> None:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--fake-classifier", action="store_true")
     mode.add_argument("--openrouter", action="store_true")
+    mode.add_argument(
+        "--research-shortfall",
+        action="store_true",
+        help="Read curated official sources without a model or private financial data",
+    )
+    parser.add_argument(
+        "--web-guidance", action="store_true", help="Enable official-source reads in live demo"
+    )
     parser.add_argument(
         "--message", action="append", default=[], help="Repeat for multi-turn input"
     )
     args = parser.parse_args()
     if args.message and not args.openrouter:
         parser.error("--message requires --openrouter")
-    asyncio.run(live_demo(args.message) if args.openrouter else demo())
+    if args.web_guidance and not args.openrouter:
+        parser.error("--web-guidance requires --openrouter")
+    if args.research_shortfall:
+        result = asyncio.run(OfficialSourceLookup().lookup())
+        print(explain_research(result))
+    else:
+        asyncio.run(
+            live_demo(args.message, web_guidance=args.web_guidance) if args.openrouter else demo()
+        )
 
 
 if __name__ == "__main__":

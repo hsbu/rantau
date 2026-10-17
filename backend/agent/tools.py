@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 from pydantic import ValidationError
 
+from backend.agent.explanations import explain_tuition_record
 from backend.agent.state import TuitionDraft, TuitionInput
 from backend.agent.tuition import TuitionPlanner
 from backend.contracts.enums import Intent, PaymentState, TuitionState
@@ -15,6 +16,7 @@ from backend.contracts.ports import AgentReadPort
 from backend.kb.catalog import load_bundle
 from backend.kb.guidance import explain_policy, known_policy
 from backend.kb.records import KnowledgeBundle
+from backend.kb.research import OfficialSourceLookup, explain_research
 
 
 class AgentTools:
@@ -25,10 +27,12 @@ class AgentTools:
         *,
         kb_loader: Callable[[], KnowledgeBundle] = load_bundle,
         beneficiary_map: Mapping[str, str] | None = None,
+        research: OfficialSourceLookup | None = None,
     ) -> None:
         self.port = port
         self.clock = clock or (lambda: datetime.now(UTC))
         self.kb_loader = kb_loader
+        self.research = research
         self.tuition = TuitionPlanner(port, self.clock, self.knowledge, beneficiary_map)
 
     async def plan_tuition(
@@ -53,6 +57,15 @@ class AgentTools:
         except (OSError, UnicodeError, ValidationError):
             return None
 
+    async def shortfall_guidance(self, university_id: str) -> tuple[str, ToolEvent]:
+        # Only this fictional demo has a curated procedural-inspiration collection.
+        # Never infer a real institution or accept source URLs from user/model input.
+        enabled = self.research is not None and university_id == "uni_cn_01"
+        result = await self.research.lookup() if enabled and self.research else None
+        return explain_research(result), ToolEvent(
+            tool="lookup_shortfall_sources", status="PENDING" if enabled else "UNAVAILABLE"
+        )
+
     async def handle(self, intent: Intent, message: str, actor: ActorContext) -> AgentResponse:
         prefix = "Simulated Rantau guidance. "
         events: tuple[ToolEvent, ...] = ()
@@ -68,6 +81,13 @@ class AgentTools:
                 ),
             )
             text = explain_policy(policy, bundle, now)
+            if bundle is None or not any(
+                claim.key == "topup_allowed" and claim.support == "EXPLICIT"
+                for claim in bundle.reference.claims
+            ):
+                guidance, event = await self.shortfall_guidance(policy.university_id)
+                text += "\n" + guidance
+                events += (event,)
             resources = (ResourceReference(kind="policy", id=policy.id),)
         elif intent == Intent.TUITION:
             response, _ = await self.plan_tuition(TuitionInput(), TuitionDraft(), actor)
@@ -109,6 +129,7 @@ class AgentTools:
                     )
                 else:
                     obligations = await self.port.obligations(actor)
+                    events += (ToolEvent(tool="get_tuition_obligation", status="OK"),)
                     # Do not guess the payment's obligation from a student's unrelated records.
                     text = (
                         "Provider state: DELIVERED. "
@@ -123,7 +144,13 @@ class AgentTools:
                                 " Do not make a duplicate payment; "
                                 "review posting or reconciliation evidence."
                             )
-                    events += (ToolEvent(tool="get_tuition_obligation", status="OK"),)
+                            if intent == Intent.RECOVER:
+                                text += "\n" + explain_tuition_record(obligation)
+                                guidance, event = await self.shortfall_guidance(
+                                    obligation.university_id
+                                )
+                                text += "\n" + guidance
+                                events += (event,)
         else:
             assessment = await self.port.assess_message(message, actor)
             events = (ToolEvent(tool="assess_fraud_risk", status="OK"),)
