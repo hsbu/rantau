@@ -1,5 +1,28 @@
 import { test, expect } from "@playwright/test";
 
+test("Chat and Scenarios tabs switch views without sharing fixture state", async ({ page }) => {
+  await page.goto("/student/chat/preview");
+  const tabs = page.getByRole("navigation", { name: "Chat views" });
+  await expect(tabs.getByRole("link", { name: "Scenarios Scripted previews" })).toHaveAttribute("aria-current", "page");
+  await page.getByRole("button", { name: /Help me pay my tuition/ }).click();
+  await expect(page.getByRole("region", { name: "Tuition balance" })).toBeVisible();
+  await tabs.getByRole("link", { name: "Chat Connected agent" }).click();
+  await expect(page).toHaveURL("/student/chat");
+  await expect(tabs.getByRole("link", { name: "Chat Connected agent" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByLabel("Sample scenario")).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Tuition balance" })).toHaveCount(0);
+  await expect(page.getByRole("log")).not.toContainText("remaining tuition is");
+  await tabs.getByRole("link", { name: "Scenarios Scripted previews" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL("/student/chat/preview");
+  await expect(page.getByLabel("Sample scenario")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "One step at a time." })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(tabs.getByRole("link", { name: "Chat Connected agent" })).toBeVisible();
+  await expect(tabs.getByRole("link", { name: "Scenarios Scripted previews" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test("tuition clarification, exact quote and waiting do not execute or expose account IDs", async ({ page }) => {
   const apiCalls: string[] = [];
   page.on("request", request => { if (request.url().includes("/api/")) apiCalls.push(request.url()); });

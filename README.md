@@ -35,6 +35,12 @@ connected. B/C services remain separate roadmap tickets.
 
 ## Student chat
 
+Use the **Chat** and **Scenarios** navigation tabs to switch between the connected
+agent workspace and scripted examples. The active tab stays highlighted; changing
+views clears the visible conversation so fixture state never carries into Chat.
+This is the first working interface, with further layout refinement expected
+after integrated agent testing.
+
 Open `http://127.0.0.1:3000/student/chat/preview` to explore the isolated fixture
 preview. Select a scenario, then use the suggested messages or type a message to
 advance its scripted steps. It demonstrates clarification, an exact quote,

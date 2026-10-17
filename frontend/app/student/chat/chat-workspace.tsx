@@ -76,9 +76,17 @@ export function ChatWorkspace({ transport = connectedTransport, preview = false,
       <Link href="/" className={styles.wordmark}>rantau<span aria-hidden="true">↗</span></Link>
       <div className={styles.navRight}><span className={styles.navSection}>Student / Chat</span><span className={styles.simulation}>Simulation</span></div>
     </nav>
+    <nav className={styles.viewTabs} aria-label="Chat views">
+      <Link href="/student/chat" className={styles.viewTab} aria-current={!preview ? "page" : undefined}>
+        Chat <span>Connected agent</span>
+      </Link>
+      <Link href="/student/chat/preview" className={styles.viewTab} aria-current={preview ? "page" : undefined}>
+        Scenarios <span>Scripted previews</span>
+      </Link>
+    </nav>
     <div className={styles.safetyBanner}>{preview
-      ? <>Fixture preview · Scripted responses, no model calls, authentication or payment actions. <Link href="/student/chat">Open connected chat ↗</Link></>
-      : <>All payments, quotes and university records are simulated. <Link href="/student/chat/preview">Explore sample conversation ↗</Link></>}
+      ? <>Scenario preview · Scripted responses, no model calls, authentication or payment actions.</>
+      : <>Chat connects to the agent through your server session. All payments, quotes and university records are simulated.</>}
     </div>
     {children}
     <main className={styles.main}>
