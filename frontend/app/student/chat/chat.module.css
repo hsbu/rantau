@@ -94,7 +94,12 @@
 .trustNote p { font-size: 11px; line-height: 1.8; color: var(--muted); margin: 0; }
 .footer { display: flex; justify-content: space-between; gap: 20px; padding: 22px 48px; max-width: 1440px; margin: auto; border-top: 1px solid var(--line); font-size: 10px; color: var(--muted); }
 .previewControls { display: flex; gap: 14px; align-items: center; padding: 14px 48px; max-width: 1280px; margin: auto; border-bottom: 1px solid var(--line); font-size: 12px; }
-.previewControls select { padding: 9px; border: 1px solid var(--control-border); border-radius: 5px; color: var(--ink); background: var(--surface); max-width: 100%; min-width: 0; }
+.scenarioSelect { position: relative; width: 330px; max-width: 100%; min-width: 0; }
+.previewControls select { appearance: none; display: block; width: 100%; min-height: 44px; padding: 11px 44px 11px 14px; border: 1px solid #dde0da; border-radius: 10px; color: var(--ink); background: #f4f6ef; min-width: 0; cursor: pointer; line-height: 1.5; text-overflow: ellipsis; }
+.previewControls select:hover { border-color: #b8bdb4; background: #f0f3e9; }
+.workspace .previewControls select:focus-visible { outline: 2px solid #8a8a8a; outline-offset: 2px; }
+.selectChevron { position: absolute; right: 17px; top: 50%; width: 7px; height: 7px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: translateY(-70%) rotate(45deg); pointer-events: none; }
+.previewControls option { color: var(--ink); background: var(--surface); }
 .previewControls button { margin-left: auto; border: 0; color: var(--ink); background: transparent; padding: 10px; white-space: nowrap; font-size: 11px; }
 .loading { font-size: 12px; color: var(--muted); }
 .error { background: var(--warm-bg); border-left: 3px solid var(--warm-border); padding: 14px 18px; margin: 12px 0; font-size: 12px; line-height: 1.8; }
@@ -117,6 +122,6 @@
   .summaryGlyph { display: none; } .summary .balance { margin-top: 22px; }
   .footer { padding: 22px 20px; font-size: 9px; } .footer > span:last-child { text-align: right; }
   .previewControls { padding: 12px 20px; gap: 9px; flex-wrap: wrap; } .previewControls label { width: 100%; }
-  .previewControls select { flex: 1; font-size: 11px; } .previewControls button { padding: 8px 0; font-size: 10px; }
+  .scenarioSelect { flex: 1; width: auto; } .previewControls select { font-size: 12px; } .previewControls button { padding: 8px 0; font-size: 10px; }
 }
 @media (prefers-reduced-motion: no-preference) { .starters button, .newChat, .composerBottom button { transition: background-color 120ms ease; } }
