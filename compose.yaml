@@ -21,8 +21,8 @@ services:
     environment:
       APP_ENV: development
       DATABASE_URL: postgresql://rantau_demo:local_demo_only@db:5432/rantau_demo
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -32,6 +32,8 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+    environment:
+      AGENT_API_ORIGIN: http://backend:8000
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:

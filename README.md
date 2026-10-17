@@ -31,7 +31,43 @@ starts PostgreSQL, backend and frontend. Container services use service DNS.
 authentication/domain services are integrated; a responding process is not a
 complete financial application. Agent endpoints reject unwired authentication.
 No identity is accepted from headers/chat text, and no fake financial gate is
-connected. B/C services and the student chat page remain separate roadmap tickets.
+connected. B/C services remain separate roadmap tickets.
+
+## Student chat
+
+Open `http://127.0.0.1:3000/student/chat/preview` to explore the isolated fixture
+preview. Select a scenario, then use the suggested messages or type a message to
+advance its scripted steps. It demonstrates clarification, an exact quote,
+sponsor waiting, provider delivery versus university posting, missing-reference
+evidence, shortfall escalation, uncertain outcomes and expired quotes. It makes
+no model or backend calls and cannot authenticate, request real approval or move
+money. The November 2026 fixture clock is displayed beside the sample details.
+New chat resets the conversation; changing the scenario clears its state.
+
+`/student/chat` is the connected workspace. For local development, create an
+ignored `frontend/.env.local` containing only:
+
+```dotenv
+AGENT_API_ORIGIN=http://127.0.0.1:8000
+```
+
+Restart Next.js after changing this server-only setting. Compose supplies
+`http://backend:8000` instead. The relay accepts only message/conversation fields,
+forwards the browser's session cookie to the fixed agent endpoint, rejects
+foreign origins, disables caching and never forwards claimed actor/role headers
+or browser bearer tokens. It does not create a session; Dev B must supply the
+verified authentication flow. Missing trusted adapters/configuration produce a
+visible unavailable state, with no fallback to mocks. No API keys enter browser
+code. Session expiry clears the visible conversation.
+
+The current agent HTTP contract supplies assistant text, tool events and resource
+references. The connected page renders text safely and keeps structured details
+empty until an agreed trusted adapter supplies them; it does not parse monetary
+amounts or approval states out of prose. Rich financial panels currently use
+generated contract types in the isolated preview. A-04/B/C must connect persisted
+intents, approval continuation and scoped financial details. There are no payment
+or approval execution buttons in this A-06 slice. Browser messages live only in
+component memory and clear on reload/new chat; server draft-memory limits still apply.
 
 ## Checks and isolated demo
 
@@ -47,9 +83,15 @@ npm run generate:contracts
 npm run typecheck
 npm run lint
 npm run build
+npm exec -- playwright install chromium
+npm run test:e2e
 Pop-Location
 docker compose config --quiet
 ```
+
+Browser checks start a production frontend on port 3100 and an isolated transport
+test double on port 8101. Both ports must be free; they do not use the real backend
+or model. Test artifacts stay in ignored `.generated/`.
 
 The offline demo forces six classifications and uses isolated synthetic adapters;
 it demonstrates graph routing, not live model quality or real payments. The OpenRouter
