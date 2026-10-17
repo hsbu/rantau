@@ -72,18 +72,13 @@ export function ChatWorkspace({ transport = connectedTransport, preview = false,
 
   const promptIndex = Math.min(messages.filter(message => message.role === "user").length, prompts.length - 1);
   return <div className={styles.workspace}>
-    <nav className={styles.nav} aria-label="Main navigation">
+    <header className={styles.nav}>
       <Link href="/" className={styles.wordmark}>rantau<span aria-hidden="true">↗</span></Link>
-      <div className={styles.navRight}><span className={styles.navSection}>Student / Chat</span><span className={styles.simulation}>Simulation</span></div>
-    </nav>
-    <nav className={styles.viewTabs} aria-label="Chat views">
-      <Link href="/student/chat" className={styles.viewTab} aria-current={!preview ? "page" : undefined}>
-        Chat <span>Connected agent</span>
-      </Link>
-      <Link href="/student/chat/preview" className={styles.viewTab} aria-current={preview ? "page" : undefined}>
-        Scenarios <span>Scripted previews</span>
-      </Link>
-    </nav>
+      <nav className={styles.viewTabs} aria-label="Chat views">
+        <Link href="/student/chat" className={styles.viewTab} aria-current={!preview ? "page" : undefined}>Chat</Link>
+        <Link href="/student/chat/preview" className={styles.viewTab} aria-current={preview ? "page" : undefined}>Scenarios</Link>
+      </nav>
+    </header>
     <div className={styles.safetyBanner}>{preview
       ? <>Scenario preview · Scripted responses, no model calls, authentication or payment actions.</>
       : <>Chat connects to the agent through your server session. All payments, quotes and university records are simulated.</>}
