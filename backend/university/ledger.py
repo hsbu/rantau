@@ -1,8 +1,10 @@
 """University ledger: internal, idempotent postings (never reachable from the agent)."""
 
 from datetime import datetime
+from uuid import uuid4
 
 from backend.authz.policy_repository import PolicyConnection
+from backend.finance.audit import AuditEvent, AuditWriter
 from backend.finance.records import Row
 from backend.finance.simclock import sim_now
 
@@ -81,5 +83,38 @@ def settle_due(
             (tenant_id, obligation["alias"], now),
         ).fetchall()
         for receipt in receipts:
-            posted += post_receipt(connection, tenant_id, receipt, "PAYMENT", now)
+            try:
+                posted += post_receipt(connection, tenant_id, receipt, "PAYMENT", now)
+            except OverpaymentError:
+                _escalate_overpayment(connection, tenant_id, receipt)
     return posted
+
+
+def _escalate_overpayment(connection: PolicyConnection, tenant_id: str, receipt: Row) -> None:
+    """Never post beyond the amount due; hand the receipt to a human-reviewed escalated case."""
+    existing = connection.execute(
+        "SELECT 1 FROM reconciliation_cases WHERE tenant_id = %s AND transfer_alias = %s "
+        "AND state = 'ESCALATED'",
+        (tenant_id, receipt["transfer_alias"]),
+    ).fetchone()
+    if existing is not None:
+        return
+    alias = f"case_{uuid4().hex[:12]}"
+    connection.execute(
+        "INSERT INTO reconciliation_cases (tenant_id, alias, transfer_alias, obligation_alias, "
+        "state, submitted_by, reviewer_decision, reviewer_reason) "
+        "VALUES (%s, %s, %s, %s, 'ESCALATED', 'university_system', 'ESCALATE', 'OVERPAYMENT')",
+        (tenant_id, alias, receipt["transfer_alias"], receipt["obligation_alias"]),
+    )
+    AuditWriter().record(
+        connection,
+        AuditEvent(
+            tenant_id=tenant_id,
+            action="RECONCILIATION_ESCALATED",
+            resource_type="reconciliation_case",
+            resource_id=alias,
+            decision="ESCALATE",
+            reason_code="OVERPAYMENT",
+            after_state={"state": "ESCALATED"},
+        ),
+    )

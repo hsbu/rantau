@@ -42,6 +42,7 @@ async def ready() -> JSONResponse:
     dependencies = {
         "database": await database_available(settings),
         "authentication": await run_in_threadpool(authentication_ready, settings),
+        "finance_storage": await run_in_threadpool(finance_storage_available, settings),
         "domain_services": False,
         "classifier_configuration": settings.classifier_configured,
     }
@@ -53,6 +54,15 @@ async def ready() -> JSONResponse:
             "dependencies": dependencies,
         },
     )
+
+
+def finance_storage_available(settings: Settings) -> bool:
+    from backend.authz.storage import Database
+    from backend.finance.wiring import finance_storage_ready
+
+    if not settings.database_url:
+        return False
+    return finance_storage_ready(Database(settings.database_url.get_secret_value()))
 
 
 def authentication_ready(settings: Settings) -> bool:

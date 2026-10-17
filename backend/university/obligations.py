@@ -22,6 +22,7 @@ class ObligationSnapshot:
     active_case_id: str | None
     latest_transfer_id: str | None
     latest_transfer_state: PaymentState | None
+    reconciliation_resolved: bool = False
 
 
 def derive_obligation_state(
@@ -74,6 +75,11 @@ def read_obligation(
         "AND obligation_alias = %s ORDER BY created_at DESC LIMIT 1",
         (tenant_id, alias),
     ).fetchone()
+    resolved = connection.execute(
+        "SELECT 1 FROM reconciliation_cases WHERE tenant_id = %s "
+        "AND obligation_alias = %s AND state = 'RESOLVED' LIMIT 1",
+        (tenant_id, alias),
+    ).fetchone()
     state = derive_obligation_state(
         row["amount_due_minor"],
         posted,
@@ -102,6 +108,7 @@ def read_obligation(
         active_case_id=case["alias"] if case else None,
         latest_transfer_id=transfer["alias"] if transfer else None,
         latest_transfer_state=PaymentState(transfer["state"]) if transfer else None,
+        reconciliation_resolved=resolved is not None,
     )
 
 

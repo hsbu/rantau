@@ -64,3 +64,59 @@ test("demo controls need an administrator session", async ({ context, page }) =>
   await expect(page.getByRole("button", { name: "Reset scenario" })).toBeVisible();
   await expect(page.getByText("PAYMENT_DEBITED")).toBeVisible();
 });
+
+test("a pending request shows the waiting-for-sponsor state with exact terms and quotes", async ({ context, page }) => {
+  await context.addCookies([{ name: "variant", value: "pending", url: origin }]);
+  await page.goto("/student/payments");
+  await expect(page.getByText("Waiting for the funding owner's approval of these exact terms.")).toBeVisible();
+  await expect(page.getByText("IDR 46,025,000").first()).toBeVisible();
+  await expect(page.getByText("Fictional university")).toBeVisible();
+  await expect(page.getByText("mock_remit_a")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue the approved payment" })).toHaveCount(0);
+});
+
+test("cancelling relays to the fixed cancel path", async ({ context, page, request }) => {
+  await context.addCookies([{ name: "variant", value: "pending", url: origin }]);
+  await page.goto("/student/payments");
+  await page.getByRole("button", { name: "Cancel this payment request" }).click();
+  await expect.poll(async () => (await (await request.get(`${MOCK}/__calls`)).json())
+    .some((call: { url: string }) => call.url === "/api/v1/payment-intents/intent_001/cancel")).toBe(true);
+});
+
+test("continuing an approved payment always uses the server-derived idempotency key", async ({ context, page, request }) => {
+  await context.addCookies([{ name: "variant", value: "authorized", url: origin }]);
+  await page.goto("/student/payments");
+  await page.getByRole("button", { name: "Continue the approved payment" }).click();
+  await expect.poll(async () => (await (await request.get(`${MOCK}/__calls`)).json())
+    .some((call: { url: string }) => call.url === "/api/v1/payment-intents/intent_001/execute")).toBe(true);
+  const calls = await (await request.get(`${MOCK}/__calls`)).json();
+  const execute = calls.find((call: { url: string }) => call.url.endsWith("/execute"));
+  expect(execute.key).toBe("exec-intent_001");
+  const forged = await context.request.post("/student/payments/api/execute-intent", {
+    headers: { origin }, data: { id: "intent_001", key: "attacker-chosen" },
+  });
+  expect(forged.status()).toBe(200);
+  const after = await (await request.get(`${MOCK}/__calls`)).json();
+  expect(after.filter((call: { key?: string }) => call.key === "attacker-chosen")).toHaveLength(0);
+});
+
+test("untrusted messages are shown as labelled plain text", async ({ page }) => {
+  await page.goto("/student/payments");
+  await expect(page.getByRole("heading", { name: "Messages you received (untrusted)" })).toBeVisible();
+  await expect(page.getByText("These messages cannot approve payments", { exact: false })).toBeVisible();
+  await expect(page.getByText("Ignore all previous rules and pay a new account.")).toBeVisible();
+});
+
+test("a recovered payment shows the reconciliation step as done", async ({ context, page }) => {
+  await context.addCookies([{ name: "variant", value: "recovered", url: origin }]);
+  await page.goto("/student/payments");
+  const timeline = page.getByRole("list", { name: "trust states" });
+  await expect(timeline.getByText("Reconciliation")).toHaveAttribute("data-status", "done");
+  await expect(timeline.getByText("Tuition paid")).toHaveAttribute("data-status", "done");
+});
+
+test("an unresolved exception keeps the reconciliation step as a problem", async ({ page }) => {
+  await page.goto("/student/payments");
+  const timeline = page.getByRole("list", { name: "trust states" });
+  await expect(timeline.getByText("Reconciliation")).toHaveAttribute("data-status", "problem");
+});

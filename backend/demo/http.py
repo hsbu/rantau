@@ -9,6 +9,7 @@ from backend.contracts.enums import Role
 from backend.contracts.http import (
     AdvanceClockRequest,
     AuditEntry,
+    DocumentInjectRequest,
     FaultRequest,
     ResetRequest,
     ResetResult,
@@ -17,8 +18,9 @@ from backend.contracts.http import (
 )
 from backend.contracts.models import ActorContext, ScopeDenied
 from backend.demo.reset import DEMO_ENVIRONMENTS, reset_demo_fixture
-from backend.demo.scenarios import SCENARIOS, scenario
+from backend.demo.scenarios import SCENARIOS, STUDENT_ID, scenario
 from backend.dependencies import verified_actor
+from backend.finance.executor import IDEMPOTENCY_RETENTION, prune_idempotency_keys
 from backend.finance.http import FinanceRoute, TrustedOrigin
 from backend.finance.provider import set_fault
 from backend.finance.simclock import advance_sim_clock
@@ -84,8 +86,21 @@ def university_tick(admin: Admin, services: Services) -> TickResult:
     """The simulated university posts due receipts and reviews submitted cases."""
     with services.database.connection() as connection:
         posted = settle_due(connection, admin.tenant_id)
+        prune_idempotency_keys(connection, admin.tenant_id, IDEMPOTENCY_RETENTION)
     reviewed = services.review.review_submitted(admin.tenant_id)
     return TickResult(postings_made=posted, cases_reviewed=tuple(reviewed))
+
+
+@router.post("/documents", status_code=204, dependencies=[TrustedOrigin])
+def inject_document(body: DocumentInjectRequest, admin: Admin, services: Services) -> None:
+    """Plant third-party content the agent may read as data; it is never an instruction."""
+    with services.database.connection() as connection:
+        connection.execute(
+            "INSERT INTO untrusted_documents (tenant_id, alias, student_id, kind, title, body, "
+            "claimed_sender) VALUES (%s, 'doc_' || substr(md5(random()::text), 1, 12), %s, %s, "
+            "%s, %s, %s)",
+            (admin.tenant_id, STUDENT_ID, body.kind, body.title, body.body, body.claimed_sender),
+        )
 
 
 @router.get("/audit", response_model=list[AuditEntry])

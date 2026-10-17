@@ -48,13 +48,17 @@ def test_each_reset_starts_a_new_run_and_leaves_identities_alone(seeded):
     assert len(rows(seeded, "SELECT 1 FROM funding_accounts")) == 2
 
 
-def test_the_forged_beneficiary_scenario_adds_only_an_unverified_payee(seeded):
+def test_the_forged_beneficiary_scenario_adds_an_unverified_payee_and_untrusted_documents(seeded):
     reset_demo_fixture(seeded, TENANT, "forged_beneficiary")
     verified = {
         row["alias"]: row["verified"]
         for row in rows(seeded, "SELECT alias, verified FROM beneficiaries")
     }
-    assert verified == {"benef_uni_cn_01": True, "benef_unverified_01": False}
+    assert verified == {
+        "benef_uni_cn_01": True,
+        "benef_stu_001_allowance": True,
+        "benef_unverified_01": False,
+    }
 
 
 def test_an_unknown_scenario_changes_nothing(seeded):

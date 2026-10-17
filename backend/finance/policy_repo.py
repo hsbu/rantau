@@ -43,22 +43,29 @@ class FinancePolicyRepository:
         if not may_view(actor.actor_id, locked.intent):
             raise ScopeDenied("Resource unavailable")
         intent = intent_from_row(locked.intent)
-        if intent.purpose != "TUITION" or locked.obligation is None:
-            raise ServiceUnavailable("Only tuition payments are supported")
+        if (intent.purpose == "TUITION") != (locked.obligation is not None):
+            raise ServiceUnavailable("Intent purpose and obligation disagree")
         now = db_now(connection)
         account = self._account(connection, tenant, locked.account)
         hold = self.authority.hold(connection, intent)
         beneficiary_row = _required(fetch(connection, "beneficiary", tenant, intent.beneficiary_id))
         quote_row = _required(fetch(connection, "quote", tenant, intent.quote_id))
-        obligation = self._obligation(connection, tenant, locked.obligation)
-        local_today = now.astimezone(ZoneInfo(account.timezone)).date()
+        obligation = (
+            self._obligation(connection, tenant, locked.obligation)
+            if locked.obligation is not None
+            else None
+        )
+        # Read last: the gate compares these markers with its own, later clock reading.
+        local_today = db_now(connection).astimezone(ZoneInfo(account.timezone)).date()
         return PaymentSnapshot(
             tenant_id=tenant,
             intent=intent,
             account=account,
             authorized_requesters=frozenset({intent.requested_by, intent.funding_owner_id}),
             beneficiary=_beneficiary(beneficiary_row),
-            recipient_owner_id=obligation.university_id,
+            recipient_owner_id=obligation.university_id
+            if obligation
+            else beneficiary_row["owner_id"],
             quote=quote_from_row(quote_row),
             rules=self._rules(connection, tenant, intent.policy_version),
             spending=self._spending(connection, tenant, account, now),
@@ -67,7 +74,9 @@ class FinancePolicyRepository:
             held=hold.held,
             risk_floor=hold.risk_floor,
             obligation=obligation,
-            university_policy=self._university_policy(connection, tenant, obligation),
+            university_policy=(
+                self._university_policy(connection, tenant, obligation) if obligation else None
+            ),
             spending_day=local_today,
             spending_month=local_today.replace(day=1),
         )

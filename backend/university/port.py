@@ -7,7 +7,7 @@ from backend.authz.policy_repository import PolicyConnection
 from backend.authz.service import AuthService
 from backend.authz.storage import Database
 from backend.contracts.auth import SharedField
-from backend.contracts.enums import PaymentState, TuitionState
+from backend.contracts.enums import PaymentState, Role, TuitionState
 from backend.contracts.models import (
     ActorContext,
     ProviderStatusRef,
@@ -37,6 +37,8 @@ class ObligationReader:
         self.transfers = transfers
 
     def list(self, actor: ActorContext) -> tuple[TuitionObligationDetail, ...]:
+        if actor.role != Role.STUDENT:
+            return ()
         with self.database.connection() as connection:
             rows = connection.execute(
                 "SELECT * FROM tuition_obligations WHERE tenant_id = %s AND student_id = %s "
@@ -112,6 +114,7 @@ class ObligationReader:
             active_case_id=snapshot.active_case_id,
             shortfall_minor=shortfall,
             topup_permitted=topup,
+            reconciliation_resolved=snapshot.reconciliation_resolved,
         )
 
 
