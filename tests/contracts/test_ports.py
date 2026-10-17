@@ -46,9 +46,25 @@ def test_export_has_full_catalogue_and_no_actor_request():
     from backend.contracts.schema import contract_schema
 
     schema = contract_schema()
-    assert len(schema["paths"]) == 21
+    assert len(schema["paths"]) == 25
     execution = schema["paths"]["/api/v1/payment-intents/{id}/execute"]["post"]
     assert any(p["name"] == "Idempotency-Key" for p in execution["parameters"])
     request = schema["components"]["schemas"]["AgentMessage"]
     assert "actor_id" not in request["properties"]
     assert request["additionalProperties"] is False
+
+
+def test_auth_contracts_are_additive_and_preserve_both_consent_methods():
+    from backend.contracts.schema import contract_schema
+
+    schema = contract_schema()
+    login = schema["paths"]["/api/v1/auth/login"]["post"]
+    assert login["security"] == []
+    assert login["requestBody"]["content"]["application/json"]["schema"]["$ref"].endswith(
+        "/LoginRequest"
+    )
+    assert set(schema["paths"]["/api/v1/student/sharing-consents/{sponsor_id}"]) == {
+        "put",
+        "delete",
+    }
+    assert "content" not in schema["paths"]["/api/v1/auth/logout"]["post"]["responses"]["204"]

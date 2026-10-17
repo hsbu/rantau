@@ -22,16 +22,16 @@ npm run dev
 Pop-Location
 ```
 
-In another terminal, run `uv run uvicorn backend.main:app --host 127.0.0.1 --port 8000`.
+In another terminal, run `uv run python -m backend.server --host 127.0.0.1 --port 8000`.
 Open the frontend at `http://127.0.0.1:3000` and backend docs at
 `http://127.0.0.1:8000/docs`. With Docker running, `docker compose up --build`
 starts PostgreSQL, backend and frontend. Container services use service DNS.
 
-`/health` reports process liveness. `/ready` deliberately reports 503 until
-authentication/domain services are integrated; a responding process is not a
-complete financial application. Agent endpoints reject unwired authentication.
-No identity is accepted from headers/chat text, and no fake financial gate is
-connected. B/C services remain separate roadmap tickets.
+`/health` reports process liveness. `/ready` reports 503 until the domain services
+are integrated; it reports configured authentication readiness separately. Backend
+authentication is opt-in as described below. Agent domain services remain unwired,
+so a valid session alone does not enable the connected financial workflow. No
+identity is accepted from headers/chat text, and no fake financial gate is connected.
 
 ## Student chat
 
@@ -66,9 +66,10 @@ Restart Next.js after changing this server-only setting. Compose supplies
 `http://backend:8000` instead. The relay accepts only message/conversation fields,
 forwards the browser's session cookie to the fixed agent endpoint, rejects
 foreign origins, disables caching and never forwards claimed actor/role headers
-or browser bearer tokens. It does not create a session; Dev B must supply the
-verified authentication flow. Missing trusted adapters/configuration produce a
-visible unavailable state, with no fallback to mocks. No API keys enter browser
+or browser bearer tokens. It does not create a session; B-01 supplies backend
+verification, while B-04's browser sign-in flow is still pending. Missing trusted
+adapters/configuration produce a visible unavailable state, with no fallback to
+mocks. No API keys enter browser
 code. Session expiry clears the visible conversation.
 
 The current agent HTTP contract supplies assistant text, tool events and resource
@@ -79,6 +80,75 @@ generated contract types in the isolated preview. A-04/B/C must connect persiste
 intents, approval continuation and scoped financial details. There are no payment
 or approval execution buttons in this A-06 slice. Browser messages live only in
 component memory and clear on reload/new chat; server draft-memory limits still apply.
+
+## Backend demo authentication (B-01)
+
+Use a dedicated, disposable PostgreSQL database for this synthetic demo. No tables
+or accounts are created at application startup. Add these values to your ignored
+local `.env` (keep both passwords private, distinct, and 12–128 characters):
+
+```dotenv
+AUTH_ENABLED=true
+AUTH_TENANT_ID=demo_001
+AUTH_TRUSTED_ORIGIN=http://127.0.0.1:3000
+AUTH_DEMO_STUDENT_PASSWORD=<local-student-password>
+AUTH_DEMO_SPONSOR_PASSWORD=<different-local-sponsor-password>
+```
+
+Set `DATABASE_URL` to that isolated database, then run:
+
+```powershell
+uv run python -m backend.authz.bootstrap --migrate --seed
+```
+
+This explicitly applies `migrations/001_auth.sql` and provisions the `student` and
+`sponsor` usernames for `stu_001` / `par_001` in `demo_001`. Bootstrap rejects
+environments other than development/test and refuses to overwrite an existing demo
+tenant. Migration replays check a stored checksum. The CLI uses local settings;
+no password is supplied on its command line. Remove the two bootstrap passwords
+from local configuration after seeding; stored credentials use salted scrypt.
+Session tokens are random and only their SHA-256 digests are stored.
+
+The additive endpoints are:
+
+- `POST /api/v1/auth/login`: `{username, password}`; sets the host-only `session`
+  cookie and returns `{authenticated: true, role}`.
+- `GET /api/v1/auth/session`: verifies the cookie against current database records.
+- `POST /api/v1/auth/logout`: empty body; revokes the session and clears its cookie.
+- `PUT /api/v1/student/sharing-consents/{sponsor_id}`: a student grants
+  `{allowed_shared_fields, expires_at}` to a same-tenant sponsor. Allowed fields are
+  `tuition_summary`, `payment_summary`, and `case_summary`.
+- `DELETE /api/v1/student/sharing-consents/{sponsor_id}`: empty body; revokes that
+  student's sharing grant.
+
+State-changing requests must send `Origin` matching `AUTH_TRUSTED_ORIGIN` exactly;
+forwarded identity/host headers are ignored. Plain HTTP is permitted only for
+loopback development (plus the isolated test host). HTTPS cookies are `Secure`;
+all session cookies are `HttpOnly`, `SameSite=Strict`, and expire after one hour.
+Login admits five attempts per username and thirty per direct client address in
+each fifteen-minute window, including successful attempts. Counters persist across
+workers; deployments behind a proxy share its direct address until a separately
+reviewed trusted-proxy configuration exists. Do not disable these limits to work
+around a proxy. The `backend.server` entrypoint explicitly disables Uvicorn proxy
+header processing; use it for local/container startup so caller-supplied forwarded
+addresses cannot evade the client limit. Authentication errors and validation
+failures are sanitized.
+
+`backend.authz.access.AccessPolicy` provides current-session, tenant, ownership,
+sponsor-role and field-specific consent guards for domain adapters. A sponsor's
+approval authority over their own funds does not grant access to student records.
+Consent grants visibility only and is checked against current expiry/revocation.
+Dev A/C must call these guards on their actual domain reads; those adapters and
+the B-02 financial gate remain pending. The B-04 sponsor UI/browser login flow is
+also pending: this ticket adds backend authentication, not browser sign-in pages.
+Do not connect fake domain services to make Chat appear ready.
+
+Auth tests use a fresh temporary PostgreSQL instance when `initdb` and `pg_ctl`
+are on PATH. Its files remain ignored under `.generated/`. Alternatively set
+`RANTAU_TEST_DATABASE_URL` to a **dedicated test database whose name starts with
+`rantau_test`**. Tests truncate its auth tables; never point it at an application
+database. CI provisions its own PostgreSQL 17 service. Tests do not use the local
+application's `DATABASE_URL` or bootstrap passwords.
 
 ## Checks and isolated demo
 
@@ -159,8 +229,8 @@ and caches results for five minutes. Downloaded text is discarded after lead det
 it is not displayed, persisted, added to the KB or sent to the model. Missing,
 oversized, unsupported or unreachable sources keep the response pending review.
 Default offline runs make no network requests. Trusted application wiring can inject
-`OfficialSourceLookup` into `AgentTools` later; the HTTP service still requires B/C
-authentication/domain adapters, and the Scenarios tab stays scripted.
+`OfficialSourceLookup` into `AgentTools` later; the HTTP service still requires
+trusted domain adapters and opted-in authentication. The Scenarios tab stays scripted.
 
 A-03 remembers tuition obligation, funding and quote selections across turns.
 The backend reloads current permissions, policy, quotes and verified payee each

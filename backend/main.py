@@ -3,12 +3,15 @@
 import psycopg
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 from backend.agent.router import router as agent_router
+from backend.authz.router import router as auth_router
 from backend.config import Settings
 
 app = FastAPI(title="Rantau", version="0.1.0")
 app.include_router(agent_router)
+app.include_router(auth_router)
 
 
 @app.get("/health")
@@ -34,7 +37,7 @@ async def ready() -> JSONResponse:
     settings = Settings()
     dependencies = {
         "database": await database_available(settings),
-        "authentication": False,
+        "authentication": await run_in_threadpool(authentication_ready, settings),
         "domain_services": False,
         "classifier_configuration": settings.classifier_configured,
     }
@@ -45,4 +48,17 @@ async def ready() -> JSONResponse:
             "simulation": True,
             "dependencies": dependencies,
         },
+    )
+
+
+def authentication_ready(settings: Settings) -> bool:
+    from backend.authz.service import AuthService
+    from backend.authz.storage import Database
+
+    return bool(
+        settings.auth_configured
+        and settings.database_url
+        and AuthService(
+            Database(settings.database_url.get_secret_value()), settings.auth_tenant_id
+        ).ready()
     )

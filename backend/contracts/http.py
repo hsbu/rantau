@@ -114,4 +114,9 @@ HTTP_ENDPOINTS = (
     ("GET", "/api/v1/kb/universities/{id}/payment-policy"),
     ("POST", "/api/v1/demo/reset"),
     ("GET", "/api/v1/demo/scenarios"),
+    ("POST", "/api/v1/auth/login"),
+    ("GET", "/api/v1/auth/session"),
+    ("POST", "/api/v1/auth/logout"),
+    ("PUT", "/api/v1/student/sharing-consents/{sponsor_id}"),
+    ("DELETE", "/api/v1/student/sharing-consents/{sponsor_id}"),
 )

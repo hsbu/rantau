@@ -5,6 +5,7 @@ from typing import Any
 from pydantic.json_schema import models_json_schema
 
 from backend.contracts import http, models
+from backend.contracts.auth import ConsentRequest, ConsentSummary, LoginRequest, SessionSummary
 
 SCHEMA_MODELS = (
     models.ActorContext,
@@ -31,6 +32,10 @@ SCHEMA_MODELS = (
     http.SponsorDecisionRequest,
     http.SponsorDecisionResult,
     http.CaseCreated,
+    LoginRequest,
+    SessionSummary,
+    ConsentRequest,
+    ConsentSummary,
 )
 
 
@@ -59,12 +64,17 @@ def contract_schema() -> dict[str, Any]:
         "/reconciliations": "CaseCreated",
         "/reconciliations/{id}/submit": "ReconciliationCase",
         "/kb/universities/{id}/payment-policy": "UniversityPolicy",
+        "/auth/login": "SessionSummary",
+        "/auth/session": "SessionSummary",
+        "/student/sharing-consents/{sponsor_id}": "ConsentSummary",
     }
     requests = {
         "/agent/messages": "AgentMessage",
         "/payment-intents": "IntentProposal",
         "/sponsor/approvals/{id}/decision": "SponsorDecisionRequest",
         "/reconciliations": "CaseSubmission",
+        "/auth/login": "LoginRequest",
+        "/student/sharing-consents/{sponsor_id}": "ConsentRequest",
     }
     arrays = {"/tuition/obligations", "/quotes", "/sponsor/approvals"}
     paths: dict[str, Any] = {}
@@ -92,6 +102,18 @@ def contract_schema() -> dict[str, Any]:
                 "503": {"description": "Trusted integration unavailable"},
             },
         }
+        is_auth = path.startswith(("/auth/", "/student/sharing-consents/"))
+        if is_auth:
+            operation["x-owner"] = "B"
+            operation["x-implementation"] = "implemented"
+            operation["responses"]["403"] = {"description": "Trusted origin required"}
+            operation["responses"]["422"] = {"description": "Invalid request (sanitized)"}
+        if path == "/auth/login":
+            operation["security"] = []
+            operation["responses"]["429"] = {"description": "Login attempt limit reached"}
+        if path == "/auth/logout" or method == "DELETE":
+            operation["responses"].pop("200")
+            operation["responses"]["204"] = {"description": "Completed without response body"}
         parameters: list[dict[str, Any]] = []
         if "{" in path:
             parameter = path.split("{")[1].split("}")[0]
@@ -107,9 +129,18 @@ def contract_schema() -> dict[str, Any]:
                     "schema": {"type": "string", "minLength": 1},
                 }
             )
+        if is_auth and method != "GET":
+            parameters.append(
+                {
+                    "name": "Origin",
+                    "in": "header",
+                    "required": True,
+                    "schema": {"type": "string"},
+                }
+            )
         if parameters:
             operation["parameters"] = parameters
-        if method == "POST" and path in requests:
+        if method in {"POST", "PUT"} and path in requests:
             operation["requestBody"] = {
                 "required": True,
                 "content": {
@@ -118,7 +149,7 @@ def contract_schema() -> dict[str, Any]:
                     }
                 },
             }
-        paths[full_path] = {method.lower(): operation}
+        paths.setdefault(full_path, {})[method.lower()] = operation
     return {
         "openapi": "3.1.0",
         "info": {"title": "Rantau v1 contract catalogue", "version": "0.1.0"},

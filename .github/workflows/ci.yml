@@ -13,6 +13,20 @@ jobs:
       - run: python scripts/check_repo_hygiene.py
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: rantau_test
+          POSTGRES_PASSWORD: isolated_test_only
+          POSTGRES_DB: rantau_test_auth
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rantau_test -d rantau_test_auth"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      RANTAU_TEST_DATABASE_URL: postgresql://rantau_test:isolated_test_only@127.0.0.1:5432/rantau_test_auth
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
