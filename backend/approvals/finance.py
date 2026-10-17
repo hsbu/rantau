@@ -31,13 +31,20 @@ class FinanceApprovalRepository(FinancePolicyRepository):
         }:
             raise ScopeDenied("Resource unavailable")
         # Freeze all trusted mutable facts before B's authority/security rows.
-        fetch(
+        beneficiary = fetch(
             connection,
             "beneficiary",
             actor.tenant_id,
             locked.intent["beneficiary_alias"],
             lock="FOR SHARE",
         )
+        if locked.intent["purpose"] == "ALLOWANCE" and (
+            beneficiary is None
+            or beneficiary["purpose_type"] != "ALLOWANCE"
+            or beneficiary["student_id"] != locked.intent["requested_by"]
+            or beneficiary["owner_id"] != locked.intent["requested_by"]
+        ):
+            raise ScopeDenied("Resource unavailable")
         fetch(connection, "quote", actor.tenant_id, locked.intent["quote_alias"], lock="FOR SHARE")
         connection.execute(
             "SELECT id FROM payment_rules WHERE tenant_id = %s AND version = %s FOR SHARE",
@@ -89,7 +96,12 @@ class FinanceApprovalRepository(FinancePolicyRepository):
         beneficiary = fetch(
             connection, "beneficiary", actor.tenant_id, request.beneficiary_id, lock="FOR SHARE"
         )
-        if beneficiary is None or request.delegate_id not in account["permitted_requesters"]:
+        if (
+            beneficiary is None
+            or request.delegate_id not in account["permitted_requesters"]
+            or beneficiary["purpose_type"] != "ALLOWANCE"
+            or beneficiary["student_id"] != request.delegate_id
+        ):
             raise ScopeDenied("Resource unavailable")
         return MandateCandidate(
             tenant_id=actor.tenant_id,

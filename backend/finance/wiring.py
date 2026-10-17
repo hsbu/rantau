@@ -21,6 +21,7 @@ from backend.finance.authority import AuthoritySource, HoldState
 from backend.finance.authorization import GateFactory
 from backend.finance.executor import ExecutionFinalizer, ExecutionService
 from backend.finance.intents import IntentService
+from backend.finance.migrations import FINANCE_MIGRATIONS
 from backend.finance.policy_repo import FinancePolicyRepository
 from backend.finance.ports import FinancePaymentPort
 from backend.finance.provider import SimulatedProvider
@@ -124,6 +125,23 @@ def build_services(
         payments=FinancePaymentPort(executor, reads),
         university=UniversityPortImpl(obligations, cases),
     )
+
+
+def finance_storage_ready(database: Database) -> bool:
+    """True only when every finance migration is applied and its tables answer queries."""
+    try:
+        with database.connection() as connection:
+            applied = {
+                row["version"]
+                for row in connection.execute("SELECT version FROM rantau_migrations").fetchall()
+            }
+            connection.execute(
+                "SELECT 1 FROM funding_accounts, transfers, university_receipts, "
+                "reconciliation_cases, untrusted_documents WHERE false"
+            )
+    except ServiceUnavailable:
+        return False
+    return set(FINANCE_MIGRATIONS) <= applied
 
 
 def finance_services() -> FinanceServices:

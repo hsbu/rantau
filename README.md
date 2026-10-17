@@ -220,8 +220,9 @@ before invoking authorization again. Do not cache or reuse preview decisions.
 Tests cover both the isolated adapter and actual default HTTP wiring with real
 sessions, B authority and C's simulated SQL ledger. Test-only adapters are never
 installed in application wiring. Browser sign-in/decision integration, the
-complete agent-driven flow, and allowance payment execution remain separate
-checks; C's current executor supports tuition only. Admin provisioning and
+complete agent-driven flow remain separate checks. Real-session HTTP tests also
+verify simulated T1 allowance execution, cumulative mandate limits, revocation,
+and current beneficiary ownership/purpose checks before debit. Admin provisioning and
 session/consent reset semantics are also separate coordinated work.
 
 Auth tests use a fresh temporary PostgreSQL instance when `initdb` and `pg_ctl`
@@ -257,6 +258,33 @@ Finance tests need PostgreSQL binaries on PATH (for example
 `rantau_test_finance` database. The `/student/payments` and `/demo` pages read the backend
 through the server-only `FINANCE_API_ORIGIN` (falls back to `AGENT_API_ORIGIN`) and relay
 mutations through fixed-path same-origin handlers.
+
+## Demo runbook (simulated)
+
+1. Prepare the isolated database once (see the backend authentication section for
+   bootstrap): `uv run python -m backend.authz.bootstrap --migrate --seed`, then
+   `uv run python -m backend.demo.reset --migrate --scenario tuition_missing_reference`.
+2. Run the whole story without a browser. The sponsor's approval is **simulated** because
+   Dev B's approval store is not connected; the real gate, ledger, provider and university run:
+
+   ```powershell
+   uv run python -m backend.demo.replay --flow all
+   ```
+
+   `happy` shows provider delivery is not tuition paid, then the university posts after the
+   simulated clock moves. `hero` recovers a payment that arrived without a reference and
+   posts it once with no second debit. `attack` plants untrusted messages, holds a forged
+   payee with zero debit, and still pays the verified university.
+3. In the browser, `/student/payments` shows the trust timeline, pending requests with exact
+   terms, quotes, receipts and untrusted messages (English or `?lang=id`). `/demo` offers
+   scenario reset, clock, fault injection, the university tick and the redacted audit trail
+   for a demo administrator. Browser sign-in is not built yet.
+4. With Docker running, the same setup commands can be run through
+   `docker compose run --rm backend uv run --no-sync python -m backend.demo.reset --migrate`
+   (not verified on this machine).
+
+`/ready` reports `finance_storage` separately; `domain_services` stays false until the agent
+is wired to trusted services.
 
 ## Checks and isolated demo
 

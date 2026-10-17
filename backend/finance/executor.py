@@ -6,6 +6,7 @@ The provider is called only after the debit commits; TransferService applies the
 import hashlib
 from collections.abc import Callable
 from dataclasses import replace
+from datetime import timedelta
 from uuid import uuid4
 
 from backend.authz.policy_repository import PolicyConnection
@@ -28,6 +29,8 @@ from backend.finance.states import INTENT_TRANSITIONS, require_transition
 from backend.finance.terms import canonical_terms_hash
 from backend.finance.transfers import FINAL_STATES, TransferService
 
+# Keys of settled payments are kept long enough to absorb client retries.
+IDEMPOTENCY_RETENTION = timedelta(days=1)
 CLEARING_ACCOUNT = "system:provider_clearing"
 FEE_ACCOUNT = "system:fee_revenue"
 ExecutionFinalizer = Callable[[PolicyConnection, ActorContext, LockedIntent, PolicyDecision], None]
@@ -260,7 +263,8 @@ def _insert_transfer(
     connection.execute(
         "INSERT INTO transfers (tenant_id, alias, intent_alias, account_alias, obligation_alias, "
         "beneficiary_alias, provider, provider_reference, state, source_total_minor, "
-        "destination_amount_minor) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'PROCESSING', %s, %s)",
+        "destination_amount_minor, blocks_obligation) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'PROCESSING', %s, %s, %s)",
         (
             tenant_id,
             alias,
@@ -272,6 +276,7 @@ def _insert_transfer(
             f"sim_ref_{uuid4().hex[:16]}",
             intent["source_total_minor"],
             intent["destination_amount_minor"],
+            intent["obligation_alias"] is not None,
         ),
     )
 
@@ -307,3 +312,16 @@ def _start_processing(connection: PolicyConnection, intent: Row) -> None:
     )
     if updated.rowcount != 1:
         raise ServiceUnavailable("Execution invariant failed: intent changed")
+
+
+def prune_idempotency_keys(
+    connection: PolicyConnection, tenant_id: str, older_than: timedelta
+) -> int:
+    """Drop old keys, but only for transfers that have reached a final state."""
+    deleted = connection.execute(
+        "DELETE FROM idempotency_keys k USING transfers t "
+        "WHERE k.tenant_id = %s AND t.tenant_id = k.tenant_id AND t.alias = k.transfer_alias "
+        "AND t.state IN ('DELIVERED', 'FAILED') AND k.created_at < clock_timestamp() - %s",
+        (tenant_id, older_than),
+    )
+    return deleted.rowcount

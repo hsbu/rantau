@@ -10,7 +10,7 @@ export function SimulatedBanner({ lang }: { lang: Lang }) {
 
 export function TrustTimeline({ steps, lang }: { steps: TrustStep[]; lang: Lang }) {
   return <ol className={styles.timeline} aria-label="trust states">
-    {steps.map(step => <li key={step.key} className={`${styles.step} ${styles[step.status] ?? ""}`}>
+    {steps.map(step => <li key={step.key} data-status={step.status} className={`${styles.step} ${styles[step.status] ?? ""}`}>
       {step.label[lang]}
     </li>)}
   </ol>;
@@ -47,4 +47,26 @@ export function ReceiptCard({ payment, lang }: { payment: Schema["PaymentResult"
 
 export function HeldNotice({ error, lang }: { error: Schema["DomainError"]; lang: Lang }) {
   return <p className={styles.notice} role="alert">{safeNextStep[error.reason_code][lang]}</p>;
+}
+
+export function IntentSummary({ intent, lang }: { intent: Schema["PaymentIntentView"]; lang: Lang }) {
+  return <div className={styles.grid}>
+    <Stat label={ui.youPay[lang]} value={money(intent.source_currency, intent.source_total_minor)} />
+    <Stat label={ui.receives[lang]} value={money(intent.destination_currency, intent.destination_amount_minor)} />
+    <Stat label={ui.payee[lang]} value={intent.beneficiary_label} />
+    <Stat label={ui.expires[lang]} value={dateTime(intent.quote_expiry)} />
+    <Stat label="" value={intent.funded_by_requester ? ui.fundedByYou[lang] : ui.fundedByOwner[lang]} />
+  </div>;
+}
+
+export function UntrustedDocuments({ documents, lang }: { documents: Schema["UntrustedDocument"][]; lang: Lang }) {
+  return <section className={styles.card} aria-label="untrusted messages">
+    <h2>{ui.untrustedTitle[lang]}</h2>
+    <p className={styles.notice}>{ui.untrustedNote[lang]}</p>
+    {documents.map(document => <article key={document.id}>
+      <h3>{document.title}</h3>
+      <p>{ui.sender[lang]}: {document.claimed_sender}</p>
+      <pre>{document.body}</pre>
+    </article>)}
+  </section>;
 }

@@ -299,9 +299,10 @@ def test_real_mandate_candidate_requires_current_delegate_relationship(integrate
         )
         connection.execute(
             "INSERT INTO beneficiaries "
-            "(tenant_id,alias,owner_id,fingerprint,masked_display,verified) "
+            "(tenant_id,alias,owner_id,fingerprint,masked_display,verified,"
+            "purpose_type,student_id) "
             "VALUES (%s,'benef_student','stu_001',"
-            "'synthetic-student-fingerprint','Student **** 0001',true)",
+            "'synthetic-student-fingerprint','Student **** 0001',true,'ALLOWANCE','stu_001')",
             (TENANT,),
         )
     sponsor = client_for("sponsor")
@@ -329,3 +330,141 @@ def test_real_mandate_candidate_requires_current_delegate_relationship(integrate
     refused = sponsor.post("/api/v1/sponsor/mandates", headers=ORIGIN, json=body)
     assert refused.status_code == 404
     assert count(database, "mandates") == 1
+
+
+def mandate_input():
+    now = datetime.now(UTC)
+    return {
+        "source_account_id": "acct_idr_01",
+        "delegate_id": "stu_001",
+        "beneficiary_id": "benef_stu_001_allowance",
+        "currency": "IDR",
+        "per_transfer_limit_minor": 5_000_000,
+        "daily_limit_minor": 5_000_000,
+        "monthly_limit_minor": 20_000_000,
+        "starts_at": now.isoformat(),
+        "expires_at": (now + timedelta(days=1)).isoformat(),
+    }
+
+
+def mandate_owner(integrated_api):
+    with integrated_api.database.connection() as connection:
+        connection.execute(
+            "UPDATE actors SET scopes=scopes || ARRAY['mandate:manage'] WHERE role='SPONSOR'"
+        )
+    return client_for("sponsor")
+
+
+def create_allowance(student):
+    response = student.get("/api/v1/quotes", params={"destination_amount_minor": 100_000})
+    assert response.status_code == 200, response.text
+    response = student.post(
+        "/api/v1/payment-intents",
+        headers=ORIGIN,
+        json={
+            "obligation_id": None,
+            "source_account_id": "acct_idr_01",
+            "beneficiary_id": "benef_stu_001_allowance",
+            "quote_id": response.json()[0]["id"],
+            "purpose": "ALLOWANCE",
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_real_allowance_mandate_enforces_cumulative_budget(integrated_api):
+    sponsor, student = mandate_owner(integrated_api), client_for("student")
+    response = sponsor.post("/api/v1/sponsor/mandates", headers=ORIGIN, json=mandate_input())
+    assert response.status_code == 200, response.text
+    database, initial = integrated_api.database, balance(integrated_api.database)
+    for index in range(3):
+        intent = create_allowance(student)
+        result = student.post(
+            f"/api/v1/payment-intents/{intent['id']}/execute",
+            headers=ORIGIN | {"Idempotency-Key": f"mandate_split_{index}"},
+        )
+        if index < 2:
+            assert intent["tier"] == "T1" and result.status_code == 200, result.text
+        else:
+            assert intent["approval_required"] is True and result.status_code == 409, result.text
+    assert count(database, "transfers") == 2
+    assert balance(database) == initial - 2 * 2_325_000
+    assert count(database, "approvals") == 0 and count(database, "university_receipts") == 0
+
+
+def test_revoked_real_mandate_cannot_authorize_a_preexisting_draft(integrated_api):
+    sponsor, student = mandate_owner(integrated_api), client_for("student")
+    saved = sponsor.post("/api/v1/sponsor/mandates", headers=ORIGIN, json=mandate_input())
+    assert saved.status_code == 200, saved.text
+    intent = create_allowance(student)
+    assert intent["tier"] == "T1"
+    response = sponsor.delete(f"/api/v1/sponsor/mandates/{saved.json()['id']}", headers=ORIGIN)
+    assert response.status_code == 204
+    initial = balance(integrated_api.database)
+    refused = student.post(
+        f"/api/v1/payment-intents/{intent['id']}/execute",
+        headers=ORIGIN | {"Idempotency-Key": "mandate_revoked_001"},
+    )
+    assert refused.status_code == 409, refused.text
+    assert count(integrated_api.database, "transfers") == 0
+    assert balance(integrated_api.database) == initial
+
+
+@pytest.mark.parametrize("column,value", [("purpose_type", "TUITION"), ("student_id", "stu_other")])
+def test_mandates_reject_mismatched_recipient_purpose_or_student(integrated_api, column, value):
+    assert column in {"purpose_type", "student_id"}
+    with integrated_api.database.connection() as connection:
+        connection.execute(
+            f"UPDATE beneficiaries SET {column}=%s WHERE alias='benef_stu_001_allowance'", (value,)
+        )
+    sponsor = mandate_owner(integrated_api)
+    response = sponsor.post("/api/v1/sponsor/mandates", headers=ORIGIN, json=mandate_input())
+    assert response.status_code == 404, response.text
+    assert count(integrated_api.database, "mandates") == 0
+
+
+def test_new_intent_revision_cannot_reuse_superseded_owner_approval(integrated_api):
+    student, sponsor = client_for("student"), client_for("sponsor")
+    old = approved(student, sponsor)
+    revised = student.post(
+        f"/api/v1/payment-intents/{old['id']}/revisions",
+        headers=ORIGIN,
+        json=proposal(quote="quote_002").model_dump(mode="json"),
+    )
+    assert revised.status_code == 201, revised.text
+    current = revised.json()
+    assert current["id"] != old["id"] and current["terms_hash"] != old["terms_hash"]
+    initial = balance(integrated_api.database)
+    for candidate in (old, current):
+        refused = student.post(
+            f"/api/v1/payment-intents/{candidate['id']}/execute",
+            headers=ORIGIN | {"Idempotency-Key": "revision_001"},
+        )
+        assert refused.status_code in {403, 409}, refused.text
+    assert count(integrated_api.database, "transfers") == 0
+    assert balance(integrated_api.database) == initial
+
+
+@pytest.mark.parametrize(
+    "column,value",
+    [("purpose_type", "TUITION"), ("student_id", "stu_other"), ("owner_id", "stu_other")],
+)
+def test_allowance_recipient_relationship_is_rechecked_at_execution(integrated_api, column, value):
+    assert column in {"purpose_type", "student_id", "owner_id"}
+    sponsor, student = mandate_owner(integrated_api), client_for("student")
+    response = sponsor.post("/api/v1/sponsor/mandates", headers=ORIGIN, json=mandate_input())
+    assert response.status_code == 200, response.text
+    intent = create_allowance(student)
+    assert intent["tier"] == "T1"
+    database, initial = integrated_api.database, balance(integrated_api.database)
+    with database.connection() as connection:
+        connection.execute(
+            f"UPDATE beneficiaries SET {column}=%s WHERE alias='benef_stu_001_allowance'", (value,)
+        )
+    refused = student.post(
+        f"/api/v1/payment-intents/{intent['id']}/execute",
+        headers=ORIGIN | {"Idempotency-Key": "changed_allowance_payee"},
+    )
+    assert refused.status_code in {403, 409}, refused.text
+    assert count(database, "transfers") == 0 and balance(database) == initial

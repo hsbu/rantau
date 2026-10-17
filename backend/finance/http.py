@@ -28,6 +28,7 @@ from backend.contracts.models import (
     ScopeDenied,
     ServiceUnavailable,
     TuitionObligationDetail,
+    UntrustedDocument,
 )
 from backend.dependencies import auth_settings, verified_actor
 from backend.finance.audit import AuditEvent, AuditWriter
@@ -39,6 +40,8 @@ from backend.finance.states import InvalidTransition
 from backend.finance.wiring import FinanceServices, finance_services
 
 NO_STORE = {"Cache-Control": "no-store"}
+# Largest simulated allowance quote request: CNY 1,000,000.00 in fen.
+MAX_ALLOWANCE_MINOR = 100_000_000
 IdempotencyKey = Annotated[
     str,
     Header(alias="Idempotency-Key", min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$"),
@@ -104,33 +107,29 @@ def recheck_obligation(
 def list_quotes(
     actor: Actor,
     services: Services,
-    obligation_id: Annotated[Identifier, Query()],
+    obligation_id: Annotated[Identifier | None, Query()] = None,
+    destination_amount_minor: Annotated[int | None, Query(ge=1, le=MAX_ALLOWANCE_MINOR)] = None,
     source: Literal["IDR"] = "IDR",
     target: Literal["CNY"] = "CNY",
 ) -> list[FxQuote]:
-    return list(services.reads.quotes(actor, obligation_id))
+    if (obligation_id is None) == (destination_amount_minor is None):
+        raise HTTPException(422, detail={"code": "ONE_QUOTE_SUBJECT_REQUIRED"})
+    if obligation_id is not None:
+        return list(services.reads.quotes(actor, obligation_id))
+    assert destination_amount_minor is not None
+    return list(services.reads.allowance_quotes(actor, destination_amount_minor))
 
 
 @router.post(
     "/payment-intents", response_model=IntentCreated, status_code=201, dependencies=[TrustedOrigin]
 )
 def create_intent(body: IntentProposal, actor: Actor, services: Services) -> Response:
-    outcome = services.intents.create(actor, body)
-    if isinstance(outcome, Refused):
-        return error_response(outcome.reason_code, outcome.audit_event_id, None)
-    assert isinstance(outcome, Created)
-    decision = outcome.decision
-    if decision.decision == Decision.HOLD and decision.reason_code is not None:
-        return error_response(decision.reason_code, decision.audit_event_id, outcome.intent.id)
-    created = IntentCreated(
-        id=outcome.intent.id,
-        terms_hash=outcome.intent.terms_hash,
-        tier=outcome.intent.tier,
-        state=outcome.intent.state,
-        approval_required=decision.decision == Decision.REQUIRE_APPROVAL,
-        quote_expires_at=outcome.intent.quote_expiry,
-    )
-    return JSONResponse(created.model_dump(mode="json"), status_code=201)
+    return _created_response(services.intents.create(actor, body))
+
+
+@router.get("/payment-intents", response_model=list[PaymentIntentView])
+def list_intents(actor: Actor, services: Services) -> list[PaymentIntentView]:
+    return list(services.reads.intent_list(actor))
 
 
 @router.get("/payment-intents/{intent_id}", response_model=PaymentIntentView)
@@ -189,6 +188,30 @@ def cancel_intent(intent_id: Identifier, actor: Actor, services: Services) -> Re
         return error_response(ReasonCode.PAYMENT_ALREADY_SUBMITTED, audit_id, intent_id)
     view = services.reads.intent_view(actor, intent_id)
     return JSONResponse(view.model_dump(mode="json"))
+
+
+@router.post(
+    "/payment-intents/{intent_id}/revisions",
+    response_model=IntentCreated,
+    status_code=201,
+    dependencies=[TrustedOrigin],
+)
+def revise_intent(
+    intent_id: Identifier, body: IntentProposal, actor: Actor, services: Services
+) -> Response:
+    try:
+        outcome = services.intents.revise(actor, intent_id, body)
+    except InvalidTransition:
+        audit_id = _refusal_audit(
+            services, actor, "REVISION_REFUSED", intent_id, ReasonCode.PAYMENT_ALREADY_SUBMITTED
+        )
+        return error_response(ReasonCode.PAYMENT_ALREADY_SUBMITTED, audit_id, intent_id)
+    return _created_response(outcome)
+
+
+@router.get("/documents", response_model=list[UntrustedDocument])
+def list_documents(actor: Actor, services: Services) -> list[UntrustedDocument]:
+    return list(services.reads.documents(actor))
 
 
 @router.get("/transfers/{transfer_id}", response_model=PaymentResult)
@@ -256,3 +279,20 @@ def _refusal_audit(
                 reason_code=reason.value,
             ),
         )
+
+
+def _created_response(outcome: Created | Refused) -> Response:
+    if isinstance(outcome, Refused):
+        return error_response(outcome.reason_code, outcome.audit_event_id, None)
+    decision = outcome.decision
+    if decision.decision == Decision.HOLD and decision.reason_code is not None:
+        return error_response(decision.reason_code, decision.audit_event_id, outcome.intent.id)
+    created = IntentCreated(
+        id=outcome.intent.id,
+        terms_hash=outcome.intent.terms_hash,
+        tier=outcome.intent.tier,
+        state=outcome.intent.state,
+        approval_required=decision.decision == Decision.REQUIRE_APPROVAL,
+        quote_expires_at=outcome.intent.quote_expiry,
+    )
+    return JSONResponse(created.model_dump(mode="json"), status_code=201)

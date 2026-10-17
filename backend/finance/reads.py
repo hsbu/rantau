@@ -14,6 +14,7 @@ from backend.contracts.models import (
     ScopeDenied,
     TrustedBeneficiary,
     UniversityPolicy,
+    UntrustedDocument,
 )
 from backend.finance.quotes import QuoteService
 from backend.finance.records import Row, fetch, may_view
@@ -40,28 +41,57 @@ class FinanceReads:
         with self.database.connection() as connection:
             return self.quote_service.issue(connection, actor.tenant_id, balance)
 
+    def allowance_quotes(self, actor: ActorContext, destination_minor: int) -> tuple[FxQuote, ...]:
+        with self.database.connection() as connection:
+            self.auth.current_actor(connection, actor)
+            return self.quote_service.issue(connection, actor.tenant_id, destination_minor)
+
+    def intent_list(self, actor: ActorContext) -> tuple[PaymentIntentView, ...]:
+        with self.database.connection() as connection:
+            self.auth.current_actor(connection, actor)
+            rows = connection.execute(
+                "SELECT * FROM payment_intents WHERE tenant_id = %s "
+                "AND (requested_by = %s OR funding_owner_id = %s) ORDER BY created_at DESC",
+                (actor.tenant_id, actor.actor_id, actor.actor_id),
+            ).fetchall()
+            return tuple(self._view(connection, actor, row) for row in rows)
+
+    def documents(self, actor: ActorContext) -> tuple[UntrustedDocument, ...]:
+        with self.database.connection() as connection:
+            self.auth.current_actor(connection, actor)
+            rows = connection.execute(
+                "SELECT alias, kind, title, body, claimed_sender, received_at "
+                "FROM untrusted_documents WHERE tenant_id = %s AND student_id = %s "
+                "ORDER BY received_at DESC",
+                (actor.tenant_id, actor.actor_id),
+            ).fetchall()
+        return tuple(UntrustedDocument(id=row.pop("alias"), **row) for row in rows)
+
     def intent_view(self, actor: ActorContext, alias: str) -> PaymentIntentView:
         with self.database.connection() as connection:
             row = self._visible_intent(connection, actor, alias)
-            beneficiary = fetch(
-                connection, "beneficiary", actor.tenant_id, row["beneficiary_alias"]
-            )
-            return PaymentIntentView(
-                id=row["alias"],
-                purpose=row["purpose"],
-                state=PaymentState(row["state"]),
-                tier=Tier(row["tier"]),
-                obligation_id=row["obligation_alias"],
-                source_currency=Currency(row["source_currency"]),
-                destination_currency=Currency(row["destination_currency"]),
-                source_total_minor=row["source_total_minor"],
-                destination_amount_minor=row["destination_amount_minor"],
-                quote_id=row["quote_alias"],
-                quote_expiry=row["quote_expiry"],
-                terms_hash=row["terms_hash"],
-                beneficiary_label=beneficiary["masked_display"] if beneficiary else "Unavailable",
-                funded_by_requester=row["funding_owner_id"] == actor.actor_id,
-            )
+            return self._view(connection, actor, row)
+
+    def _view(
+        self, connection: PolicyConnection, actor: ActorContext, row: Row
+    ) -> PaymentIntentView:
+        beneficiary = fetch(connection, "beneficiary", actor.tenant_id, row["beneficiary_alias"])
+        return PaymentIntentView(
+            id=row["alias"],
+            purpose=row["purpose"],
+            state=PaymentState(row["state"]),
+            tier=Tier(row["tier"]),
+            obligation_id=row["obligation_alias"],
+            source_currency=Currency(row["source_currency"]),
+            destination_currency=Currency(row["destination_currency"]),
+            source_total_minor=row["source_total_minor"],
+            destination_amount_minor=row["destination_amount_minor"],
+            quote_id=row["quote_alias"],
+            quote_expiry=row["quote_expiry"],
+            terms_hash=row["terms_hash"],
+            beneficiary_label=beneficiary["masked_display"] if beneficiary else "Unavailable",
+            funded_by_requester=row["funding_owner_id"] == actor.actor_id,
+        )
 
     def payment_result(self, actor: ActorContext, transfer_alias: str) -> PaymentResult:
         with self.database.connection() as connection:
