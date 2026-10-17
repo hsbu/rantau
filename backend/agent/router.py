@@ -43,7 +43,7 @@ router = APIRouter(prefix="/api/v1/agent", tags=["agent"])
 @router.post("/messages", response_model=AgentResponse)
 async def message(body: AgentMessage, actor: Actor, services: Services) -> AgentResponse:
     try:
-        result = await services.graph.run(body.message, actor)
+        result = await services.graph.run(body.message, actor, body.conversation_id)
         await services.runs.put(result, actor)
         return result
     except ScopeDenied:

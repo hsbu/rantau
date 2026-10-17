@@ -1,18 +1,19 @@
 """Read-only intent handlers with selected display fields and safe fallbacks."""
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 
 from pydantic import ValidationError
 
-from backend.agent.explanations import comparable_quotes, explain_quotes, explain_tuition_record
-from backend.contracts.enums import Currency, Intent, PaymentState, TuitionState
+from backend.agent.state import TuitionDraft, TuitionInput
+from backend.agent.tuition import TuitionPlanner
+from backend.contracts.enums import Intent, PaymentState, TuitionState
 from backend.contracts.http import AgentResponse, ResourceReference, ToolEvent
-from backend.contracts.models import ActorContext, Money, ScopeDenied, ServiceUnavailable
+from backend.contracts.models import ActorContext, ScopeDenied, ServiceUnavailable
 from backend.contracts.ports import AgentReadPort
 from backend.kb.catalog import load_bundle
-from backend.kb.guidance import UNKNOWN_POLICY, explain_policy, known_policy
+from backend.kb.guidance import explain_policy, known_policy
 from backend.kb.records import KnowledgeBundle
 
 
@@ -23,10 +24,28 @@ class AgentTools:
         clock: Callable[[], datetime] | None = None,
         *,
         kb_loader: Callable[[], KnowledgeBundle] = load_bundle,
+        beneficiary_map: Mapping[str, str] | None = None,
     ) -> None:
         self.port = port
         self.clock = clock or (lambda: datetime.now(UTC))
         self.kb_loader = kb_loader
+        self.tuition = TuitionPlanner(port, self.clock, self.knowledge, beneficiary_map)
+
+    async def plan_tuition(
+        self, inputs: TuitionInput, draft: TuitionDraft, actor: ActorContext
+    ) -> tuple[AgentResponse, TuitionDraft]:
+        try:
+            return await self.tuition.plan(inputs, draft, actor)
+        except ServiceUnavailable:
+            return (
+                AgentResponse(
+                    run_id="pending",
+                    requested_action=Intent.TUITION,
+                    message="Trusted service unavailable. No financial action was taken.",
+                    tool_events=(ToolEvent(tool="domain_read", status="UNAVAILABLE"),),
+                ),
+                draft,
+            )
 
     def knowledge(self) -> KnowledgeBundle | None:
         try:
@@ -51,59 +70,8 @@ class AgentTools:
             text = explain_policy(policy, bundle, now)
             resources = (ResourceReference(kind="policy", id=policy.id),)
         elif intent == Intent.TUITION:
-            obligations = await self.port.obligations(actor)
-            events = (ToolEvent(tool="get_tuition_obligation", status="OK"),)
-            if len(obligations) != 1:
-                text = "Select the tuition obligation you want to review."
-            else:
-                obligation = obligations[0]
-                if obligation.student_id != actor.actor_id:
-                    raise ScopeDenied("Resource unavailable")
-                balance = Money(currency=Currency.CNY, amount_minor=obligation.balance_minor)
-                text = explain_tuition_record(obligation) + " "
-                resources = (ResourceReference(kind="obligation", id=obligation.id),)
-                if obligation.balance_minor == 0:
-                    text += "No outstanding tuition balance; no payment is needed."
-                elif obligation.state != TuitionState.UNPAID:
-                    text += (
-                        "Review the existing payment and reconciliation evidence before "
-                        "planning another payment. Tuition completion remains unverified."
-                    )
-                else:
-                    policy = await self.port.policy(actor)
-                    bundle = self.knowledge()
-                    if (
-                        not known_policy(policy, bundle, self.clock())
-                        or policy.id != obligation.policy_id
-                        or policy.university_id != obligation.university_id
-                    ):
-                        events += (
-                            ToolEvent(tool="get_university_payment_policy", status="PENDING"),
-                        )
-                        text += UNKNOWN_POLICY
-                    else:
-                        quotes = await self.port.quotes(obligation.id, actor)
-                        now = self.clock()
-                        if not known_policy(policy, bundle, now):
-                            events += (
-                                ToolEvent(tool="get_university_payment_policy", status="PENDING"),
-                                ToolEvent(tool="get_fx_quotes", status="PENDING"),
-                            )
-                            text += UNKNOWN_POLICY
-                        else:
-                            events += (
-                                ToolEvent(tool="get_university_payment_policy", status="OK"),
-                                ToolEvent(
-                                    tool="get_fx_quotes",
-                                    status=(
-                                        "OK"
-                                        if comparable_quotes(quotes, balance, now)
-                                        else "PENDING"
-                                    ),
-                                ),
-                            )
-                            text += explain_quotes(quotes, balance, now)
-                text += " No payment has been requested or executed."
+            response, _ = await self.plan_tuition(TuitionInput(), TuitionDraft(), actor)
+            return response
         elif intent == Intent.ALLOWANCE:
             permissions = await self.port.permissions(actor)
             events = (ToolEvent(tool="get_account_permissions", status="OK"),)
