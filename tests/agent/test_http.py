@@ -75,3 +75,55 @@ def test_scoped_run_round_trip_and_foreign_reference():
         TestClient(app).post("/api/v1/agent/messages", json={"message": "Tuition"}).status_code
         == 503
     )
+
+
+def test_existing_conversation_metadata_preserves_tuition_selections_over_http():
+    from backend.agent.state import TuitionInput
+    from tests.agent.test_tuition import PlanningPort, Turns, graph_for
+
+    class Runs:
+        async def put(self, response, actor):
+            assert actor == ACTOR
+
+    graph = graph_for(
+        PlanningPort(multiple_funding=True),
+        Turns(TuitionInput(), TuitionInput(funding_option=2), TuitionInput()),
+    )
+    app.dependency_overrides[verified_actor] = lambda: ACTOR
+    app.dependency_overrides[agent_services] = lambda: AgentServices(graph, Runs())
+    try:
+        with TestClient(app) as client:
+            first = client.post(
+                "/api/v1/agent/messages",
+                json={
+                    "message": "Pay tuition",
+                    "conversation_id": "browser_conversation",
+                },
+            )
+            second = client.post(
+                "/api/v1/agent/messages",
+                json={
+                    "message": "The second",
+                    "conversation_id": "browser_conversation",
+                },
+            )
+            separate = client.post(
+                "/api/v1/agent/messages",
+                json={
+                    "message": "Continue",
+                    "conversation_id": "another_conversation",
+                },
+            )
+        assert first.status_code == second.status_code == separate.status_code == 200
+        assert "Which permitted funding account" in first.json()["message"]
+        assert "Draft intent preview" in second.json()["message"]
+        assert "Which permitted funding account" in separate.json()["message"]
+        assert set(second.json()) == {
+            "run_id",
+            "message",
+            "requested_action",
+            "tool_events",
+            "resources",
+        }
+    finally:
+        app.dependency_overrides.clear()

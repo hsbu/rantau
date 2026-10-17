@@ -90,7 +90,10 @@ async def test_graph_displays_scoped_quotes_without_execution_or_raw_account_det
     assert "expected CNY 20,000.00; posted CNY 0.00; remaining CNY 20,000.00" in result.message
     assert "No payment has been requested or executed" in result.message
     assert "quotes" in port.calls
-    assert all(call in {"obligations", "obligation", "policy", "quotes"} for call in port.calls)
+    assert all(
+        call in {"obligations", "obligation", "policy", "quotes", "permissions"}
+        for call in port.calls
+    )
     assert "acct_idr_01" not in result.model_dump_json()
 
 
@@ -107,8 +110,7 @@ def test_expected_posted_and_remaining_keep_exact_partial_credit():
 async def test_fully_posted_tuition_has_no_new_quote_or_payment():
     port = FakeReadPort()
     port.tuition = type(OBLIGATION).model_validate(
-        OBLIGATION.model_dump()
-        | {"posted_minor": 2_000_000, "balance_minor": 0, "state": "PAID"}
+        OBLIGATION.model_dump() | {"posted_minor": 2_000_000, "balance_minor": 0, "state": "PAID"}
     )
     result = await AgentTools(port, clock=lambda: NOW).handle(Intent.TUITION, "Tuition", ACTOR)
     assert "posted CNY 20,000.00; remaining CNY 0.00" in result.message

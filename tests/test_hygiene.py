@@ -30,3 +30,5 @@ def test_secrets_are_detected_without_echoing_values():
     assert findings
     assert value not in str(findings)
     assert not inspect_path(".env.example", "OPENAI_API_KEY=\n")
+    assert not inspect_path(".env.example", "OPENROUTER_API_KEY=\n")
+    assert inspect_path(".env.example", "OPENROUTER_API_KEY=synthetic-nonempty-key\n")

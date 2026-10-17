@@ -65,7 +65,14 @@ async def test_chat_cannot_grant_authority_even_with_adversarial_classification(
         FixedClassifier(Intent.TUITION), AgentTools(port, clock=lambda: NOW)
     ).run(attack, ACTOR)
     assert ACTOR.model_dump() == before
-    assert set(port.calls) <= {"obligations", "policy", "obligation", "quotes"}
+    assert set(port.calls) <= {
+        "obligations",
+        "policy",
+        "obligation",
+        "quotes",
+        "permissions",
+        "beneficiary",
+    }
     assert "No payment has been requested or executed" in result.message
 
 

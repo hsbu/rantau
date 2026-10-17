@@ -49,7 +49,7 @@ def inspect_path(path: str, content: str) -> list[str]:
         findings.append("possible credential; inspect locally and rotate if real")
     if name == ".env.example":
         for line in content.splitlines():
-            if line.startswith("OPENAI_API_KEY="):
+            if line.startswith(("OPENROUTER_API_KEY=", "OPENAI_API_KEY=")):
                 value = line.partition("=")[2].strip().strip("\"'")
                 if value and value != "replace-with-local-key":
                     findings.append("API key template must be blank or a placeholder")
