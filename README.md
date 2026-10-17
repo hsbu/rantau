@@ -9,7 +9,7 @@ Product sources: [MVP specification](Rantau-MVP-Spec.md) and
 ## Local setup
 
 Use Python 3.12, uv, Node 22.13+ and npm. Copy `.env.example` to ignored `.env` if
-needed. Set `OPENAI_API_KEY` and `OPENAI_MODEL` locally to configure the classifier;
+needed. Set `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` locally to configure the classifier;
 offline tests and the explicit synthetic harness need neither.
 
 ```powershell
@@ -52,8 +52,13 @@ docker compose config --quiet
 ```
 
 The offline demo forces six classifications and uses isolated synthetic adapters;
-it demonstrates graph routing, not live model quality or real payments. The OpenAI
-adapter uses a configurable model with structured output and safe failure handling.
+it demonstrates graph routing, not live model quality or real payments. The OpenRouter
+adapter uses its `https://openrouter.ai/api/v1` endpoint with the compatible Python
+SDK, a configurable provider/model ID, JSON-schema output and safe failure handling.
+Provider routing requires parameter support and requests `data_collection: deny`.
+These are provider-routing preferences, not an independent privacy/compliance guarantee.
+Set the key/model
+locally; the old `OPENAI_API_KEY`/`OPENAI_MODEL` variables are not used.
 Live API access requires separate verification. Keep task updates in the shared
 progress folder: [Dev A](docs/progress/progress-a.md),
 [Dev B](docs/progress/progress-b.md), and [Dev C](docs/progress/progress-c.md).
