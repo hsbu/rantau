@@ -18,8 +18,10 @@ from backend.finance.audit import AuditEvent, AuditWriter
 from backend.finance.authorization import GateFactory, evaluate_gate
 from backend.finance.outcomes import Created, Refused
 from backend.finance.records import Row, fetch, intent_from_row, lock_intent, may_view
+from backend.finance.simclock import sim_now
 from backend.finance.states import INTENT_TRANSITIONS, require_transition
 from backend.finance.terms import canonical_terms_hash
+from backend.university.obligations import read_obligation
 
 _STATE_AFTER_DECISION = {
     Decision.ALLOW: PaymentState.DRAFT,
@@ -122,7 +124,10 @@ class IntentService:
 
 
 class _ProposalFacts:
-    def __init__(self, obligation: Row, account: Row, beneficiary: Row | None, quote: Row):
+    def __init__(
+        self, obligation: Row, account: Row, beneficiary: Row | None, quote: Row, balance_minor: int
+    ):
+        self.balance_minor = balance_minor
         self.obligation = obligation
         self.account = account
         self.beneficiary = beneficiary
@@ -130,7 +135,7 @@ class _ProposalFacts:
 
     @property
     def mismatched(self) -> bool:
-        wrong_amount = self.quote["destination_amount_minor"] != self.obligation["amount_due_minor"]
+        wrong_amount = self.quote["destination_amount_minor"] != self.balance_minor
         wrong_currency = self.quote["source_currency"] != self.account["currency"]
         return bool(wrong_amount or wrong_currency)
 
@@ -146,8 +151,13 @@ class _ProposalFacts:
         quote = fetch(connection, "quote", tenant, proposal.quote_id)
         if account is None or quote is None:
             raise ScopeDenied("Resource unavailable")
+        if actor.actor_id not in {account["owner_id"], *account["permitted_requesters"]}:
+            raise ScopeDenied("Resource unavailable")
+        balance = read_obligation(
+            connection, tenant, obligation, sim_now(connection, tenant)
+        ).obligation.balance_minor
         beneficiary = fetch(connection, "beneficiary", tenant, proposal.beneficiary_id)
-        return cls(obligation, account, beneficiary, quote)
+        return cls(obligation, account, beneficiary, quote, balance)
 
 
 def _insert_draft(

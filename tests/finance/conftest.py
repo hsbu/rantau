@@ -14,6 +14,10 @@ from backend.finance.executor import ExecutionService
 from backend.finance.intents import IntentService
 from backend.finance.migrations import migrate_all
 from backend.finance.policy_repo import FinancePolicyRepository
+from backend.finance.provider import SimulatedProvider
+from backend.finance.transfers import TransferService
+from backend.university.receipts import UniversityReceipts
+from backend.university.reconciliation import CaseService, ReviewService
 from tests.authz import conftest as auth_conftest
 from tests.finance.authority import ScriptedAuthority
 
@@ -23,11 +27,17 @@ postgres_dsn = auth_conftest.postgres_dsn
 TENANT = "demo_001"
 FINANCE_DB = "rantau_test_finance"
 ACTORS = (
-    ("stu_001", "STUDENT", ["student:read", "payment:propose", "payment:execute"]),
+    (
+        "stu_001",
+        "STUDENT",
+        ["student:read", "payment:propose", "payment:execute", "reconciliation:submit"],
+    ),
     ("par_001", "SPONSOR", ["sponsor:read", "sponsor:approve", "payment:execute"]),
 )
 TRUNCATED = (
-    "audit_events, policy_decisions, auth_login_attempts, spend_entries, ledger_entries, "
+    "audit_events, policy_decisions, auth_login_attempts, reconciliation_evidence, "
+    "reconciliation_cases, university_receipts, sim_provider_faults, sim_provider_transfers, "
+    "spend_entries, ledger_entries, "
     "idempotency_keys, transfers, payment_intents, fx_quotes, university_postings, "
     "tuition_obligations, beneficiaries, payment_rules, university_policies, funding_accounts, "
     "demo_state, actors"
@@ -80,6 +90,9 @@ class Services:
     authority: ScriptedAuthority
     intents: IntentService
     executor: ExecutionService
+    transfers: TransferService
+    cases: CaseService
+    review: ReviewService
 
     def actor(self, actor_id: str) -> ActorContext:
         return self.auth.login(USERNAMES[actor_id], PASSWORD, "finance-tests").actor
@@ -101,8 +114,16 @@ def services(seeded, password_hash):
     def gate(connection):
         return TransactionAuthorization(connection, auth, repository)
 
+    transfers = TransferService(seeded, SimulatedProvider(seeded), UniversityReceipts())
     return Services(
-        seeded, auth, authority, IntentService(seeded, gate), ExecutionService(seeded, gate)
+        seeded,
+        auth,
+        authority,
+        IntentService(seeded, gate),
+        ExecutionService(seeded, gate, transfers),
+        transfers,
+        CaseService(seeded, gate),
+        ReviewService(seeded),
     )
 
 
