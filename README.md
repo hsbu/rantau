@@ -227,6 +227,16 @@ verify simulated T1 allowance execution, cumulative mandate limits, revocation,
 and current beneficiary ownership/purpose checks before debit. Admin provisioning and
 session/consent reset semantics are also separate coordinated work.
 
+`GET /api/v1/security-cases/{id}` returns a scoped `SecurityCaseView` with
+`case_id`, `resource_id`, `state`, `reason`, `created_at`, `updated_at` and
+`audit_event_id`. Reporter identity and evidence references remain internal.
+Reads require a current real session and the existing role-specific read scope;
+related funding owners and explicitly scoped reviewers use the trusted resource
+adapter. Missing and inaccessible cases both return the same 404; unavailable
+case storage returns a sanitized 503. Responses are `no-store`. This read endpoint
+does not expose hold placement/clearing or reviewer decisions. Agent invocation
+and a case UI remain separate work.
+
 Auth tests use a fresh temporary PostgreSQL instance when `initdb` and `pg_ctl`
 are on PATH. Its files remain ignored under `.generated/`. Alternatively set
 `RANTAU_TEST_DATABASE_URL` to a **dedicated test database whose name starts with
