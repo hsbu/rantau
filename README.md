@@ -174,6 +174,20 @@ are on PATH. Its files remain ignored under `.generated/`. Alternatively set
 at an application database. CI provisions its own PostgreSQL 17 service. Tests do
 not use the local application's `DATABASE_URL` or bootstrap passwords.
 
+## Finance foundation (Dev C)
+
+Apply the ordered auth and finance migrations, then reset the isolated demo fixture
+(development/test only; touches Dev C tables, never identities or audit history):
+
+```powershell
+uv run python -m backend.demo.reset --migrate --scenario tuition_happy_path
+```
+
+Scenarios: `tuition_happy_path`, `forged_beneficiary`, `demo_long_quotes`. All data is
+synthetic. Finance tests need PostgreSQL binaries on PATH (for example
+`C:\Program Files\PostgreSQL\18\bin`) or `RANTAU_TEST_DATABASE_URL`; they use their own
+`rantau_test_finance` database. No HTTP finance routes exist yet.
+
 ## Checks and isolated demo
 
 ```powershell
