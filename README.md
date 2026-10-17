@@ -127,6 +127,10 @@ After setting `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` in the ignored local
 uv run python -m backend.agent.demo --openrouter
 # Or send several turns in one process:
 uv run python -m backend.agent.demo --openrouter --message "Pay my tuition" --message "Use the full balance"
+# Opt into public official-source reads when shortfall guidance is missing:
+uv run python -m backend.agent.demo --openrouter --web-guidance
+# Check those sources alone, without a model/key or financial data:
+uv run python -m backend.agent.demo --research-shortfall
 ```
 
 This calls the configured OpenRouter model for intent and bounded tuition-field
@@ -135,6 +139,28 @@ scenario clock. Replies explain scoped data deterministically. The harness can
 build a typed draft preview; it cannot persist a payment intent, approve, debit,
 post tuition or clear a hold. It does not install fake authentication or a fake
 authorization gate in the application. `/quit` exits interactive mode.
+
+Shortfall guidance checks the reviewed KB first. With `--web-guidance`, a missing
+claim triggers a bounded read of two curated ZJU pages, used only as procedural
+inspiration for the fictional university. This is source discovery, not unrestricted
+web search or automatic procedure extraction: keyword matches are unreviewed leads.
+The response includes source links, curated publication dates (or unknown), cohort
+limits and the actual UTC retrieval time. Fresh pages never change payment rules.
+Without an applicable reviewed procedure, the response stays pending university
+review and asks for receipt/reference and expected-versus-posted evidence. It does
+not submit a case, approve a top-up or alter tuition posting. The authored 48-hour
+posting window and November scenario clock remain fixture configuration; establishing
+a real university SLA is not an MVP blocker.
+
+The lookup sends only fixed public HTTPS requests, with no chat text, identifiers,
+cookies, credentials or financial details. It follows no redirects/links, accepts
+only uncompressed HTML up to 256 KiB per page, bounds each fetch to six seconds,
+and caches results for five minutes. Downloaded text is discarded after lead detection;
+it is not displayed, persisted, added to the KB or sent to the model. Missing,
+oversized, unsupported or unreachable sources keep the response pending review.
+Default offline runs make no network requests. Trusted application wiring can inject
+`OfficialSourceLookup` into `AgentTools` later; the HTTP service still requires B/C
+authentication/domain adapters, and the Scenarios tab stays scripted.
 
 A-03 remembers tuition obligation, funding and quote selections across turns.
 The backend reloads current permissions, policy, quotes and verified payee each
