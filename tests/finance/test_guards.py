@@ -84,3 +84,16 @@ def imports_tests(tree):
         ):
             return True
     return False
+
+
+def test_the_simulated_sponsor_approval_is_reachable_only_from_the_replay_tool():
+    importers = [
+        path.name
+        for path in BACKEND.rglob("*.py")
+        if path.name != "replay.py"
+        and (
+            "backend.demo.replay" in path.read_text(encoding="utf-8")
+            or "SimulatedSponsorApproval" in path.read_text(encoding="utf-8")
+        )
+    ]
+    assert not importers
