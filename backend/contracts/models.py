@@ -97,6 +97,21 @@ class TuitionObligation(Contract):
         return self
 
 
+class ProviderStatusRef(Contract):
+    """Provider delivery is reported separately from the university's posted balance."""
+
+    payment_id: Identifier
+    transfer_status: PaymentState
+
+
+class TuitionObligationDetail(TuitionObligation):
+    provider_status: ProviderStatusRef | None = None
+    posting_deadline_at: AwareDatetime | None = None
+    active_case_id: Identifier | None = None
+    shortfall_minor: Minor = 0
+    topup_permitted: bool = False
+
+
 class TrustedBeneficiary(Contract):
     id: Identifier
     owner_id: Identifier
@@ -167,6 +182,25 @@ class PaymentIntent(PaymentTerms):
         if self.id != self.intent_id:
             raise ValueError("Intent aliases must agree")
         return self
+
+
+class PaymentIntentView(Contract):
+    """Client-safe intent: no account identifiers, fingerprints or balances."""
+
+    id: Identifier
+    purpose: Literal["TUITION", "ALLOWANCE"]
+    state: PaymentState
+    tier: Tier
+    obligation_id: Identifier | None
+    source_currency: Currency
+    destination_currency: Currency
+    source_total_minor: PositiveMinor
+    destination_amount_minor: PositiveMinor
+    quote_id: Identifier
+    quote_expiry: AwareDatetime
+    terms_hash: str
+    beneficiary_label: str
+    funded_by_requester: bool
 
 
 class Approval(PaymentTerms):

@@ -15,10 +15,25 @@ def test_liveness_does_not_claim_domain_readiness(monkeypatch):
     assert response.json()["dependencies"]["authentication"] is False
 
 
-def test_no_finance_executor_or_fake_gate_is_exposed():
+def test_finance_routes_fail_closed_without_trusted_configuration(monkeypatch):
+    monkeypatch.setenv("AUTH_ENABLED", "false")
+    client = TestClient(app)
     paths = app.openapi()["paths"]
-    assert "/api/v1/payment-intents/{id}/execute" not in paths
-    assert "/api/v1/demo/reset" not in paths
+    assert "/api/v1/payment-intents/{intent_id}/execute" in paths
+    assert "/api/v1/demo/reset" in paths
+    for method, path in (
+        ("post", "/api/v1/payment-intents/x/execute"),
+        ("post", "/api/v1/demo/reset"),
+        ("get", "/api/v1/tuition/obligations"),
+    ):
+        response = getattr(client, method)(path, headers={"Idempotency-Key": "k"})
+        assert response.status_code in {401, 503}
+
+
+def test_the_integrated_wiring_never_installs_a_permissive_authority():
+    from backend.finance.wiring import UnavailableAuthority, configured_authority
+
+    assert isinstance(configured_authority(), UnavailableAuthority)
 
 
 def test_failed_database_connection_is_sanitized(monkeypatch):
