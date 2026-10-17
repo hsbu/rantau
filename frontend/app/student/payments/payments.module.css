@@ -1,0 +1,22 @@
+.page { width: min(920px, 100%); margin: auto; padding: 32px 20px 64px; display: grid; gap: 20px; }
+.banner { border: 1px solid #bac8bf; background: #eef2ea; padding: 8px 12px; font-size: .85rem; border-radius: 8px; }
+.card { background: #fff; border: 1px solid #d3ddd5; border-radius: 12px; padding: 18px; display: grid; gap: 14px; }
+.card h2 { margin: 0; font-size: 1.1rem; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.stat { display: grid; gap: 2px; }
+.stat span { font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: #5a756e; }
+.stat strong { font-size: 1.05rem; }
+.timeline { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0; }
+.step { border: 1px solid #d3ddd5; border-radius: 999px; padding: 6px 12px; font-size: .85rem; background: #fafafa; }
+.done { background: #e3f1e6; border-color: #8ab79a; }
+.current { background: #fff4d6; border-color: #d4b25a; }
+.problem { background: #fde4e1; border-color: #d98a80; }
+.notice { border-left: 4px solid #b8860b; background: #fff8e6; padding: 10px 12px; font-size: .9rem; }
+.table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.table th, .table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #e7ede9; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions button, .form button { border: 1px solid #2f5d54; background: #2f5d54; color: #fff; padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+.actions button:disabled, .form button:disabled { opacity: .6; cursor: progress; }
+.form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.form select, .form input { padding: 7px 8px; border: 1px solid #bac8bf; border-radius: 8px; }
+.lang { font-size: .85rem; }
