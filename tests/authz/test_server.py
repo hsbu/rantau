@@ -8,7 +8,7 @@ import time
 import httpx
 
 
-def test_live_server_does_not_trust_forwarded_client_addresses(service):
+def test_live_server_does_not_trust_forwarded_client_addresses(service, tmp_path):
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
         port = listener.getsockname()[1]
@@ -20,7 +20,7 @@ def test_live_server_does_not_trust_forwarded_client_addresses(service):
         AUTH_TRUSTED_ORIGIN="http://127.0.0.1:3000",
         DATABASE_URL=service.database.dsn,
     )
-    with tempfile.TemporaryFile(dir=".generated") as output:
+    with tempfile.TemporaryFile(dir=tmp_path) as output:
         process = subprocess.Popen(
             [sys.executable, "-m", "backend.server", "--host", "127.0.0.1", "--port", str(port)],
             env=environment,
