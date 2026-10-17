@@ -25,7 +25,10 @@ from backend.finance.authority import AuthoritySource
 from backend.finance.clock import db_now, period_starts
 from backend.finance.quotes import quote_from_row
 from backend.finance.records import Row, fetch, intent_from_row, lock_intent, may_view
-from backend.university.obligations import derive_obligation_state
+from backend.finance.simclock import sim_now
+from backend.university.obligations import read_obligation
+
+SUBMITTABLE_CASE_STATES = frozenset({"OPEN", "EVIDENCE_REQUIRED", "READY", "NEEDS_INFO"})
 
 
 class FinancePolicyRepository:
@@ -72,7 +75,20 @@ class FinancePolicyRepository:
     def load_reconciliation(
         self, connection: PolicyConnection, actor: ActorContext, action: ActionIntent
     ) -> ReconciliationSnapshot:
-        raise ServiceUnavailable("Reconciliation snapshots arrive with the university service")
+        case = connection.execute(
+            "SELECT c.alias, c.state, o.student_id FROM reconciliation_cases c "
+            "JOIN tuition_obligations o ON o.tenant_id = c.tenant_id "
+            "AND o.alias = c.obligation_alias WHERE c.tenant_id = %s AND c.alias = %s",
+            (actor.tenant_id, action.resource_id),
+        ).fetchone()
+        if case is None:
+            raise ScopeDenied("Resource unavailable")
+        return ReconciliationSnapshot(
+            tenant_id=actor.tenant_id,
+            case_id=case["alias"],
+            student_id=case["student_id"],
+            submission_allowed=case["state"] in SUBMITTABLE_CASE_STATES,
+        )
 
     def _account(self, connection: PolicyConnection, tenant: str, row: Row) -> AccountSnapshot:
         owner = connection.execute(
@@ -94,31 +110,7 @@ class FinancePolicyRepository:
         )
 
     def _obligation(self, connection: PolicyConnection, tenant: str, row: Row) -> TuitionObligation:
-        posted = connection.execute(
-            "SELECT COALESCE(sum(posted_minor), 0) AS posted FROM university_postings "
-            "WHERE tenant_id = %s AND obligation_alias = %s",
-            (tenant, row["alias"]),
-        ).fetchone()
-        unresolved = connection.execute(
-            "SELECT 1 FROM transfers WHERE tenant_id = %s AND obligation_alias = %s "
-            "AND blocks_obligation",
-            (tenant, row["alias"]),
-        ).fetchone()
-        posted_minor = int(posted["posted"]) if posted else 0
-        due = row["amount_due_minor"]
-        return TuitionObligation(
-            id=row["alias"],
-            student_id=row["student_id"],
-            university_id=row["university_id"],
-            amount_due_minor=due,
-            posted_minor=posted_minor,
-            balance_minor=due - posted_minor,
-            due_at=row["due_at"],
-            policy_id=row["policy_alias"],
-            state=derive_obligation_state(
-                due, posted_minor, unresolved_transfer=unresolved is not None
-            ),
-        )
+        return read_obligation(connection, tenant, row, sim_now(connection, tenant)).obligation
 
     def _rules(self, connection: PolicyConnection, tenant: str, version: str) -> PolicyRules:
         row = connection.execute(

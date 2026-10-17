@@ -174,7 +174,7 @@ are on PATH. Its files remain ignored under `.generated/`. Alternatively set
 at an application database. CI provisions its own PostgreSQL 17 service. Tests do
 not use the local application's `DATABASE_URL` or bootstrap passwords.
 
-## Finance foundation (Dev C)
+## Finance, university simulator and demo (Dev C)
 
 Apply the ordered auth and finance migrations, then reset the isolated demo fixture
 (development/test only; touches Dev C tables, never identities or audit history):
@@ -183,10 +183,23 @@ Apply the ordered auth and finance migrations, then reset the isolated demo fixt
 uv run python -m backend.demo.reset --migrate --scenario tuition_happy_path
 ```
 
-Scenarios: `tuition_happy_path`, `forged_beneficiary`, `demo_long_quotes`. All data is
-synthetic. Finance tests need PostgreSQL binaries on PATH (for example
+Scenarios: `tuition_happy_path`, `forged_beneficiary`, `demo_long_quotes`,
+`tuition_missing_reference`, `shortfall_topup_off`, `shortfall_topup_on`,
+`provider_timeout`, `provider_unavailable`, `delayed_posting`. All data is synthetic.
+
+Finance routes live under `/api/v1` (obligations, quotes, payment intents, transfers,
+reconciliations, audit) and demo controls under `/api/v1/demo` (administrator only).
+Payment writes return 503 until Dev B's approval, mandate and hold stores are connected;
+no scripted authority is installed in the application. The provider and university are
+simulated: payment delivery is never tuition paid, and posting happens only when the
+simulated clock reaches the receipt's posting time (`POST /demo/university/tick`,
+`POST /tuition/obligations/{id}/recheck`).
+
+Finance tests need PostgreSQL binaries on PATH (for example
 `C:\Program Files\PostgreSQL\18\bin`) or `RANTAU_TEST_DATABASE_URL`; they use their own
-`rantau_test_finance` database. No HTTP finance routes exist yet.
+`rantau_test_finance` database. The `/student/payments` and `/demo` pages read the backend
+through the server-only `FINANCE_API_ORIGIN` (falls back to `AGENT_API_ORIGIN`) and relay
+mutations through fixed-path same-origin handlers.
 
 ## Checks and isolated demo
 

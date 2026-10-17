@@ -39,12 +39,12 @@ def test_approved_payment_debits_once_and_records_every_effect(services, student
     alias = approved_intent(services, student)
     result = services.executor.execute(student, alias, "key-001")
     assert isinstance(result, Executed)
-    assert result.transfer_state == PaymentState.PROCESSING and not result.replayed
+    assert result.transfer_state == PaymentState.DELIVERED and not result.replayed
     db = services.database
     assert balance(db) == OPENING - TOTAL
     assert count(db, "transfers") == 1 and count(db, "spend_entries") == 1
     assert count(db, "ledger_entries") == 3 and ledger_totals(db) == 0
-    assert scalar(db, "SELECT state FROM payment_intents") == "PROCESSING"
+    assert scalar(db, "SELECT state FROM payment_intents") == "DELIVERED"
     assert scalar(db, "SELECT count(*) FROM audit_events WHERE action = 'PAYMENT_DEBITED'") == 1
     assert scalar(db, "SELECT count(*) FROM policy_decisions WHERE decision = 'ALLOW'") == 1
 

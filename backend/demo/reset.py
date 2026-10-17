@@ -11,6 +11,11 @@ from backend.finance.migrations import migrate_all
 DEMO_ENVIRONMENTS = frozenset({"development", "test"})
 # Child tables first so every delete respects the logical dependencies.
 RESETTABLE_TABLES = (
+    "reconciliation_evidence",
+    "reconciliation_cases",
+    "university_receipts",
+    "sim_provider_faults",
+    "sim_provider_transfers",
     "spend_entries",
     "ledger_entries",
     "idempotency_keys",

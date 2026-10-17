@@ -1,10 +1,10 @@
 """Protected execution: gate, re-checks, debit, ledger and transfer in one transaction.
 
-The provider call and its outcome transaction follow in the next change; a committed
-transfer stays PROCESSING with provider_submitted_at unset until then.
+The provider is called only after the debit commits; TransferService applies the outcome.
 """
 
 import hashlib
+from dataclasses import replace
 from uuid import uuid4
 
 from backend.authz.policy_repository import PolicyConnection
@@ -25,6 +25,7 @@ from backend.finance.outcomes import Executed, Refused
 from backend.finance.records import LockedIntent, Row, fetch, intent_from_row, lock_intent, may_view
 from backend.finance.states import INTENT_TRANSITIONS, require_transition
 from backend.finance.terms import canonical_terms_hash
+from backend.finance.transfers import FINAL_STATES, TransferService
 
 CLEARING_ACCOUNT = "system:provider_clearing"
 FEE_ACCOUNT = "system:fee_revenue"
@@ -35,12 +36,32 @@ class IdempotencyKeyReused(Exception):
 
 
 class ExecutionService:
-    def __init__(self, database: Database, gate: GateFactory, audit: AuditWriter | None = None):
+    def __init__(
+        self,
+        database: Database,
+        gate: GateFactory,
+        transfers: TransferService,
+        audit: AuditWriter | None = None,
+    ):
         self.database = database
         self.gate = gate
+        self.transfers = transfers
         self.audit = audit or AuditWriter()
 
     def execute(
+        self,
+        actor: ActorContext,
+        intent_alias: str,
+        idempotency_key: str,
+        claimed_terms_hash: str | None = None,
+    ) -> Executed | Refused:
+        outcome = self._decide_and_debit(actor, intent_alias, idempotency_key, claimed_terms_hash)
+        if isinstance(outcome, Refused) or outcome.transfer_state in FINAL_STATES:
+            return outcome
+        state = self.transfers.settle(actor.tenant_id, outcome.payment_id)
+        return replace(outcome, transfer_state=state)
+
+    def _decide_and_debit(
         self,
         actor: ActorContext,
         intent_alias: str,
