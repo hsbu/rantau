@@ -15,7 +15,11 @@ _TEXT_RULES: tuple[tuple[AdvisorySignal, re.Pattern[str]], ...] = (
     ),
     (
         AdvisorySignal.IMPERSONATION,
-        re.compile(r"\b(pretend to be|act as|impersonat\w*|from the (?:bank|university))\b", re.I),
+        re.compile(
+            r"\b(pretend to be|act as|impersonat\w*|from the (?:bank|university)|"
+            r"(?:i am|i'm) (?:your|the) (?:parent|father|mother|guardian))\b",
+            re.I,
+        ),
     ),
     (
         AdvisorySignal.EMERGENCY_REQUEST,
@@ -32,8 +36,9 @@ _TEXT_RULES: tuple[tuple[AdvisorySignal, re.Pattern[str]], ...] = (
     (
         AdvisorySignal.PROMPT_INJECTION,
         re.compile(
-            r"\b(ignore (?:all )?(?:previous|prior) instructions|override (?:the )?policy|"
-            r"bypass (?:approval|verification)|reveal (?:the )?system prompt)\b",
+            r"\b(ignore (?:all )?(?:previous|prior|the) (?:instructions|rules|guidance)|"
+            r"override (?:the )?policy|bypass (?:approval|verification)|"
+            r"reveal (?:the )?system prompt|(?:remove|clear|release) (?:the )?security hold)\b",
             re.I,
         ),
     ),
