@@ -41,8 +41,7 @@ views clears the visible conversation so fixture state never carries into Chat.
 This is the first working interface, with further layout refinement expected
 after integrated agent testing.
 
-The header's moon/sun button toggles dark mode. The workspace follows your system
-theme until you choose a mode, then saves that preference locally. Scroll within
+The workspace uses a light theme with neutral form focus indicators. Scroll within
 the conversation to read older messages, or continue scrolling past its edge to
 move the page. New replies follow the bottom only while you are already there;
 use **Latest messages** to return after reading history.

@@ -1,38 +1,5 @@
 import { test, expect } from "@playwright/test";
 
-test("dark mode follows the system and retains a manual choice across views and reloads", async ({ page }) => {
-  await page.emulateMedia({ colorScheme: "dark" });
-  await page.goto("/student/chat");
-  const toggle = page.getByRole("button", { name: "Dark mode", exact: true });
-  await expect(toggle).toHaveAttribute("aria-pressed", "true");
-  await toggle.click();
-  await expect(toggle).toHaveAttribute("aria-pressed", "false");
-  await page.getByRole("navigation", { name: "Chat views" }).getByRole("link", { name: "Scenarios", exact: true }).click();
-  await expect(toggle).toHaveAttribute("aria-pressed", "false");
-  await page.reload();
-  await expect(toggle).toHaveAttribute("aria-pressed", "false");
-  await toggle.click();
-  await page.emulateMedia({ colorScheme: "light" });
-  await expect(toggle).toHaveAttribute("aria-pressed", "true");
-  await page.reload();
-  await expect(toggle).toHaveAttribute("aria-pressed", "true");
-});
-
-test("theme control still works when browser preference storage is blocked", async ({ page }) => {
-  await page.addInitScript(() => {
-    Storage.prototype.getItem = () => { throw new Error("Storage blocked in test"); };
-    Storage.prototype.setItem = () => { throw new Error("Storage blocked in test"); };
-  });
-  await page.emulateMedia({ colorScheme: "light" });
-  await page.goto("/student/chat");
-  const toggle = page.getByRole("button", { name: "Dark mode", exact: true });
-  await expect(toggle).toHaveAttribute("aria-pressed", "false");
-  await toggle.click();
-  await expect(toggle).toHaveAttribute("aria-pressed", "true");
-  await toggle.click();
-  await expect(toggle).toHaveAttribute("aria-pressed", "false");
-});
-
 test("page scroll chains past the transcript and new replies do not pull readers away from history", async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 720 });
   let release: (() => void) | undefined;

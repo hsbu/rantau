@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import { ActionPanel } from "./action-panel";
 import { ChatError, connectedTransport, visibleText } from "./chat-types";
 import type { ActionSummary, ChatTransport } from "./chat-types";
-import { useTheme } from "./theme";
 import styles from "./chat.module.css";
 
 type Message = { id: number; role: "user" | "assistant"; text: string };
@@ -26,7 +25,6 @@ export function ChatWorkspace({ transport = connectedTransport, preview = false,
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<keyof typeof errorText>();
   const [showLatest, setShowLatest] = useState(false);
-  const { theme, toggleTheme } = useTheme();
   const conversation = useRef<string | null>(null);
   const request = useRef<AbortController | null>(null);
   const sequence = useRef(0);
@@ -88,16 +86,13 @@ export function ChatWorkspace({ transport = connectedTransport, preview = false,
   }
 
   const promptIndex = Math.min(messages.filter(message => message.role === "user").length, prompts.length - 1);
-  return <div className={styles.workspace} data-theme={theme}>
+  return <div className={styles.workspace}>
     <header className={styles.nav}>
       <Link href="/" className={styles.wordmark}>rantau<span aria-hidden="true">↗</span></Link>
-      <div className={styles.headerActions}><nav className={styles.viewTabs} aria-label="Chat views">
+      <nav className={styles.viewTabs} aria-label="Chat views">
         <Link href="/student/chat" className={styles.viewTab} aria-current={!preview ? "page" : undefined}>Chat</Link>
         <Link href="/student/chat/preview" className={styles.viewTab} aria-current={preview ? "page" : undefined}>Scenarios</Link>
       </nav>
-      <button type="button" className={styles.themeToggle} onClick={toggleTheme} aria-label="Dark mode" aria-pressed={theme === "dark"} title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
-        <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
-      </button></div>
     </header>
     <div className={styles.safetyBanner}>{preview
       ? <>Scenario preview · Scripted responses, no model calls, authentication or payment actions.</>

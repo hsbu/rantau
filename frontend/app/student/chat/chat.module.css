@@ -1,45 +1,21 @@
 .workspace {
   --ink: #183c37; --muted: #5d6e67; --line: #d8dfd5; --green: #24594a; --paper: #fafbf7;
   --surface: #fff; --soft: #edf1e8; --user: #eff3eb; --balance: #eaf0df;
-  --focus: #477b64; --control-border: #aabdad; --scrollbar: #9baa9d;
+  --focus: #737373; --control-border: #c7c7c7; --scrollbar: #9baa9d;
   --accent-ink: #31573d; --tag-bg: #edf3e7; --tag-border: #bdcdbc;
   --warm-ink: #6e5119; --warm-copy: #6c582f; --warm-bg: #fbf5e9; --warm-border: #d8c69d;
   --send-ink: #fff; --send-hover: #153f32; --hover-ink: #38734c; --mark-bg: #dfe9d6;
   color-scheme: light; min-height: 100dvh; background: var(--paper); color: var(--ink); font-family: Arial, Helvetica, sans-serif;
 }
-.workspace[data-theme="dark"] {
-  --ink: #e0ede4; --muted: #a4b7aa; --line: #344b3d; --green: #95c6a7; --paper: #101c16;
-  --surface: #17271f; --soft: #1b2e25; --user: #20362b; --balance: #243d2b;
-  --focus: #89c9a3; --control-border: #52705c; --scrollbar: #71917c;
-  --accent-ink: #c3e4b8; --tag-bg: #263d2c; --tag-border: #4a6b4b;
-  --warm-ink: #f0d49d; --warm-copy: #dbc8a4; --warm-bg: #30291b; --warm-border: #6e5b34;
-  --send-ink: #12281c; --send-hover: #acd2b9; --hover-ink: #b4dec2; --mark-bg: #2c4734;
-  color-scheme: dark;
-}
-@media (prefers-color-scheme: dark) {
-  .workspace[data-theme="system"] {
-    --ink: #e0ede4; --muted: #a4b7aa; --line: #344b3d; --green: #95c6a7; --paper: #101c16;
-    --surface: #17271f; --soft: #1b2e25; --user: #20362b; --balance: #243d2b;
-    --focus: #89c9a3; --control-border: #52705c; --scrollbar: #71917c;
-    --accent-ink: #c3e4b8; --tag-bg: #263d2c; --tag-border: #4a6b4b;
-    --warm-ink: #f0d49d; --warm-copy: #dbc8a4; --warm-bg: #30291b; --warm-border: #6e5b34;
-    --send-ink: #12281c; --send-hover: #acd2b9; --hover-ink: #b4dec2; --mark-bg: #2c4734;
-    color-scheme: dark;
-  }
-}
 .workspace button, .workspace textarea, .workspace select { font: inherit; }
 .workspace button, .workspace a, .workspace select { -webkit-tap-highlight-color: transparent; }
 .workspace button { cursor: pointer; }
 .workspace button:disabled { cursor: not-allowed; opacity: .5; }
-.workspace :is(button, a, select, textarea):focus-visible, .messages:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
+.workspace :is(button, a, select):focus-visible, .messages:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 .workspace a { color: inherit; text-underline-offset: 4px; }
 .nav { height: 82px; max-width: 1440px; margin: auto; padding: 0 48px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
 .wordmark { text-decoration: none; font-size: 34px; font-weight: 700; letter-spacing: -2px; display: flex; align-items: center; gap: 7px; }
 .wordmark span { font-size: 25px; font-weight: 400; }
-.headerActions { display: flex; align-items: center; gap: 25px; align-self: stretch; }
-.themeToggle { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--ink); }
-.themeToggle span { font-size: 21px; line-height: 1; }
-.themeToggle:hover { background: var(--soft); }
 .latest { display: block; margin: -6px auto 8px; padding: 8px 13px; border: 1px solid var(--control-border); border-radius: 6px; background: var(--surface); color: var(--ink); font-size: 12px !important; }
 .tag, .warningTag { border: 1px solid var(--tag-border); border-radius: 5px; padding: 5px 9px; font-size: 11px; color: var(--accent-ink); background: var(--tag-bg); white-space: nowrap; }
 .viewTabs { display: flex; align-self: stretch; gap: 28px; }
@@ -74,7 +50,7 @@
 .userMessage p, .assistantMessage p { font-size: 14px; line-height: 1.85; white-space: pre-wrap; margin: 7px 0 0; }
 .composerArea { padding: 8px 0 20px; }
 .composer { background: var(--surface); border: 1px solid var(--control-border); border-radius: 12px; padding: 16px; box-shadow: 0 3px 14px #183c3707; }
-.composer:focus-within { border-color: var(--green); }
+.composer:focus-within { border-color: var(--focus); }
 .composer textarea { width: 100%; min-height: 52px; max-height: 180px; resize: vertical; border: 0; outline: none; color: var(--ink); background: transparent; font-size: 14px; line-height: 1.6; }
 .composer textarea::placeholder { color: var(--muted); opacity: 1; }
 .composerBottom { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 7px; }
@@ -130,7 +106,6 @@
 @media (max-width: 760px) {
   .nav { height: 66px; padding: 0 20px; } .wordmark { font-size: 29px; }
   .viewTabs { gap: 22px; } .viewTab { font-size: 13px; }
-  .headerActions { gap: 14px; } .themeToggle { width: 32px; height: 32px; }
   .safetyBanner { padding: 10px 18px; font-size: 10px; } .safetyBanner a { margin-left: 5px; }
   .main { display: block; } .conversation { padding: 0 20px; border-right: 0; } .chatHeader { padding: 28px 0 23px; }
   .chatHeader h1 { font-size: 27px; } .chatHeader p:last-child { font-size: 11px; } .kicker { font-size: 9px; margin-bottom: 12px; }
