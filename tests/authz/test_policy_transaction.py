@@ -272,7 +272,7 @@ def test_both_migrations_replay_and_validate_checksums(database):
         rows = connection.execute(
             "SELECT version FROM rantau_migrations ORDER BY version"
         ).fetchall()
-        assert [row["version"] for row in rows] == ["001_auth", "002_policy_audit"]
+        assert [row["version"] for row in rows] == ["001_auth", "002_policy_audit", "003_authority"]
         connection.execute(
             "UPDATE rantau_migrations SET checksum = 'bad' WHERE version = '002_policy_audit'"
         )

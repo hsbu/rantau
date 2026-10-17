@@ -38,7 +38,7 @@ def migrate(database: Database) -> None:
             "CREATE TABLE IF NOT EXISTS rantau_migrations "
             "(version text PRIMARY KEY, checksum text NOT NULL)"
         )
-        for version in ("001_auth", "002_policy_audit"):
+        for version in ("001_auth", "002_policy_audit", "003_authority"):
             path = Path(__file__).resolve().parents[2] / "migrations" / f"{version}.sql"
             raw = path.read_bytes().replace(b"\r\n", b"\n")
             checksum = hashlib.sha256(raw).hexdigest()

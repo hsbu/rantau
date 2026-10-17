@@ -102,7 +102,7 @@ uv run python -m backend.authz.bootstrap --migrate --seed
 ```
 
 This explicitly applies the ordered, checksummed `001_auth.sql` and
-`002_policy_audit.sql` migrations and provisions the `student` and
+`002_policy_audit.sql` / `003_authority.sql` migrations and provisions the `student` and
 `sponsor` usernames for `stu_001` / `par_001` in `demo_001`. Bootstrap rejects
 environments other than development/test and refuses to overwrite an existing demo
 tenant. Migration replays check a stored checksum. The CLI uses local settings;
@@ -146,8 +146,9 @@ Do not connect fake domain services to make Chat appear ready.
 
 `backend.authz.policy_transaction.TransactionAuthorization` implements B-02's
 existing `AuthorizationPort` against a trusted `PolicyRepository` and the caller's
-PostgreSQL connection. Dev C must supply the repository and call the gate inside
-the protected execution transaction, on a worker thread, after locking current
+PostgreSQL connection. Dev C must supply the repository and use B-03's
+`authorize_execution` wrapper inside the protected execution transaction, on a
+worker thread, after locking current
 financial/authority state. The adapter rechecks the session and current database
 clock, then records a minimal redacted decision in `policy_decisions`. It never
 commits: a returned audit ID is durable only after the caller commits; a rollback
@@ -162,10 +163,55 @@ and the sponsor `payment:execute`, in addition to their existing scopes. These
 only permit gate evaluation: ownership, mandate/approval, holds and financial
 checks still apply. Migrations do not grant existing actors new privileges or
 overwrite credentials. Existing demo tenants require an explicitly coordinated
-scope update/reset; bootstrap continues refusing to overwrite them. B-03's
-authenticated approval/mandate lifecycle and C-03's atomic debit/reservation and
-idempotency integration remain pending; B-02's typed financial tests do not prove
-those effects. B-06 will add the broader holds/case/audit workflow.
+scope update/reset; bootstrap continues refusing to overwrite them. Connecting
+B-03's persisted authority to C-03's atomic debit/reservation and idempotency
+implementation remains pending; typed financial tests do not prove those
+effects. B-06 will add the broader holds/case/audit workflow.
+
+`backend.approvals.service.ApprovalService` persists B-03's owner requests,
+decisions and allowance mandates in PostgreSQL. `APPROVAL_TTL_SECONDS` defaults
+to 600 (valid range 1–3600); approval expiry is also capped by quote expiry.
+Dev C must use `backend.contracts.terms.canonical_terms_hash` when constructing
+immutable intents. SHA-256 covers every `PaymentTerms` field except the hash
+itself, with sorted compact JSON, exact integers and UTC-normalized timestamps.
+An approval is permission to attempt execution; current policy/balance/holds
+are still checked when executing, and it never means money has moved.
+
+The protected endpoints add student own-account review/confirmation at
+`GET /api/v1/student/approvals` and
+`POST /api/v1/student/approvals/{id}/decision`; the sponsor routes keep their
+existing decision payloads. Both lists return masked `ApprovalView` records
+without balances, bank identifiers, raw terms or student-private summaries.
+`POST /api/v1/payment-intents/{id}/approval-requests` has an empty body. Owner
+confirmation requires the exact reviewed `terms_hash` and trusted origin.
+Stale/expired/consumed/conflicting authority returns a sanitized 409.
+
+Sponsors manage own-account allowance mandates through GET/POST
+`/api/v1/sponsor/mandates` and PUT/DELETE `/api/v1/sponsor/mandates/{id}`.
+Writes require `mandate:manage`, granted to new sponsor seeds only. Existing
+actors are not silently upgraded. Limits are integer minor units; source
+timezone, active student relationship and verified beneficiary fingerprint
+come from trusted server records. Updates retain immutable revisions and
+revocation retains history. Expired mandates may be replaced; creating or
+replacing one never resets account-wide spending. Reading/revoking existing
+owned mandates remains available during a financial-adapter outage.
+
+Dev C implements `ApprovalFinanceRepository` and its full-terms CAS state hook,
+then injects it into `ApprovalService`. Runtime approval creation/review/decision
+and mandate creation/revision remain 503 until that adapter exists. Call
+`service.invalidate_for_revision(connection, actor, intent_id)` after revising
+terms. Inside protected execution, use
+`await service.authorize_execution(connection, actor, action)` on the worker
+thread with the caller's connection. This wraps B-02 with authority loaded
+from B's store and consumes an approved T2 record once. It rechecks time-sensitive
+policy after audit/session work and rolls back stale authority. C must retain
+locks, check freshness at its financial mutation, reserve limits, create the
+transfer and debit on that same transaction before commit. Rollback
+restores consumption/audit, and caller idempotency must resolve prior outcomes
+before invoking authorization again. Do not cache or reuse preview decisions.
+The isolated SQL financial repository in `tests/approvals/` tests this handoff;
+it is never installed as a runtime dependency. B-04's browser flow, real C
+integration, remote CI and full payment verification remain pending.
 
 Auth tests use a fresh temporary PostgreSQL instance when `initdb` and `pg_ctl`
 are on PATH. Its files remain ignored under `.generated/`. Alternatively set
