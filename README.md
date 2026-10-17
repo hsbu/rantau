@@ -63,14 +63,15 @@ AGENT_API_ORIGIN=http://127.0.0.1:8000
 ```
 
 Restart Next.js after changing this server-only setting. Compose supplies
-`http://backend:8000` instead. The relay accepts only message/conversation fields,
-forwards the browser's session cookie to the fixed agent endpoint, rejects
-foreign origins, disables caching and never forwards claimed actor/role headers
-or browser bearer tokens. It does not create a session; B-01 supplies backend
-verification, while B-04's browser sign-in flow is still pending. Missing trusted
-adapters/configuration produce a visible unavailable state, with no fallback to
-mocks. No API keys enter browser
-code. Session expiry clears the visible conversation.
+`http://backend:8000` instead. The student chat relay accepts only
+message/conversation fields, forwards the browser's session cookie to the fixed
+agent endpoint, rejects foreign origins, disables caching and never forwards
+claimed actor/role headers or browser bearer tokens. It does not create a
+session; B-01 supplies backend verification. The sponsor workspace at `/sponsor`
+uses fixed same-origin relays for sign-in, session, approval list and owner
+decisions. Both flows keep API keys and session tokens out of browser code.
+Missing trusted adapters/configuration produce a visible unavailable state,
+with no fallback to mocks. Session expiry clears the visible chat conversation.
 
 The current agent HTTP contract supplies assistant text, tool events and resource
 references. The connected page renders text safely and keeps structured details
@@ -101,8 +102,8 @@ Set `DATABASE_URL` to that isolated database, then run:
 uv run python -m backend.authz.bootstrap --migrate --seed
 ```
 
-This explicitly applies the ordered, checksummed `001_auth.sql` and
-`002_policy_audit.sql` migrations and provisions the `student` and
+This explicitly applies the ordered, checksummed auth, policy, authority and
+security migrations (`001`–`005`) and provisions the `student` and
 `sponsor` usernames for `stu_001` / `par_001` in `demo_001`. Bootstrap rejects
 environments other than development/test and refuses to overwrite an existing demo
 tenant. Migration replays check a stored checksum. The CLI uses local settings;
@@ -139,33 +140,90 @@ failures are sanitized.
 sponsor-role and field-specific consent guards for domain adapters. A sponsor's
 approval authority over their own funds does not grant access to student records.
 Consent grants visibility only and is checked against current expiry/revocation.
-Dev A/C must call these guards on their actual domain reads; those adapters remain
-pending. The B-04 sponsor UI/browser login flow is also pending: this ticket adds
-backend authentication, not browser sign-in pages.
+Dev C's scoped reads use these guards; the agent domain wiring remains pending.
+The B-04 sponsor page provides browser sign-in and protected owner decisions
+through fixed same-origin relays. Its complete browser-to-finance flow still
+needs an integrated browser run.
 Do not connect fake domain services to make Chat appear ready.
 
 `backend.authz.policy_transaction.TransactionAuthorization` implements B-02's
 existing `AuthorizationPort` against a trusted `PolicyRepository` and the caller's
-PostgreSQL connection. Dev C must supply the repository and call the gate inside
-the protected execution transaction, on a worker thread, after locking current
+PostgreSQL connection. `backend.approvals.finance.FinanceApprovalRepository`
+implements the trusted C SQL handoff. The runtime finance builder installs B-03's
+protected execution wrapper on a worker thread, after locking current
 financial/authority state. The adapter rechecks the session and current database
 clock, then records a minimal redacted decision in `policy_decisions`. It never
 commits: a returned audit ID is durable only after the caller commits; a rollback
 invalidates the result. Preview decisions cannot authorize a later debit.
 Repository locking, complete accounting coverage and authority provenance are
 documented in `backend/authz/policy_repository.py`. No financial test repository
-is connected to application wiring; `/ready` still reports unavailable domain
-services until the real simulator adapters exist.
+is connected to application wiring. `/ready` still reports unavailable domain
+services while the agent domain wiring remains incomplete.
 
 New demo seeds grant the student `payment:execute` and `reconciliation:submit`,
 and the sponsor `payment:execute`, in addition to their existing scopes. These
 only permit gate evaluation: ownership, mandate/approval, holds and financial
 checks still apply. Migrations do not grant existing actors new privileges or
 overwrite credentials. Existing demo tenants require an explicitly coordinated
-scope update/reset; bootstrap continues refusing to overwrite them. B-03's
-authenticated approval/mandate lifecycle and C-03's atomic debit/reservation and
-idempotency integration remain pending; B-02's typed financial tests do not prove
-those effects. B-06 will add the broader holds/case/audit workflow.
+scope update/reset; bootstrap continues refusing to overwrite them. B-03 authority
+and B-06 active holds now feed C's actual simulated executor. Hold writers take
+the same account/obligation/intent locks as execution before touching security
+rows. `backend.fraud.finance_access.build_security_service` exposes this backend
+service for payment-intent resources; no public hold-clearing endpoint is added.
+
+`backend.approvals.service.ApprovalService` persists B-03's owner requests,
+decisions and allowance mandates in PostgreSQL. `APPROVAL_TTL_SECONDS` defaults
+to 600 (valid range 1–3600); approval expiry is also capped by quote expiry.
+Dev C must use `backend.contracts.terms.canonical_terms_hash` when constructing
+immutable intents. SHA-256 covers every `PaymentTerms` field except the hash
+itself, with sorted compact JSON, exact integers and UTC-normalized timestamps
+with six fractional digits. C's compatibility import delegates to that helper.
+Existing immutable C intents hashed with the old zero-fraction timestamp format
+fail the integrity gate; create a fresh intent and obtain fresh approval rather
+than rewriting the stored digest or reusing old authority.
+An approval is permission to attempt execution; current policy/balance/holds
+are still checked when executing, and it never means money has moved.
+
+The protected endpoints add student own-account review/confirmation at
+`GET /api/v1/student/approvals` and
+`POST /api/v1/student/approvals/{id}/decision`; the sponsor routes keep their
+existing decision payloads. Both lists return masked `ApprovalView` records
+without balances, bank identifiers, raw terms or student-private summaries.
+`POST /api/v1/payment-intents/{id}/approval-requests` has an empty body. Owner
+confirmation requires the exact reviewed `terms_hash` and trusted origin.
+Stale/expired/consumed/conflicting authority returns a sanitized 409.
+
+Sponsors manage own-account allowance mandates through GET/POST
+`/api/v1/sponsor/mandates` and PUT/DELETE `/api/v1/sponsor/mandates/{id}`.
+Writes require `mandate:manage`, granted to new sponsor seeds only. Existing
+actors are not silently upgraded. Limits are integer minor units; source
+timezone, active student relationship and verified beneficiary fingerprint
+come from trusted server records. Updates retain immutable revisions and
+revocation retains history. Expired mandates may be replaced; creating or
+replacing one never resets account-wide spending. Reading/revoking existing
+owned mandates remains available during a financial-adapter outage.
+
+`FinanceApprovalRepository` implements the full-terms CAS state hook and is
+installed in runtime approval and finance services. Missing tables or required
+configuration still return sanitized 503 responses. Call
+`service.invalidate_for_revision(connection, actor, intent_id)` after revising
+terms. Inside protected execution, use
+`await service.authorize_execution(connection, actor, action)` on the worker
+thread with the caller's connection. This wraps B-02 with authority loaded
+from B's store and consumes an approved T2 record once. It rechecks time-sensitive
+policy after audit/session work and rolls back stale authority. C retains
+locks, creates the transfer and ledger debit on that same transaction, then runs
+a rejecting-only finalizer before commit to recheck authority/quote/policy
+expiry and the current session. The provider is called only after commit. Rollback
+restores consumption/audit, and caller idempotency must resolve prior outcomes
+before invoking authorization again. Do not cache or reuse preview decisions.
+Tests cover both the isolated adapter and actual default HTTP wiring with real
+sessions, B authority and C's simulated SQL ledger. Test-only adapters are never
+installed in application wiring. Browser sign-in/decision integration, the
+complete agent-driven flow remain separate checks. Real-session HTTP tests also
+verify simulated T1 allowance execution, cumulative mandate limits, revocation,
+and current beneficiary ownership/purpose checks before debit. Admin provisioning and
+session/consent reset semantics are also separate coordinated work.
 
 Auth tests use a fresh temporary PostgreSQL instance when `initdb` and `pg_ctl`
 are on PATH. Its files remain ignored under `.generated/`. Alternatively set
@@ -189,7 +247,7 @@ Scenarios: `tuition_happy_path`, `forged_beneficiary`, `demo_long_quotes`,
 
 Finance routes live under `/api/v1` (obligations, quotes, payment intents, transfers,
 reconciliations, audit) and demo controls under `/api/v1/demo` (administrator only).
-Payment writes return 503 until Dev B's approval, mandate and hold stores are connected;
+Payment writes use B's stored approval/mandate/hold readers and protected consumption;
 no scripted authority is installed in the application. The provider and university are
 simulated: payment delivery is never tuition paid, and posting happens only when the
 simulated clock reaches the receipt's posting time (`POST /demo/university/tick`,

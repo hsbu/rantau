@@ -284,6 +284,9 @@ def test_admin_can_inject_faults_and_advance_the_simulated_clock(api, password_h
 
 
 def test_payment_writes_fail_closed_when_no_authority_is_connected(services, monkeypatch):
+    from backend.finance.wiring import UnavailableAuthority
+
+    monkeypatch.setattr("backend.finance.wiring.configured_authority", UnavailableAuthority)
     monkeypatch.setenv("AUTH_ENABLED", "true")
     monkeypatch.setenv("AUTH_TENANT_ID", TENANT)
     monkeypatch.setenv("AUTH_TRUSTED_ORIGIN", "http://testserver")

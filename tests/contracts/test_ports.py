@@ -46,7 +46,7 @@ def test_export_has_full_catalogue_and_no_actor_request():
     from backend.contracts.schema import contract_schema
 
     schema = contract_schema()
-    assert len(schema["paths"]) == 34  # one path is shared by two methods
+    assert len(schema["paths"]) == 38
     execution = schema["paths"]["/api/v1/payment-intents/{id}/execute"]["post"]
     assert any(p["name"] == "Idempotency-Key" for p in execution["parameters"])
     request = schema["components"]["schemas"]["AgentMessage"]

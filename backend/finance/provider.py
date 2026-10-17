@@ -58,6 +58,12 @@ class SimulatedProvider:
     def submit(self, request: SubmitRequest) -> ProviderEvidence:
         """Idempotent per reference: a repeated submit never creates a second debit."""
         with self.database.connection() as connection:
+            # A missing row cannot be locked. Serialize first submissions before
+            # reading status or consuming a scripted fault for this reference.
+            connection.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                ("rantau:sim-provider:" + request.reference,),
+            )
             existing = self._lookup(connection, request.reference, request.tenant_id)
             if existing is not None:
                 return existing

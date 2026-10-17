@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, R
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 
+from backend.approvals.service import ApprovalConflict
 from backend.contracts.enums import Decision, ReasonCode
 from backend.contracts.http import (
     AuditEntry,
@@ -60,6 +61,8 @@ class FinanceRoute(APIRoute):
                 return JSONResponse(
                     {"detail": {"code": "FINANCE_UNAVAILABLE"}}, 503, headers=NO_STORE
                 )
+            except ApprovalConflict as error:
+                return JSONResponse({"detail": {"code": error.code}}, 409, headers=NO_STORE)
             result.headers["Cache-Control"] = "no-store"
             return result
 

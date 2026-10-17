@@ -9,16 +9,24 @@ from backend.authz.policy_repository import PolicyConnection
 from backend.authz.policy_transaction import TransactionAuthorization
 from backend.authz.service import AuthService
 from backend.authz.storage import Database
-from backend.contracts.models import Approval, PaymentIntent, ServiceUnavailable
+from backend.contracts.models import (
+    ActorContext,
+    Approval,
+    PaymentIntent,
+    PolicyDecision,
+    ServiceUnavailable,
+)
 from backend.dependencies import auth_service, auth_settings
 from backend.finance.authority import AuthoritySource, HoldState
-from backend.finance.executor import ExecutionService
+from backend.finance.authorization import GateFactory
+from backend.finance.executor import ExecutionFinalizer, ExecutionService
 from backend.finance.intents import IntentService
 from backend.finance.migrations import FINANCE_MIGRATIONS
 from backend.finance.policy_repo import FinancePolicyRepository
 from backend.finance.ports import FinancePaymentPort
 from backend.finance.provider import SimulatedProvider
 from backend.finance.reads import FinanceReads
+from backend.finance.records import LockedIntent
 from backend.finance.transfers import TransferService
 from backend.university.port import ObligationReader, UniversityPortImpl
 from backend.university.receipts import UniversityReceipts
@@ -26,7 +34,7 @@ from backend.university.reconciliation import CaseService, ReviewService
 
 
 class UnavailableAuthority:
-    """Stands in until Dev B's approval, mandate and hold stores exist; every use fails closed."""
+    """Explicit fail-closed source for integrations whose authority storage is unavailable."""
 
     def approval(self, connection: PolicyConnection, intent: PaymentIntent) -> Approval | None:
         raise ServiceUnavailable("Approval store is not connected")
@@ -41,8 +49,10 @@ class UnavailableAuthority:
 
 
 def configured_authority() -> AuthoritySource:
-    """Replace with Dev B's stores when they exist; never a scripted or permissive source."""
-    return UnavailableAuthority()
+    """Stored B authority bound to the server-configured authentication tenant."""
+    from backend.approvals.finance_authority import StoredAuthority
+
+    return StoredAuthority(auth_settings().auth_tenant_id)
 
 
 @dataclass(frozen=True)
@@ -61,17 +71,46 @@ class FinanceServices:
 
 
 def build_services(
-    database: Database, auth: AuthService, authority: AuthoritySource
+    database: Database,
+    auth: AuthService,
+    authority: AuthoritySource,
 ) -> FinanceServices:
+    from backend.approvals.finalize import finalize_execution
+    from backend.approvals.finance_authority import StoredAuthority
+    from backend.approvals.wiring import ProtectedAuthorization, build_approval_service
+
     repository = FinancePolicyRepository(authority)
 
     def gate(connection: PolicyConnection) -> TransactionAuthorization:
         return TransactionAuthorization(connection, auth, repository)
 
+    execution_gate: GateFactory = gate
+    finalize_authorization: ExecutionFinalizer | None = None
+    if isinstance(authority, StoredAuthority):
+        if authority.tenant_id != auth.tenant_id:
+            raise ServiceUnavailable("Authority tenant does not match authentication")
+        # Real stored authority may never use a preview-only execution gate.
+        approval = build_approval_service(auth)
+
+        def protected(connection: PolicyConnection) -> ProtectedAuthorization:
+            return ProtectedAuthorization(connection, approval)
+
+        def finalize(
+            connection: PolicyConnection,
+            actor: ActorContext,
+            locked: LockedIntent,
+            decision: PolicyDecision,
+        ) -> None:
+            finalize_execution(approval, connection, actor, locked, decision)
+
+        execution_gate, finalize_authorization = protected, finalize
+
     transfers = TransferService(database, SimulatedProvider(database), UniversityReceipts())
     obligations = ObligationReader(database, auth, transfers)
     reads = FinanceReads(database, auth, obligations)
-    executor = ExecutionService(database, gate, transfers)
+    executor = ExecutionService(
+        database, execution_gate, transfers, finalize_authorization=finalize_authorization
+    )
     cases = CaseService(database, gate)
     return FinanceServices(
         database=database,

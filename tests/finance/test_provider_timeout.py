@@ -1,3 +1,6 @@
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from threading import Event
+
 import pytest
 
 from backend.contracts.enums import FaultMode, PaymentState, ReasonCode
@@ -16,6 +19,34 @@ from tests.finance.factories import authorize, balance, count, proposal, scalar
 
 OPENING = 150_000_000
 TOTAL = 46_025_000
+
+
+def test_concurrent_provider_submissions_serialize_before_checking_status(finance_db, monkeypatch):
+    import backend.finance.provider as provider_module
+
+    entered, release = Event(), Event()
+    original = provider_module._record
+
+    def paused_record(connection, request, fault, now):
+        if not entered.is_set():
+            entered.set()
+            assert release.wait(10)
+        return original(connection, request, fault, now)
+
+    monkeypatch.setattr(provider_module, "_record", paused_record)
+    provider = SimulatedProvider(finance_db)
+    request = SubmitRequest(TENANT, "mock_remit_a", "sim_ref_concurrent", 100, 100, "reference")
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(provider.submit, request)
+        assert entered.wait(10)
+        second = pool.submit(provider.submit, request)
+        try:
+            with pytest.raises(TimeoutError):
+                second.result(timeout=0.3)
+        finally:
+            release.set()
+        assert first.result(timeout=10) == second.result(timeout=10)
+    assert count(finance_db, "sim_provider_transfers") == 1
 
 
 def with_fault(database, mode, provider="mock_remit_a"):

@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from backend.agent.router import router as agent_router
+from backend.approvals.router import router as approval_router
 from backend.authz.router import router as auth_router
 from backend.config import Settings
 from backend.demo.http import router as demo_router
@@ -16,6 +17,7 @@ app.include_router(agent_router)
 app.include_router(auth_router)
 app.include_router(finance_router)
 app.include_router(demo_router)
+app.include_router(approval_router)
 
 
 @app.get("/health")

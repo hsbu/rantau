@@ -6,6 +6,7 @@ from pydantic.json_schema import models_json_schema
 
 from backend.contracts import http, models
 from backend.contracts.auth import ConsentRequest, ConsentSummary, LoginRequest, SessionSummary
+from backend.contracts.authority import ApprovalView, MandateRequest, MandateView
 
 SCHEMA_MODELS = (
     models.ActorContext,
@@ -49,6 +50,9 @@ SCHEMA_MODELS = (
     SessionSummary,
     ConsentRequest,
     ConsentSummary,
+    ApprovalView,
+    MandateRequest,
+    MandateView,
 )
 
 
@@ -86,7 +90,11 @@ def contract_schema() -> dict[str, Any]:
         "/payment-intents": "IntentCreated",
         "/payment-intents/{id}": "PaymentIntentView",
         "/payment-intents/{id}/approval-requests": "ApprovalRequest",
-        "/sponsor/approvals": "Approval",
+        "/sponsor/approvals": "ApprovalView",
+        "/student/approvals": "ApprovalView",
+        "/student/approvals/{id}/decision": "SponsorDecisionResult",
+        "/sponsor/mandates": "MandateView",
+        "/sponsor/mandates/{id}": "MandateView",
         "/sponsor/approvals/{id}/decision": "SponsorDecisionResult",
         "/payment-intents/{id}/execute": "ExecutionResult",
         "/payment-intents/{id}/cancel": "PaymentIntentView",
@@ -111,6 +119,9 @@ def contract_schema() -> dict[str, Any]:
         "/agent/messages": "AgentMessage",
         "/payment-intents": "IntentProposal",
         "/sponsor/approvals/{id}/decision": "SponsorDecisionRequest",
+        "/student/approvals/{id}/decision": "SponsorDecisionRequest",
+        "/sponsor/mandates": "MandateRequest",
+        "/sponsor/mandates/{id}": "MandateRequest",
         "/reconciliations": "CaseSubmission",
         "/payment-intents/{id}/execute": "ExecuteRequest",
         "/payment-intents/{id}/revisions": "IntentProposal",
@@ -129,6 +140,8 @@ def contract_schema() -> dict[str, Any]:
         "/documents",
         "/demo/scenarios",
         "/demo/audit",
+        "/student/approvals",
+        "/sponsor/mandates",
     }
     paths: dict[str, Any] = {}
     for method, full_path in http.HTTP_ENDPOINTS:
@@ -137,7 +150,7 @@ def contract_schema() -> dict[str, Any]:
         result: dict[str, Any] = (
             {"$ref": f"#/components/schemas/{model_name}"} if model_name else {"type": "object"}
         )
-        if path in arrays:
+        if path in arrays and method == "GET":
             result = {"type": "array", "items": result}
         operation_name = path.strip("/").replace("/", "_").replace("{", "").replace("}", "")
         operation: dict[str, Any] = {
@@ -158,11 +171,17 @@ def contract_schema() -> dict[str, Any]:
         is_auth = path.startswith(("/auth/", "/student/sharing-consents/"))
         if _finance_implemented(path):
             operation["x-owner"] = "C"
-        if is_auth:
+        is_authority = path.startswith(
+            ("/sponsor/approvals", "/student/approvals", "/sponsor/mandates")
+        ) or path.endswith("/approval-requests")
+        if is_auth or is_authority:
             operation["x-owner"] = "B"
             operation["x-implementation"] = "implemented"
             operation["responses"]["403"] = {"description": "Trusted origin required"}
             operation["responses"]["422"] = {"description": "Invalid request (sanitized)"}
+        if is_authority:
+            operation["x-implementation"] = "implemented-requires-finance"
+            operation["responses"]["409"] = {"description": "Authority is stale or conflicting"}
         if path == "/auth/login":
             operation["security"] = []
             operation["responses"]["429"] = {"description": "Login attempt limit reached"}
@@ -184,7 +203,7 @@ def contract_schema() -> dict[str, Any]:
                     "schema": {"type": "string", "minLength": 1},
                 }
             )
-        if is_auth and method != "GET":
+        if (is_auth or is_authority) and method != "GET":
             parameters.append(
                 {
                     "name": "Origin",
