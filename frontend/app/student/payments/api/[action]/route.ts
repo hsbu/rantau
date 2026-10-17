@@ -5,7 +5,13 @@ const failure = (status: number) => Response.json({ error: "Finance service unav
 const ID = /^[A-Za-z0-9_.:-]{1,128}$/;
 
 // Fixed upstream paths only. No actor, role or arbitrary URL is ever accepted from the browser.
-const ACTIONS: Record<string, (body: Record<string, string>) => { path: string; payload?: object } | null> = {
+type Target = { path: string; payload?: object; headers?: Record<string, string> };
+const ACTIONS: Record<string, (body: Record<string, string>) => Target | null> = {
+  "cancel-intent": b => ID.test(b.id ?? "") ? { path: `/api/v1/payment-intents/${b.id}/cancel` } : null,
+  // The key is derived server-side from the intent so a retry can never become a second payment.
+  "execute-intent": b => ID.test(b.id ?? "")
+    ? { path: `/api/v1/payment-intents/${b.id}/execute`, headers: { "Idempotency-Key": `exec-${b.id}` } }
+    : null,
   "recheck-obligation": b => ID.test(b.id ?? "") ? { path: `/api/v1/tuition/obligations/${b.id}/recheck` } : null,
   "recheck-transfer": b => ID.test(b.id ?? "") ? { path: `/api/v1/transfers/${b.id}/recheck` } : null,
   "submit-case": b => ID.test(b.id ?? "") ? { path: `/api/v1/reconciliations/${b.id}/submit` } : null,
@@ -41,6 +47,7 @@ export async function POST(request: Request, context: { params: Promise<{ action
         "Content-Type": "application/json",
         Cookie: request.headers.get("cookie") ?? "",
         Origin: request.headers.get("origin") ?? "",
+        ...target.headers,
       },
       body: target.payload ? JSON.stringify(target.payload) : undefined,
     });
