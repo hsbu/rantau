@@ -101,7 +101,8 @@ Set `DATABASE_URL` to that isolated database, then run:
 uv run python -m backend.authz.bootstrap --migrate --seed
 ```
 
-This explicitly applies `migrations/001_auth.sql` and provisions the `student` and
+This explicitly applies the ordered, checksummed `001_auth.sql` and
+`002_policy_audit.sql` migrations and provisions the `student` and
 `sponsor` usernames for `stu_001` / `par_001` in `demo_001`. Bootstrap rejects
 environments other than development/test and refuses to overwrite an existing demo
 tenant. Migration replays check a stored checksum. The CLI uses local settings;
@@ -138,17 +139,40 @@ failures are sanitized.
 sponsor-role and field-specific consent guards for domain adapters. A sponsor's
 approval authority over their own funds does not grant access to student records.
 Consent grants visibility only and is checked against current expiry/revocation.
-Dev A/C must call these guards on their actual domain reads; those adapters and
-the B-02 financial gate remain pending. The B-04 sponsor UI/browser login flow is
-also pending: this ticket adds backend authentication, not browser sign-in pages.
+Dev A/C must call these guards on their actual domain reads; those adapters remain
+pending. The B-04 sponsor UI/browser login flow is also pending: this ticket adds
+backend authentication, not browser sign-in pages.
 Do not connect fake domain services to make Chat appear ready.
+
+`backend.authz.policy_transaction.TransactionAuthorization` implements B-02's
+existing `AuthorizationPort` against a trusted `PolicyRepository` and the caller's
+PostgreSQL connection. Dev C must supply the repository and call the gate inside
+the protected execution transaction, on a worker thread, after locking current
+financial/authority state. The adapter rechecks the session and current database
+clock, then records a minimal redacted decision in `policy_decisions`. It never
+commits: a returned audit ID is durable only after the caller commits; a rollback
+invalidates the result. Preview decisions cannot authorize a later debit.
+Repository locking, complete accounting coverage and authority provenance are
+documented in `backend/authz/policy_repository.py`. No financial test repository
+is connected to application wiring; `/ready` still reports unavailable domain
+services until the real simulator adapters exist.
+
+New demo seeds grant the student `payment:execute` and `reconciliation:submit`,
+and the sponsor `payment:execute`, in addition to their existing scopes. These
+only permit gate evaluation: ownership, mandate/approval, holds and financial
+checks still apply. Migrations do not grant existing actors new privileges or
+overwrite credentials. Existing demo tenants require an explicitly coordinated
+scope update/reset; bootstrap continues refusing to overwrite them. B-03's
+authenticated approval/mandate lifecycle and C-03's atomic debit/reservation and
+idempotency integration remain pending; B-02's typed financial tests do not prove
+those effects. B-06 will add the broader holds/case/audit workflow.
 
 Auth tests use a fresh temporary PostgreSQL instance when `initdb` and `pg_ctl`
 are on PATH. Its files remain ignored under `.generated/`. Alternatively set
 `RANTAU_TEST_DATABASE_URL` to a **dedicated test database whose name starts with
-`rantau_test`**. Tests truncate its auth tables; never point it at an application
-database. CI provisions its own PostgreSQL 17 service. Tests do not use the local
-application's `DATABASE_URL` or bootstrap passwords.
+`rantau_test`**. Tests truncate its auth and policy-decision tables; never point it
+at an application database. CI provisions its own PostgreSQL 17 service. Tests do
+not use the local application's `DATABASE_URL` or bootstrap passwords.
 
 ## Checks and isolated demo
 

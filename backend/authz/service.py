@@ -22,7 +22,7 @@ _ACTOR_QUERY = """
     FROM auth_sessions s
     JOIN actors a USING (tenant_id, actor_id)
     JOIN auth_credentials c USING (tenant_id, actor_id)
-    WHERE a.active AND s.revoked_at IS NULL AND s.expires_at > now()
+    WHERE a.active AND s.revoked_at IS NULL AND s.expires_at > clock_timestamp()
       AND s.credential_version = c.version AND s.tenant_id = %s
 """
 

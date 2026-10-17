@@ -71,7 +71,7 @@ def test_migration_replays_verify_checksum_and_do_not_reseed(database):
     with database.connection() as connection:
         # Restore the disposable test DB for subsequent tests, not application data.
         connection.execute(
-            "DROP TABLE rantau_migrations, student_sponsor_consents, "
+            "DROP TABLE rantau_migrations, policy_decisions, student_sponsor_consents, "
             "auth_sessions, auth_credentials, actors, auth_login_attempts CASCADE"
         )
 

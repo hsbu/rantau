@@ -18,14 +18,14 @@ def provision_demo(
         (
             "stu_001",
             "STUDENT",
-            ["student:read", "payment:propose"],
+            ["student:read", "payment:propose", "payment:execute", "reconciliation:submit"],
             "student",
             hash_password(student_password),
         ),
         (
             "par_001",
             "SPONSOR",
-            ["sponsor:read", "sponsor:approve"],
+            ["sponsor:read", "sponsor:approve", "payment:execute"],
             "sponsor",
             hash_password(sponsor_password),
         ),

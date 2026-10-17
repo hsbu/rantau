@@ -32,21 +32,22 @@ class Database:
 
 def migrate(database: Database) -> None:
     """Explicit migration only; callers must enforce the deployment's operator boundary."""
-    raw = (Path(__file__).resolve().parents[2] / "migrations" / "001_auth.sql").read_bytes()
-    raw = raw.replace(b"\r\n", b"\n")
-    checksum = hashlib.sha256(raw).hexdigest()
     with database.connection() as connection:
         connection.execute("SELECT pg_advisory_xact_lock(714202601)")
         connection.execute(
             "CREATE TABLE IF NOT EXISTS rantau_migrations "
             "(version text PRIMARY KEY, checksum text NOT NULL)"
         )
-        previous = connection.execute(
-            "SELECT checksum FROM rantau_migrations WHERE version = '001_auth'"
-        ).fetchone()
-        if previous:
-            if previous["checksum"] != checksum:
-                raise ValueError("Applied authentication migration checksum differs")
-            return
-        connection.execute(raw.decode("utf-8"))
-        connection.execute("INSERT INTO rantau_migrations VALUES ('001_auth', %s)", (checksum,))
+        for version in ("001_auth", "002_policy_audit"):
+            path = Path(__file__).resolve().parents[2] / "migrations" / f"{version}.sql"
+            raw = path.read_bytes().replace(b"\r\n", b"\n")
+            checksum = hashlib.sha256(raw).hexdigest()
+            previous = connection.execute(
+                "SELECT checksum FROM rantau_migrations WHERE version = %s", (version,)
+            ).fetchone()
+            if previous:
+                if previous["checksum"] != checksum:
+                    raise ValueError("Applied migration checksum differs")
+                continue
+            connection.execute(raw.decode("utf-8"))
+            connection.execute("INSERT INTO rantau_migrations VALUES (%s, %s)", (version, checksum))

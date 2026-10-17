@@ -66,7 +66,7 @@ def database(postgres_dsn):
     database = Database(postgres_dsn)
     migrate(database)
     with psycopg.connect(postgres_dsn) as connection:
-        connection.execute("TRUNCATE actors, auth_login_attempts CASCADE")
+        connection.execute("TRUNCATE actors, auth_login_attempts, policy_decisions CASCADE")
     return database
 
 
