@@ -1,4 +1,5 @@
 import type { components } from "../lib/api-contracts/generated";
+import Link from "next/link";
 
 // Compile-time consumer of the shared Python contract, not a hand-copied enum.
 const intents: components["schemas"]["Intent"][] = [
@@ -10,6 +11,7 @@ export default function Home() {
     <p className="eyebrow">Rantau / Development preview</p>
     <h1>A clearer path<br />from home to campus.</h1>
     <p className="description">A financial agent for students abroad and the people supporting them.</p>
+    <p><Link href="/student/chat">Open student chat →</Link> · <Link href="/student/chat/preview">Explore the sample conversation →</Link></p>
     <section aria-labelledby="status"><h2 id="status">Foundation in progress</h2>
       <p>All quotes, payments and university records in this project are simulated.
         Student authentication and financial services are awaiting integration.</p>
