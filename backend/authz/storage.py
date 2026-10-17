@@ -38,7 +38,12 @@ def migrate(database: Database) -> None:
             "CREATE TABLE IF NOT EXISTS rantau_migrations "
             "(version text PRIMARY KEY, checksum text NOT NULL)"
         )
-        for version in ("001_auth", "002_policy_audit", "003_authority"):
+        for version in (
+            "001_auth",
+            "002_policy_audit",
+            "003_authority",
+            "004_security_cases",
+        ):
             path = Path(__file__).resolve().parents[2] / "migrations" / f"{version}.sql"
             raw = path.read_bytes().replace(b"\r\n", b"\n")
             checksum = hashlib.sha256(raw).hexdigest()
@@ -50,4 +55,6 @@ def migrate(database: Database) -> None:
                     raise ValueError("Applied migration checksum differs")
                 continue
             connection.execute(raw.decode("utf-8"))
-            connection.execute("INSERT INTO rantau_migrations VALUES (%s, %s)", (version, checksum))
+            connection.execute(
+                "INSERT INTO rantau_migrations VALUES (%s, %s)", (version, checksum)
+            )
