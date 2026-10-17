@@ -28,7 +28,9 @@ class UniversityReceipts:
         now = sim_now(connection, tenant_id)
         student = obligation["student_id"]
         reference = evidence.payer_reference
-        matched = reference is not None and student in reference
+        matched = reference is not None and all(
+            required in reference for required in (student, obligation["student_name"])
+        )
         connection.execute(
             "INSERT INTO university_receipts (tenant_id, alias, provider_reference, "
             "transfer_alias, obligation_alias, received_minor, payer_reference_text, "

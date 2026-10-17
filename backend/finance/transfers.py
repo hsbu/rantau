@@ -65,8 +65,10 @@ class TransferService:
     def _read(self, tenant_id: str, transfer_alias: str) -> Row:
         with self.database.connection() as connection:
             row = connection.execute(
-                "SELECT t.*, i.requested_by FROM transfers t JOIN payment_intents i "
-                "ON i.tenant_id = t.tenant_id AND i.alias = t.intent_alias "
+                "SELECT t.*, i.requested_by, o.student_name FROM transfers t "
+                "JOIN payment_intents i ON i.tenant_id = t.tenant_id "
+                "AND i.alias = t.intent_alias LEFT JOIN tuition_obligations o "
+                "ON o.tenant_id = t.tenant_id AND o.alias = t.obligation_alias "
                 "WHERE t.tenant_id = %s AND t.alias = %s",
                 (tenant_id, transfer_alias),
             ).fetchone()
@@ -84,7 +86,7 @@ class TransferService:
                 reference=transfer["provider_reference"],
                 amount_minor=transfer["source_total_minor"],
                 destination_minor=transfer["destination_amount_minor"],
-                payer_reference=transfer["requested_by"],
+                payer_reference=_payer_reference(transfer),
             )
         )
 
@@ -96,13 +98,15 @@ class TransferService:
                 "SELECT intent_alias FROM transfers WHERE tenant_id = %s AND alias = %s",
                 (tenant_id, transfer_alias),
             ).fetchone()
-            assert peek is not None
+            if peek is None:
+                raise ScopeDenied("Resource unavailable")
             locked = lock_intent(connection, tenant_id, peek["intent_alias"])
             transfer = connection.execute(
                 "SELECT * FROM transfers WHERE tenant_id = %s AND alias = %s FOR UPDATE",
                 (tenant_id, transfer_alias),
             ).fetchone()
-            assert transfer is not None
+            if transfer is None:
+                raise ScopeDenied("Resource unavailable")
             current = PaymentState(transfer["state"])
             if transfer["version"] != expected_version or current in FINAL_STATES:
                 return current
@@ -112,7 +116,7 @@ class TransferService:
                 _mirror_intent(connection, locked.intent, target)
             if target == PaymentState.FAILED:
                 _reverse(connection, tenant_id, updated, locked.account)
-            if target == PaymentState.DELIVERED:
+            if target == PaymentState.DELIVERED and updated["obligation_alias"] is not None:
                 self.listener.on_delivered(connection, tenant_id, updated, evidence)
             self._audit(connection, tenant_id, updated, target, evidence)
             return target
@@ -139,7 +143,7 @@ class TransferService:
                 evidence.delivered_destination_minor if delivered else None,
                 evidence.payer_reference if delivered else None,
                 f"receipt_{uuid4().hex[:12]}" if delivered else transfer["receipt_reference"],
-                target != PaymentState.FAILED,
+                target != PaymentState.FAILED and transfer["obligation_alias"] is not None,
                 transfer["tenant_id"],
                 transfer["alias"],
                 transfer["version"],
@@ -170,6 +174,13 @@ class TransferService:
                 after_state={"state": target.value},
             ),
         )
+
+
+def _payer_reference(transfer: Row) -> str | None:
+    """What the sender writes on the wire: student ID and full name, per the university rule."""
+    if transfer["obligation_alias"] is None:
+        return None
+    return f"{transfer['requested_by']} {transfer['student_name']}"
 
 
 def _target_state(current: PaymentState, evidence: ProviderEvidence) -> PaymentState:

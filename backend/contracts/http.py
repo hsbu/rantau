@@ -108,6 +108,13 @@ class FaultRequest(Contract):
     remaining: Annotated[int, Field(strict=True, ge=1, le=10)] = 1
 
 
+class DocumentInjectRequest(Contract):
+    kind: Literal["INVOICE", "EMAIL", "NOTICE"]
+    title: Annotated[str, Field(min_length=1, max_length=200)]
+    body: Annotated[str, Field(min_length=1, max_length=4000)]
+    claimed_sender: Annotated[str, Field(min_length=1, max_length=200)]
+
+
 class TickResult(Contract):
     postings_made: int
     cases_reviewed: tuple[Identifier, ...]
@@ -162,6 +169,9 @@ HTTP_ENDPOINTS = (
     ("POST", "/api/v1/demo/clock/advance"),
     ("POST", "/api/v1/demo/faults"),
     ("POST", "/api/v1/demo/university/tick"),
+    ("POST", "/api/v1/demo/documents"),
+    ("GET", "/api/v1/documents"),
+    ("POST", "/api/v1/payment-intents/{id}/revisions"),
     ("GET", "/api/v1/demo/audit"),
     ("POST", "/api/v1/tuition/obligations/{id}/recheck"),
     ("POST", "/api/v1/transfers/{id}/recheck"),

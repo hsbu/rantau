@@ -110,6 +110,7 @@ class TuitionObligationDetail(TuitionObligation):
     active_case_id: Identifier | None = None
     shortfall_minor: Minor = 0
     topup_permitted: bool = False
+    reconciliation_resolved: bool = False
 
 
 class TrustedBeneficiary(Contract):
@@ -201,6 +202,18 @@ class PaymentIntentView(Contract):
     terms_hash: str
     beneficiary_label: str
     funded_by_requester: bool
+
+
+class UntrustedDocument(Contract):
+    """Third-party content shown to the user as data; it never carries authority."""
+
+    id: Identifier
+    kind: Literal["INVOICE", "EMAIL", "NOTICE"]
+    title: str
+    body: str
+    claimed_sender: str
+    received_at: AwareDatetime
+    trust: Literal["UNTRUSTED"] = "UNTRUSTED"
 
 
 class Approval(PaymentTerms):

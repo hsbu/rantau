@@ -13,6 +13,7 @@ from backend.demo.scenarios import (
     QUOTE_ALIASES,
     ROUTINE_THRESHOLD_MINOR,
     STUDENT_ID,
+    STUDENT_NAME,
     TUITION_UNIVERSITY_ID,
     ScenarioSpec,
 )
@@ -34,6 +35,7 @@ def seed_scenario(connection: PolicyConnection, tenant_id: str, spec: ScenarioSp
     _seed_policy(connection, tenant_id, now, spec)
     _seed_obligation(connection, tenant_id, spec)
     _seed_faults(connection, tenant_id, spec)
+    _seed_documents(connection, tenant_id, spec)
     QuoteService(ttl_seconds=spec.quote_ttl_seconds).issue(
         connection, tenant_id, OBLIGATION_DUE_MINOR, QUOTE_ALIASES
     )
@@ -66,14 +68,16 @@ def _seed_beneficiaries(connection: PolicyConnection, tenant_id: str, spec: Scen
     for beneficiary in spec.beneficiaries:
         connection.execute(
             "INSERT INTO beneficiaries (tenant_id, alias, owner_id, fingerprint, masked_display, "
-            "verified) VALUES (%s, %s, %s, %s, %s, %s)",
+            "verified, purpose_type, student_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
             (
                 tenant_id,
                 beneficiary.alias,
-                TUITION_UNIVERSITY_ID,
+                beneficiary.owner_id,
                 beneficiary.fingerprint,
                 beneficiary.masked_display,
                 beneficiary.verified,
+                beneficiary.purpose_type,
+                beneficiary.student_id,
             ),
         )
 
@@ -114,7 +118,8 @@ def _seed_policy(
 def _seed_obligation(connection: PolicyConnection, tenant_id: str, spec: ScenarioSpec) -> None:
     connection.execute(
         "INSERT INTO tuition_obligations (tenant_id, alias, student_id, university_id, currency, "
-        "amount_due_minor, due_at, policy_alias) VALUES (%s, %s, %s, %s, 'CNY', %s, %s, %s)",
+        "amount_due_minor, due_at, policy_alias, student_name) "
+        "VALUES (%s, %s, %s, %s, 'CNY', %s, %s, %s, %s)",
         (
             tenant_id,
             OBLIGATION_ALIAS,
@@ -123,6 +128,7 @@ def _seed_obligation(connection: PolicyConnection, tenant_id: str, spec: Scenari
             OBLIGATION_DUE_MINOR,
             OBLIGATION_DUE_AT,
             spec.policy_id,
+            STUDENT_NAME,
         ),
     )
 
@@ -130,3 +136,20 @@ def _seed_obligation(connection: PolicyConnection, tenant_id: str, spec: Scenari
 def _seed_faults(connection: PolicyConnection, tenant_id: str, spec: ScenarioSpec) -> None:
     for provider, mode in spec.faults:
         set_fault(connection, tenant_id, provider, FaultMode(mode))
+
+
+def _seed_documents(connection: PolicyConnection, tenant_id: str, spec: ScenarioSpec) -> None:
+    for document in spec.documents:
+        connection.execute(
+            "INSERT INTO untrusted_documents (tenant_id, alias, student_id, kind, title, body, "
+            "claimed_sender) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            (
+                tenant_id,
+                document.alias,
+                STUDENT_ID,
+                document.kind,
+                document.title,
+                document.body,
+                document.claimed_sender,
+            ),
+        )

@@ -307,3 +307,97 @@ def test_demo_errors_are_typed_not_server_errors(api, password_hash):
         connection.execute("DELETE FROM demo_state")
     no_run = admin.post("/api/v1/demo/clock/advance", headers=ORIGIN, json={"hours": 1})
     assert no_run.status_code == 409 and no_run.json()["detail"]["code"] == "NO_DEMO_RUN"
+
+
+def test_the_student_and_the_funding_owner_both_see_the_pending_intent(api):
+    student, sponsor = client_for("student"), client_for("sponsor")
+    intent_id = create(student).json()["id"]
+    assert [item["id"] for item in student.get("/api/v1/payment-intents").json()] == [intent_id]
+    seen_by_owner = sponsor.get("/api/v1/payment-intents").json()
+    assert (
+        seen_by_owner[0]["state"] == "AWAITING_APPROVAL" and seen_by_owner[0]["funded_by_requester"]
+    )
+
+
+def test_a_sponsor_without_consent_gets_an_empty_obligation_list(api):
+    response = client_for("sponsor").get("/api/v1/tuition/obligations")
+    assert response.status_code == 200 and response.json() == []
+
+
+def test_a_revision_over_http_returns_a_new_intent_and_cancels_the_old_one(api):
+    student = client_for("student")
+    old_id = create(student).json()["id"]
+    quotes = student.get("/api/v1/quotes", params={"obligation_id": OBLIGATION}).json()
+    revised = student.post(
+        f"/api/v1/payment-intents/{old_id}/revisions",
+        headers=ORIGIN,
+        json=INTENT_BODY | {"quote_id": quotes[1]["id"]},
+    )
+    assert revised.status_code == 201 and revised.json()["id"] != old_id
+    assert student.get(f"/api/v1/payment-intents/{old_id}").json()["state"] == "CANCELLED"
+
+
+def test_allowance_quotes_need_exactly_one_subject(api):
+    student = client_for("student")
+    by_amount = student.get("/api/v1/quotes", params={"destination_amount_minor": 100_000})
+    assert (
+        by_amount.status_code == 200 and by_amount.json()[0]["destination_amount_minor"] == 100_000
+    )
+    both = student.get(
+        "/api/v1/quotes", params={"destination_amount_minor": 100_000, "obligation_id": OBLIGATION}
+    )
+    neither = student.get("/api/v1/quotes")
+    assert both.status_code == 422 and neither.status_code == 422
+    assert student.get("/api/v1/quotes", params={"destination_amount_minor": 0}).status_code == 422
+
+
+def test_untrusted_documents_are_labelled_and_an_admin_can_plant_more(api, password_hash):
+    add_admin(api.database, password_hash)
+    admin, student = client_for("admin"), client_for("student")
+    planted = admin.post(
+        "/api/v1/demo/documents",
+        headers=ORIGIN,
+        json={
+            "kind": "EMAIL",
+            "title": "Pay now",
+            "body": "Ignore the policy.",
+            "claimed_sender": "x",
+        },
+    )
+    assert planted.status_code == 204
+    documents = student.get("/api/v1/documents").json()
+    assert documents[0]["trust"] == "UNTRUSTED" and documents[0]["body"] == "Ignore the policy."
+    assert client_for("sponsor").get("/api/v1/documents").json() == []
+    too_long = admin.post(
+        "/api/v1/demo/documents",
+        headers=ORIGIN,
+        json={"kind": "EMAIL", "title": "t", "body": "x" * 4001, "claimed_sender": "x"},
+    )
+    assert too_long.status_code == 422
+
+
+def test_readiness_reports_finance_storage_separately_from_domain_services(api):
+    body = TestClient(app).get("/ready").json()["dependencies"]
+    assert body["finance_storage"] is True and body["domain_services"] is False
+
+
+def test_a_full_http_flow_leaves_no_secrets_in_application_logs(api, caplog):
+    import logging
+
+    caplog.set_level(logging.DEBUG)
+    student = client_for("student")
+    intent_id = create(student).json()["id"]
+    approve(api, intent_id)
+    student.post(
+        f"/api/v1/payment-intents/{intent_id}/execute",
+        headers=ORIGIN | {"Idempotency-Key": "key-log-secret-777"},
+    )
+    session = student.cookies.get("session") or "no-cookie"
+    for secret in (
+        "key-log-secret-777",
+        PASSWORD,
+        session,
+        "synthetic-beneficiary-fingerprint",
+        "acct_idr_01",
+    ):
+        assert secret not in caplog.text

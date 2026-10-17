@@ -8,11 +8,14 @@ from typing import Any
 
 from backend.authz.policy_repository import PolicyConnection
 from backend.contracts.enums import Currency
-from backend.contracts.models import FxQuote
+from backend.contracts.models import FxQuote, ServiceUnavailable
 from backend.finance.clock import db_now
 from backend.finance.money import fee_minor, price_for_destination
 
 DEFAULT_QUOTE_TTL_SECONDS = 900
+# A stored quote is reused only while it keeps at least this share of its lifetime.
+MIN_REMAINING_SHARE = 3
+MAX_REFRESHES = 5
 CNY_PER_IDR_RATE = "0.0004347826086956521739130435"
 
 
@@ -73,7 +76,35 @@ class QuoteService:
     ) -> FxQuote:
         principal = price_for_destination(destination_minor, route.rate, Currency.IDR, Currency.CNY)
         fee = fee_minor(principal, bps=route.fee_bps, floor=route.fee_floor_minor)
-        digest = self._request_digest(route, destination_minor, now)
+        for refresh in range(MAX_REFRESHES):
+            digest = self._request_digest(route, destination_minor, now, refresh)
+            quote = self._store(
+                connection,
+                tenant_id,
+                route,
+                destination_minor,
+                now,
+                digest,
+                alias if refresh == 0 else None,
+                principal,
+                fee,
+            )
+            if quote.expires_at - now >= self.ttl / MIN_REMAINING_SHARE:
+                return quote
+        raise ServiceUnavailable("A fresh quote could not be issued")
+
+    def _store(
+        self,
+        connection: PolicyConnection,
+        tenant_id: str,
+        route: Route,
+        destination_minor: int,
+        now: datetime,
+        digest: str,
+        alias: str | None,
+        principal: int,
+        fee: int,
+    ) -> FxQuote:
         connection.execute(
             "INSERT INTO fx_quotes (tenant_id, alias, provider, source_currency, "
             "destination_currency, source_principal_minor, fee_minor, source_total_minor, "
@@ -103,9 +134,11 @@ class QuoteService:
         assert row is not None
         return quote_from_row(row)
 
-    def _request_digest(self, route: Route, destination_minor: int, now: datetime) -> str:
+    def _request_digest(
+        self, route: Route, destination_minor: int, now: datetime, refresh: int
+    ) -> str:
         bucket = int(now.timestamp() // self.ttl.total_seconds())
-        material = f"{route.provider}|{destination_minor}|{bucket}"
+        material = f"{route.provider}|{destination_minor}|{bucket}|{refresh}"
         return hashlib.sha256(material.encode()).hexdigest()
 
 

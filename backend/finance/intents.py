@@ -1,4 +1,4 @@
-"""Create and cancel payment intents. Terms are server-derived and immutable."""
+"""Create, revise and cancel payment intents. Terms are server-derived and immutable."""
 
 from uuid import uuid4
 
@@ -23,6 +23,7 @@ from backend.finance.states import INTENT_TRANSITIONS, require_transition
 from backend.finance.terms import canonical_terms_hash
 from backend.university.obligations import read_obligation
 
+FIRST_REVISION = 1
 _STATE_AFTER_DECISION = {
     Decision.ALLOW: PaymentState.DRAFT,
     Decision.REQUIRE_APPROVAL: PaymentState.AWAITING_APPROVAL,
@@ -38,7 +39,26 @@ class IntentService:
 
     def create(self, actor: ActorContext, proposal: IntentProposal) -> Created | Refused:
         with self.database.connection() as connection:
-            return self._create(connection, actor, proposal)
+            return self._create(connection, actor, proposal, FIRST_REVISION, None)
+
+    def revise(
+        self, actor: ActorContext, intent_alias: str, proposal: IntentProposal
+    ) -> Created | Refused:
+        """Replace an unstarted intent with a new immutable revision; the old one is cancelled."""
+        with self.database.connection() as connection:
+            locked = lock_intent(connection, actor.tenant_id, intent_alias)
+            if locked.intent["requested_by"] != actor.actor_id:
+                raise ScopeDenied("Resource unavailable")
+            require_transition(
+                INTENT_TRANSITIONS, PaymentState(locked.intent["state"]), PaymentState.CANCELLED
+            )
+            facts = _ProposalFacts.load(connection, actor, proposal)
+            if facts.refusal is not None:
+                return self._refuse(connection, actor, facts.refusal, None)
+            cancelled = _set_state(connection, locked.intent, PaymentState.CANCELLED)
+            self._audit(connection, actor, "INTENT_SUPERSEDED", cancelled.id, cancelled.state)
+            revision = locked.intent["intent_revision"] + 1
+            return self._create(connection, actor, proposal, revision, intent_alias, facts)
 
     def cancel(self, actor: ActorContext, intent_alias: str) -> PaymentIntent:
         with self.database.connection() as connection:
@@ -52,14 +72,18 @@ class IntentService:
             return updated
 
     def _create(
-        self, connection: PolicyConnection, actor: ActorContext, proposal: IntentProposal
+        self,
+        connection: PolicyConnection,
+        actor: ActorContext,
+        proposal: IntentProposal,
+        revision: int,
+        supersedes: str | None,
+        loaded: "_ProposalFacts | None" = None,
     ) -> Created | Refused:
-        facts = _ProposalFacts.load(connection, actor, proposal)
-        if facts.beneficiary is None:
-            return self._refuse(connection, actor, ReasonCode.UNKNOWN_BENEFICIARY, proposal)
-        if facts.mismatched:
-            return self._refuse(connection, actor, ReasonCode.INVALID_SCOPE, proposal)
-        intent = _insert_draft(connection, actor, facts)
+        facts = loaded or _ProposalFacts.load(connection, actor, proposal)
+        if facts.refusal is not None:
+            return self._refuse(connection, actor, facts.refusal, None)
+        intent = _insert_draft(connection, actor, facts, revision, supersedes)
         decision = evaluate_gate(
             self.gate,
             connection,
@@ -70,7 +94,7 @@ class IntentService:
         )
         if decision.decision == Decision.DENY:
             _discard_draft(connection, actor.tenant_id, intent.id)
-            return self._refuse(connection, actor, decision.reason_code, proposal, decision)
+            return self._refuse(connection, actor, decision.reason_code, decision)
         stored = _settle_draft(connection, actor.tenant_id, intent, decision)
         self._audit(connection, actor, "INTENT_CREATED", stored.id, stored.state, decision)
         return Created(stored, decision)
@@ -80,8 +104,7 @@ class IntentService:
         connection: PolicyConnection,
         actor: ActorContext,
         reason: ReasonCode | None,
-        proposal: IntentProposal,
-        decision: PolicyDecision | None = None,
+        decision: PolicyDecision | None,
     ) -> Refused:
         reason = reason or ReasonCode.INVALID_SCOPE
         audit_id = self.audit.record(
@@ -124,55 +147,107 @@ class IntentService:
 
 
 class _ProposalFacts:
+    """Server-side facts behind a proposal. The client names resources, never amounts."""
+
     def __init__(
-        self, obligation: Row, account: Row, beneficiary: Row | None, quote: Row, balance_minor: int
+        self,
+        purpose: str,
+        obligation: Row | None,
+        account: Row,
+        beneficiary: Row | None,
+        quote: Row,
+        balance_minor: int | None,
+        policy_version: str,
     ):
-        self.balance_minor = balance_minor
+        self.purpose = purpose
         self.obligation = obligation
         self.account = account
         self.beneficiary = beneficiary
         self.quote = quote
+        self.balance_minor = balance_minor
+        self.policy_version = policy_version
 
     @property
-    def mismatched(self) -> bool:
-        wrong_amount = self.quote["destination_amount_minor"] != self.balance_minor
+    def refusal(self) -> ReasonCode | None:
+        if self.beneficiary is None:
+            return ReasonCode.UNKNOWN_BENEFICIARY
         wrong_currency = self.quote["source_currency"] != self.account["currency"]
-        return bool(wrong_amount or wrong_currency)
+        wrong_amount = (
+            self.balance_minor is not None
+            and self.quote["destination_amount_minor"] != self.balance_minor
+        )
+        return ReasonCode.INVALID_SCOPE if wrong_currency or wrong_amount else None
 
     @classmethod
     def load(
         cls, connection: PolicyConnection, actor: ActorContext, proposal: IntentProposal
     ) -> "_ProposalFacts":
         tenant = actor.tenant_id
-        obligation = fetch(connection, "obligation", tenant, proposal.obligation_id or "")
-        if obligation is None or obligation["student_id"] != actor.actor_id:
-            raise ScopeDenied("Resource unavailable")
         account = fetch(connection, "account", tenant, proposal.source_account_id)
         quote = fetch(connection, "quote", tenant, proposal.quote_id)
         if account is None or quote is None:
             raise ScopeDenied("Resource unavailable")
         if actor.actor_id not in {account["owner_id"], *account["permitted_requesters"]}:
             raise ScopeDenied("Resource unavailable")
+        beneficiary = fetch(connection, "beneficiary", tenant, proposal.beneficiary_id)
+        if beneficiary is not None and not _fits_purpose(beneficiary, proposal.purpose, actor):
+            beneficiary = None
+        if proposal.purpose == "ALLOWANCE":
+            if proposal.obligation_id is not None:
+                raise ScopeDenied("Resource unavailable")
+            return cls(
+                "ALLOWANCE",
+                None,
+                account,
+                beneficiary,
+                quote,
+                None,
+                _rules_version(connection, tenant),
+            )
+        obligation = fetch(connection, "obligation", tenant, proposal.obligation_id or "")
+        if obligation is None or obligation["student_id"] != actor.actor_id:
+            raise ScopeDenied("Resource unavailable")
         balance = read_obligation(
             connection, tenant, obligation, sim_now(connection, tenant)
         ).obligation.balance_minor
-        beneficiary = fetch(connection, "beneficiary", tenant, proposal.beneficiary_id)
-        return cls(obligation, account, beneficiary, quote, balance)
+        return cls(
+            "TUITION", obligation, account, beneficiary, quote, balance, obligation["policy_alias"]
+        )
+
+
+def _fits_purpose(beneficiary: Row, purpose: str, actor: ActorContext) -> bool:
+    if beneficiary["purpose_type"] != purpose:
+        return False
+    return purpose == "TUITION" or beneficiary["student_id"] == actor.actor_id
+
+
+def _rules_version(connection: PolicyConnection, tenant_id: str) -> str:
+    row = connection.execute(
+        "SELECT version FROM payment_rules WHERE tenant_id = %s "
+        "ORDER BY effective_from DESC LIMIT 1",
+        (tenant_id,),
+    ).fetchone()
+    if row is None:
+        raise ScopeDenied("Resource unavailable")
+    return str(row["version"])
 
 
 def _insert_draft(
-    connection: PolicyConnection, actor: ActorContext, facts: _ProposalFacts
+    connection: PolicyConnection,
+    actor: ActorContext,
+    facts: _ProposalFacts,
+    revision: int,
+    supersedes: str | None,
 ) -> PaymentIntent:
-    assert facts.beneficiary is not None
     alias = f"intent_{uuid4().hex[:12]}"
-    terms = _terms(alias, actor, facts)
+    terms = _terms(alias, facts, revision)
     connection.execute(
         "INSERT INTO payment_intents (tenant_id, alias, requested_by, funding_owner_id, "
         "source_account_alias, beneficiary_alias, beneficiary_fingerprint, obligation_alias, "
         "purpose, source_currency, destination_currency, source_total_minor, "
         "destination_amount_minor, quote_alias, quote_expiry, policy_version, intent_revision, "
-        "terms_hash, tier, state) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
-        "%s, %s, %s, %s, %s, %s, %s)",
+        "terms_hash, tier, state, supersedes_alias) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, "
+        "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
         (
             actor.tenant_id,
             alias,
@@ -192,8 +267,9 @@ def _insert_draft(
             terms.policy_version,
             terms.intent_revision,
             terms.terms_hash,
-            Tier.T2.value,
+            _starting_tier(terms.purpose).value,
             PaymentState.DRAFT.value,
+            supersedes,
         ),
     )
     row = fetch(connection, "intent", actor.tenant_id, alias)
@@ -201,25 +277,30 @@ def _insert_draft(
     return intent_from_row(row)
 
 
-def _terms(alias: str, actor: ActorContext, facts: _ProposalFacts) -> PaymentTerms:
+def _starting_tier(purpose: str) -> Tier:
+    """The stored tier is a floor for the gate, so a routine allowance must start low."""
+    return Tier.T1 if purpose == "ALLOWANCE" else Tier.T2
+
+
+def _terms(alias: str, facts: _ProposalFacts, revision: int) -> PaymentTerms:
     assert facts.beneficiary is not None
-    quote, account, obligation = facts.quote, facts.account, facts.obligation
+    quote, account = facts.quote, facts.account
     unsigned = PaymentTerms(
         intent_id=alias,
-        intent_revision=1,
+        intent_revision=revision,
         funding_owner_id=account["owner_id"],
         source_account_id=account["alias"],
         beneficiary_id=facts.beneficiary["alias"],
         beneficiary_fingerprint=facts.beneficiary["fingerprint"],
-        purpose="TUITION",
-        obligation_id=obligation["alias"],
+        purpose=facts.purpose,  # type: ignore[arg-type]
+        obligation_id=facts.obligation["alias"] if facts.obligation else None,
         source_currency=quote["source_currency"],
         destination_currency=quote["destination_currency"],
         source_total_minor=quote["source_total_minor"],
         destination_amount_minor=quote["destination_amount_minor"],
         quote_id=quote["alias"],
         quote_expiry=quote["expires_at"],
-        policy_version=obligation["policy_alias"],
+        policy_version=facts.policy_version,
         terms_hash="pending",
     )
     return unsigned.model_copy(update={"terms_hash": canonical_terms_hash(unsigned)})
