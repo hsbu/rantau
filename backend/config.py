@@ -3,7 +3,7 @@
 import re
 from urllib.parse import urlsplit
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     auth_trusted_origin: str = ""
     auth_demo_student_password: SecretStr | None = None
     auth_demo_sponsor_password: SecretStr | None = None
+    approval_ttl_seconds: int = Field(default=600, ge=1, le=3600)
 
     @property
     def auth_configured(self) -> bool:

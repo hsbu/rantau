@@ -30,10 +30,19 @@ def test_finance_routes_fail_closed_without_trusted_configuration(monkeypatch):
         assert response.status_code in {401, 503}
 
 
-def test_the_integrated_wiring_never_installs_a_permissive_authority():
-    from backend.finance.wiring import UnavailableAuthority, configured_authority
+def test_the_integrated_wiring_uses_tenant_bound_stored_authority(monkeypatch):
+    from types import SimpleNamespace
 
-    assert isinstance(configured_authority(), UnavailableAuthority)
+    from backend.approvals.finance_authority import StoredAuthority
+    from backend.finance.wiring import configured_authority
+
+    monkeypatch.setattr(
+        "backend.finance.wiring.auth_settings",
+        lambda: SimpleNamespace(auth_tenant_id="configured_tenant"),
+    )
+    authority = configured_authority()
+    assert isinstance(authority, StoredAuthority)
+    assert authority.tenant_id == "configured_tenant"
 
 
 def test_failed_database_connection_is_sanitized(monkeypatch):

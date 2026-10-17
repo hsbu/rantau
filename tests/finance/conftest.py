@@ -35,6 +35,7 @@ ACTORS = (
     ("par_001", "SPONSOR", ["sponsor:read", "sponsor:approve", "payment:execute"]),
 )
 TRUNCATED = (
+    "approvals, mandates, authority_events, security_holds, security_cases, security_events, "
     "audit_events, policy_decisions, auth_login_attempts, reconciliation_evidence, "
     "reconciliation_cases, university_receipts, sim_provider_faults, sim_provider_transfers, "
     "spend_entries, ledger_entries, "

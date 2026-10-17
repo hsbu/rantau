@@ -4,6 +4,7 @@ The provider is called only after the debit commits; TransferService applies the
 """
 
 import hashlib
+from collections.abc import Callable
 from dataclasses import replace
 from uuid import uuid4
 
@@ -29,6 +30,7 @@ from backend.finance.transfers import FINAL_STATES, TransferService
 
 CLEARING_ACCOUNT = "system:provider_clearing"
 FEE_ACCOUNT = "system:fee_revenue"
+ExecutionFinalizer = Callable[[PolicyConnection, ActorContext, LockedIntent, PolicyDecision], None]
 
 
 class IdempotencyKeyReused(Exception):
@@ -42,11 +44,14 @@ class ExecutionService:
         gate: GateFactory,
         transfers: TransferService,
         audit: AuditWriter | None = None,
+        *,
+        finalize_authorization: ExecutionFinalizer | None = None,
     ):
         self.database = database
         self.gate = gate
         self.transfers = transfers
         self.audit = audit or AuditWriter()
+        self.finalize_authorization = finalize_authorization
 
     def execute(
         self,
@@ -92,7 +97,12 @@ class ExecutionService:
             if decision.decision != Decision.ALLOW:
                 assert decision.reason_code is not None
                 return self._refuse(connection, actor, intent_alias, decision.reason_code, decision)
-            return self._debit(connection, actor, locked, idempotency_key, fingerprint, decision)
+            executed = self._debit(
+                connection, actor, locked, idempotency_key, fingerprint, decision
+            )
+            if self.finalize_authorization is not None:
+                self.finalize_authorization(connection, actor, locked, decision)
+            return executed
 
     def _debit(
         self,
