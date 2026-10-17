@@ -136,6 +136,7 @@ class AgentGraph:
         async with self.conversations.turn(key) as session:
             response, updated = await self._turn(message, actor, session.state)
             session.state = updated
+            session.response = response
             return response
 
     async def _turn(

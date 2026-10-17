@@ -10,6 +10,7 @@ from typing import Annotated, Literal, Protocol, Self
 from pydantic import Field, model_validator
 
 from backend.contracts.enums import Intent
+from backend.contracts.http import AgentResponse
 from backend.contracts.models import Contract, Identifier, Minor, ServiceUnavailable
 
 Option = Annotated[int, Field(strict=True, ge=1, le=100)]
@@ -71,6 +72,7 @@ class ConversationKey(Contract):
 @dataclass
 class ConversationSession:
     state: ConversationState = field(default_factory=ConversationState)
+    response: AgentResponse | None = None
 
 
 class ConversationStore(Protocol):
@@ -123,6 +125,7 @@ class InMemoryConversations:
             acquired = True
             yield entry.session
         finally:
+            entry.session.response = None
             entry.users -= 1
             if acquired:
                 entry.updated_at = self.clock()
