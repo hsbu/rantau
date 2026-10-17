@@ -1,6 +1,6 @@
 # B-04 Sponsor Approval Dashboard Design
 
-**Status:** Conversation design approved on 2026-10-17; awaiting review of this written spec before implementation.
+**Status:** Written spec and inline implementation plan approved on 2026-10-17; implementation is in progress.
 
 ## Goal
 

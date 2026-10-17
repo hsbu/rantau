@@ -63,14 +63,15 @@ AGENT_API_ORIGIN=http://127.0.0.1:8000
 ```
 
 Restart Next.js after changing this server-only setting. Compose supplies
-`http://backend:8000` instead. The relay accepts only message/conversation fields,
-forwards the browser's session cookie to the fixed agent endpoint, rejects
-foreign origins, disables caching and never forwards claimed actor/role headers
-or browser bearer tokens. It does not create a session; B-01 supplies backend
-verification, while B-04's browser sign-in flow is still pending. Missing trusted
-adapters/configuration produce a visible unavailable state, with no fallback to
-mocks. No API keys enter browser
-code. Session expiry clears the visible conversation.
+`http://backend:8000` instead. The student chat relay accepts only
+message/conversation fields, forwards the browser's session cookie to the fixed
+agent endpoint, rejects foreign origins, disables caching and never forwards
+claimed actor/role headers or browser bearer tokens. It does not create a
+session; B-01 supplies backend verification. The sponsor workspace at `/sponsor`
+uses fixed same-origin relays for sign-in, session, approval list and owner
+decisions. Both flows keep API keys and session tokens out of browser code.
+Missing trusted adapters/configuration produce a visible unavailable state,
+with no fallback to mocks. Session expiry clears the visible chat conversation.
 
 The current agent HTTP contract supplies assistant text, tool events and resource
 references. The connected page renders text safely and keeps structured details
@@ -210,8 +211,9 @@ transfer and debit on that same transaction before commit. Rollback
 restores consumption/audit, and caller idempotency must resolve prior outcomes
 before invoking authorization again. Do not cache or reuse preview decisions.
 The isolated SQL financial repository in `tests/approvals/` tests this handoff;
-it is never installed as a runtime dependency. B-04's browser flow, real C
-integration, remote CI and full payment verification remain pending.
+it is never installed as a runtime dependency. The B-04 page and relays are
+implemented, but browser sign-in/decision integration, real C integration,
+remote CI and full payment verification remain pending.
 
 Auth tests use a fresh temporary PostgreSQL instance when `initdb` and `pg_ctl`
 are on PATH. Its files remain ignored under `.generated/`. Alternatively set
