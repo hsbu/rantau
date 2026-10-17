@@ -219,8 +219,10 @@ restores consumption/audit, and caller idempotency must resolve prior outcomes
 before invoking authorization again. Do not cache or reuse preview decisions.
 Tests cover both the isolated adapter and actual default HTTP wiring with real
 sessions, B authority and C's simulated SQL ledger. Test-only adapters are never
-installed in application wiring. Browser sign-in/decision integration, the
-complete agent-driven flow remain separate checks. Real-session HTTP tests also
+installed in application wiring. Sponsor browser sign-in, approve/reject and
+student continuation against the real backend were manually verified on
+2026-10-17; see B-04 in `docs/progress/progress-b.md` for database evidence.
+The complete agent-driven flow remains a separate check. Real-session HTTP tests also
 verify simulated T1 allowance execution, cumulative mandate limits, revocation,
 and current beneficiary ownership/purpose checks before debit. Admin provisioning and
 session/consent reset semantics are also separate coordinated work.
@@ -278,7 +280,8 @@ mutations through fixed-path same-origin handlers.
 3. In the browser, `/student/payments` shows the trust timeline, pending requests with exact
    terms, quotes, receipts and untrusted messages (English or `?lang=id`). `/demo` offers
    scenario reset, clock, fault injection, the university tick and the redacted audit trail
-   for a demo administrator. Browser sign-in is not built yet.
+   for a demo administrator. `/sponsor` provides sponsor browser sign-in and
+   approval decisions. Dedicated student and administrator sign-in pages are not built yet.
 4. With Docker running, the same setup commands can be run through
    `docker compose run --rm backend uv run --no-sync python -m backend.demo.reset --migrate`
    (not verified on this machine).
