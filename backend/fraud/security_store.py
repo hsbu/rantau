@@ -305,7 +305,7 @@ class SecurityStore:
             actor,
             SecurityEventAction.CASE_REVIEWED,
             security_decision,
-            case.case_id,
+            case.resource_id,
             reason,
             case.state.value,
             event_id,

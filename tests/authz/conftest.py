@@ -68,7 +68,7 @@ def database(postgres_dsn):
     with psycopg.connect(postgres_dsn) as connection:
         connection.execute(
             "TRUNCATE actors, auth_login_attempts, policy_decisions, approvals, mandates, "
-            "authority_events CASCADE"
+            "authority_events, security_holds, security_cases, security_events CASCADE"
         )
     return database
 

@@ -43,6 +43,7 @@ def migrate(database: Database) -> None:
             "002_policy_audit",
             "003_authority",
             "004_security_cases",
+            "005_security_history_guards",
         ):
             path = Path(__file__).resolve().parents[2] / "migrations" / f"{version}.sql"
             raw = path.read_bytes().replace(b"\r\n", b"\n")
