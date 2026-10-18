@@ -1,9 +1,10 @@
 """Scoped agent HTTP seam; trusted services are deliberately not replaced by fakes."""
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Annotated, Protocol
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from backend.agent.graph import AgentGraph
 from backend.contracts.http import AgentMessage, AgentResponse
@@ -25,14 +26,11 @@ class AgentServices:
     runs: RunRepository
 
 
-async def agent_services() -> AgentServices:
-    raise HTTPException(
-        status_code=503,
-        detail={
-            "code": "DOMAIN_SERVICE_NOT_CONFIGURED",
-            "message": "Trusted domain services are not connected yet.",
-        },
-    )
+async def agent_services(request: Request) -> AsyncIterator[AgentServices]:
+    from backend.agent.wiring import configured_agent_services
+
+    async with configured_agent_services(require_classifier=request.method == "POST") as services:
+        yield services
 
 
 Actor = Annotated[ActorContext, Depends(verified_actor)]

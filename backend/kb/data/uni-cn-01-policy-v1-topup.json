@@ -1,0 +1,34 @@
+{
+  "id": "uni_cn_01_simulation_topup",
+  "revision": 1,
+  "synthetic": true,
+  "usage": "ISOLATED_SIMULATION_ONLY",
+  "operational_values": "AUTHORED_SIMULATION",
+  "policy": {
+    "id": "cn_demo_v1_topup",
+    "university_id": "uni_cn_01",
+    "term_id": "term_demo_2026",
+    "version": "cn_demo_v1_topup",
+    "required_references": [
+      "student ID",
+      "full name"
+    ],
+    "posting_window_hours": 48,
+    "partial_payment_allowed": false,
+    "topup_allowed": true,
+    "source_url": "https://example.invalid/rantau/synthetic-policy",
+    "verified_at": "2026-11-01T09:00:00Z",
+    "effective_from": "2026-10-31T09:00:00Z",
+    "effective_to": "2026-12-31T09:00:00Z",
+    "certainty": "SYNTHETIC",
+    "synthetic": true
+  },
+  "assumptions": "Matches the existing shortfall_topup_on simulator scenario. This separate authored variant permits top-ups while partial payments remain disabled; the default cn_demo_v1 record is unchanged. Dates retain the fictional November anchor and may move together to a persisted simulator seed time. These rules are not ZJU claims. Recognition supports guidance only and cannot authorize a payment, clear a hold or override approval requirements.",
+  "procedural_inspiration": [
+    {
+      "reference_id": "zju_current_students_2026",
+      "reference_revision": 1,
+      "claim_key": "transfer_references"
+    }
+  ]
+}

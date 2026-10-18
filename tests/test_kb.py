@@ -147,3 +147,39 @@ def test_bundled_data_is_sanitized_and_loader_returns_independent_records():
     second = load_bundle()
     assert first == second
     assert first is not second
+
+
+@pytest.mark.parametrize("duplicate", ["record", "policy", "version"])
+def test_simulation_variants_cannot_reuse_another_records_identity(duplicate):
+    bundle = load_bundle().model_dump()
+    variant = bundle["simulation_variants"][0]
+    original = bundle["simulation"]
+    if duplicate == "record":
+        variant["id"] = original["id"]
+    else:
+        field = "id" if duplicate == "policy" else "version"
+        variant["policy"][field] = original["policy"][field]
+    with pytest.raises(ValidationError, match="must be unique"):
+        KnowledgeBundle.model_validate(bundle)
+
+
+def test_variant_cannot_activate_unreviewed_procedural_claims():
+    bundle = load_bundle().model_dump()
+    bundle["simulation_variants"][0]["procedural_inspiration"][0]["claim_key"] = "topup_allowed"
+    with pytest.raises(ValidationError, match="explicit claim"):
+        KnowledgeBundle.model_validate(bundle)
+
+
+def test_unlisted_policy_files_cannot_enable_new_rules(tmp_path, monkeypatch):
+    from backend.kb import catalog
+    from backend.kb.guidance import known_policy
+
+    for name in (
+        "zju-current-students-2026-v1.json", "uni-cn-01-policy-v1.json",
+        "uni-cn-01-policy-v1-topup.json",
+    ):
+        (tmp_path / name).write_bytes((Path("backend/kb/data") / name).read_bytes())
+    unreviewed = POLICY.model_copy(update={"posting_window_hours": 1})
+    (tmp_path / "downloaded-policy.json").write_text(unreviewed.model_dump_json(), encoding="utf-8")
+    monkeypatch.setattr(catalog, "_DATA", tmp_path)
+    assert not known_policy(unreviewed, catalog.load_bundle(), NOW)

@@ -132,16 +132,27 @@ class SimulationPolicy(Record):
 class KnowledgeBundle(Record):
     reference: ReviewedReference
     simulation: SimulationPolicy
+    simulation_variants: tuple[SimulationPolicy, ...] = ()
 
     @model_validator(mode="after")
     def resolve_inspiration(self) -> Self:
         claims = {claim.key: claim for claim in self.reference.claims}
-        for link in self.simulation.procedural_inspiration:
-            if (
-                link.reference_id != self.reference.id
-                or link.reference_revision != self.reference.revision
-                or link.claim_key not in claims
-                or claims[link.claim_key].support != "EXPLICIT"
-            ):
-                raise ValueError("Inspiration must cite an explicit claim in the reviewed revision")
+        simulations = (self.simulation, *self.simulation_variants)
+        if (
+            len({item.id for item in simulations}) != len(simulations)
+            or len({item.policy.id for item in simulations}) != len(simulations)
+            or len({item.policy.version for item in simulations}) != len(simulations)
+        ):
+            raise ValueError("Simulation record IDs, policy IDs and versions must be unique")
+        for simulation in simulations:
+            for link in simulation.procedural_inspiration:
+                if (
+                    link.reference_id != self.reference.id
+                    or link.reference_revision != self.reference.revision
+                    or link.claim_key not in claims
+                    or claims[link.claim_key].support != "EXPLICIT"
+                ):
+                    raise ValueError(
+                        "Inspiration must cite an explicit claim in the reviewed revision"
+                    )
         return self

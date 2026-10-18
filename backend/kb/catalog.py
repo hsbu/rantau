@@ -15,4 +15,10 @@ def load_bundle() -> KnowledgeBundle:
     simulation = SimulationPolicy.model_validate_json(
         (_DATA / "uni-cn-01-policy-v1.json").read_text(encoding="utf-8")
     )
-    return KnowledgeBundle(reference=reference, simulation=simulation)
+    # Load only explicitly listed records; extra downloaded files cannot activate rules.
+    topup_variant = SimulationPolicy.model_validate_json(
+        (_DATA / "uni-cn-01-policy-v1-topup.json").read_text(encoding="utf-8")
+    )
+    return KnowledgeBundle(
+        reference=reference, simulation=simulation, simulation_variants=(topup_variant,)
+    )

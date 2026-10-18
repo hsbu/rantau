@@ -1,9 +1,10 @@
 """Server configuration; secret values never participate in public models."""
 
 import re
+from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,12 +14,21 @@ class Settings(BaseSettings):
     database_url: SecretStr | None = None
     openrouter_api_key: SecretStr | None = None
     openrouter_model: str = ""
+    openrouter_max_tokens: int = Field(default=2048, ge=512, le=8192)
+    openrouter_reasoning_effort: (
+        Literal["none", "minimal", "low", "medium", "high", "xhigh", "max"] | None
+    ) = None
     auth_enabled: bool = False
     auth_tenant_id: str = ""
     auth_trusted_origin: str = ""
     auth_demo_student_password: SecretStr | None = None
     auth_demo_sponsor_password: SecretStr | None = None
     approval_ttl_seconds: int = Field(default=600, ge=1, le=3600)
+
+    @field_validator("openrouter_reasoning_effort", mode="before")
+    @classmethod
+    def optional_reasoning_effort(cls, value: object) -> object:
+        return None if value == "" else value
 
     @property
     def auth_configured(self) -> bool:

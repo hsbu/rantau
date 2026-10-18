@@ -27,11 +27,12 @@ Open the frontend at `http://127.0.0.1:3000` and backend docs at
 `http://127.0.0.1:8000/docs`. With Docker running, `docker compose up --build`
 starts PostgreSQL, backend and frontend. Container services use service DNS.
 
-`/health` reports process liveness. `/ready` reports 503 until the domain services
-are integrated; it reports configured authentication readiness separately. Backend
-authentication is opt-in as described below. Agent domain services remain unwired,
-so a valid session alone does not enable the connected financial workflow. No
-identity is accepted from headers/chat text, and no fake financial gate is connected.
+`/health` reports process liveness. `/ready` remains a conservative 503 gate during
+the staged agent financial integration; it reports authentication and finance
+storage separately. Read-only Chat is now wired to verified sessions, scoped
+simulator reads, OpenRouter and PostgreSQL draft/run storage. It requires the
+configuration and explicit setup below. Financial actions remain unavailable in
+the agent graph; no identity is accepted from headers/chat text or a fake gate.
 
 ## Student chat
 
@@ -158,7 +159,8 @@ invalidates the result. Preview decisions cannot authorize a later debit.
 Repository locking, complete accounting coverage and authority provenance are
 documented in `backend/authz/policy_repository.py`. No financial test repository
 is connected to application wiring. `/ready` still reports unavailable domain
-services while the agent domain wiring remains incomplete.
+services during the remaining agent financial-workflow integration; its global
+status does not serve as the read-only Chat availability probe.
 
 New demo seeds grant the student `payment:execute` and `reconciliation:submit`,
 and the sponsor `payment:execute`, in addition to their existing scopes. These
@@ -296,8 +298,9 @@ mutations through fixed-path same-origin handlers.
    `docker compose run --rm backend uv run --no-sync python -m backend.demo.reset --migrate`
    (not verified on this machine).
 
-`/ready` reports `finance_storage` separately; `domain_services` stays false until the agent
-is wired to trusted services.
+`/ready` reports `finance_storage` separately; `domain_services` remains false during
+the staged agent financial-workflow integration. Read-only Chat handles its own
+configuration/storage checks and does not change global readiness in this slice.
 
 ## Checks and isolated demo
 
@@ -337,6 +340,16 @@ progress folder: [Dev A](docs/progress/progress-a.md),
 Each owner updates their task checkboxes, descriptions and validation evidence in
 the same commit/PR as the work. See `AGENTS.md` section 7 for the full workflow.
 
+`OPENROUTER_MAX_TOKENS` bounds combined reasoning and visible output (default
+2048, range 512–8192). An exhausted budget can return no JSON; the agent then
+fails safely without acting. Optionally set `OPENROUTER_REASONING_EFFORT` to an
+effort supported by the selected model; omitted/empty retains provider defaults.
+For optional-reasoning classifiers, `none` can leave more budget for the schema.
+Mandatory-reasoning models may reject `none`. These settings also pass through
+Compose. See [OpenRouter's reasoning guidance](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).
+Missing tuition funding/amount/quote selections are clarified by the deterministic
+planner; model clarification is reserved for an unclear intent.
+
 ## Interactive agent and conversation state
 
 After setting `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` in the ignored local
@@ -358,6 +371,18 @@ scenario clock. Replies explain scoped data deterministically. The harness can
 build a typed draft preview; it cannot persist a payment intent, approve, debit,
 post tuition or clear a hold. It does not install fake authentication or a fake
 authorization gate in the application. `/quit` exits interactive mode.
+
+The KB explicitly lists two fictional simulator policies: `cn_demo_v1` keeps
+partial payments and top-ups disabled; `cn_demo_v1_topup` matches C's existing
+`shortfall_topup_on` scenario and permits top-ups while partial payments stay
+disabled. The original default record and ZJU reference remain unchanged.
+Recognition compares every policy field with its listed record, allowing only
+the verification/validity timestamps to move together to the persisted seed time.
+The validity offsets must match exactly, a future verification time is rejected,
+and the stored policy still expires; requests never renew it. Unknown identities,
+versions or changed rules stay pending. Unlisted JSON files cannot activate a
+policy. Recognizing the top-up variant supplies guidance only: it does not enable
+an agent payment action, grant approval or bypass the protected executor.
 
 Shortfall guidance checks the reviewed KB first. With `--web-guidance`, a missing
 claim triggers a bounded read of two curated ZJU pages, used only as procedural
@@ -400,5 +425,69 @@ is single-worker/process-local: restart, worker change or expiry loses the draft
 It stores no raw transcript, approval or cached authorization. Only the previous
 intent, pending field and option counts accompany the current redacted user text
 to the model; server IDs, balances and tool outputs stay outside model context.
-The store interface allows later PostgreSQL persistence after shared schema
-coordination; no database migration is introduced here.
+
+## Durable agent drafts and run diagnostics
+
+The approved A-03-F1 adapters implement the same memory/run interfaces using
+PostgreSQL. Explicitly apply the existing B/C migrations followed by
+`020_agent_storage.sql` to the configured database:
+
+```powershell
+uv run python -m backend.agent.migrations
+```
+
+This command creates no identities, sessions or financial fixtures. It does not
+run at application startup. Complete the existing explicit authentication bootstrap
+and C scenario seed for an isolated demo database, and configure authentication,
+`DATABASE_URL`, `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` locally. Chat uses the
+existing verified student cookie; a new student sign-in screen is not part of this
+wiring change. Never put credentials or API keys in browser code or chat.
+
+The default HTTP dependency now calls `backend.agent.wiring.configured_agent_services`.
+It constructs B's real `AuthService`, C's `FinanceAgentReadPort`/scoped database reads,
+the existing OpenRouter classifier and the durable graph/run factory. The fixed
+fictional university binding is `uni_cn_01` to `benef_uni_cn_01`; only trusted server
+code supplies it. No executor, approval or case-submission tool is installed.
+SDK clients are scoped to each request and closed afterward. Missing classifier
+configuration returns 503 `CLASSIFIER_NOT_CONFIGURED` on messages; missing required
+finance/agent storage returns 503 `AGENT_STORAGE_UNAVAILABLE` before a model call.
+No request migrates or seeds storage. Run retrieval uses the current verified
+session and storage without requiring an API key or making a model request.
+
+Scenarios stay scripted. The isolated CLI retains its explicit in-memory setup;
+configured PostgreSQL adapters never fall back to process-local storage on error.
+
+`PostgresConversations` retains only typed tuition selections and the previous
+intent, scoped by tenant, student, verified session and conversation ID. Drafts
+survive process/worker changes, expire after 30 idle minutes or earlier session
+expiry, and are invalidated by a simulator reset. Storage is limited to 128 active
+drafts per tenant and 64 KiB per draft; expired/invalid-session drafts are purged
+on access. Login under a new session starts a new namespace. All resource,
+permission, policy and quote checks still run again; stored IDs grant no authority.
+To continue a saved draft, a client must reuse its `conversation_id` within the
+same valid session. The current browser keeps that ID and visible messages only
+in component memory; reload starts a new conversation. This backend change does
+not restore a browser transcript or add a chat-history interface.
+
+Workers serialize each conversation with a PostgreSQL advisory lock and a
+five-second contention limit. Database work runs in bounded worker calls, including
+on Windows' default event loop. No open transaction or auth/financial row locks span
+model/network calls. A completed state and its run metadata commit together after
+fresh session/scope/scenario checks. Errors and cancellation before commit roll
+back the write; a completed commit remains recorded if the HTTP connection is
+subsequently lost. Missing/corrupt storage produces a sanitized unavailable result.
+
+`PostgresRuns` stores append-only diagnostic metadata: intent, allowlisted tool
+events/resource references, scope and scenario identifiers. It stores no user text,
+assistant prose, model output, credentials, account balances, full quotes or approval
+objects. Records are limited to 64 events/resources and 32 KiB; identical writes
+are idempotent and conflicting writes cannot replace history. There is no automatic
+run-history deletion during the MVP, including on logout or fixture reset.
+
+`GET /api/v1/agent/runs/{run_id}` keeps the existing response shape but reconstructs
+a fixed safe message plus the saved diagnostics. It does not replay the original
+assistant response or restore chat history. Only the original currently valid
+student session can retrieve a run; logout, expiry, changed scopes/credentials or
+disabled actors deny access. These are past orchestration diagnostics, not current
+financial state or the authoritative B/C financial/security audit. New financial
+tools must update the diagnostic allowlist and domain audit integration together.

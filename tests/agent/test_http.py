@@ -11,7 +11,8 @@ from tests.fixtures.data import ACTOR
 from tests.fixtures.fakes import FakeReadPort
 
 
-def test_default_http_auth_fails_closed_even_with_forged_headers():
+def test_default_http_auth_fails_closed_even_with_forged_headers(monkeypatch):
+    monkeypatch.setenv("AUTH_ENABLED", "false")
     client = TestClient(app)
     response = client.post(
         "/api/v1/agent/messages",
@@ -22,17 +23,19 @@ def test_default_http_auth_fails_closed_even_with_forged_headers():
     assert response.json()["detail"]["code"] == "AUTHENTICATION_NOT_CONFIGURED"
 
 
-def test_authenticated_but_domain_unwired_fails_closed():
+def test_actor_override_cannot_replace_required_trusted_configuration(monkeypatch):
+    monkeypatch.setenv("AUTH_ENABLED", "false")
     app.dependency_overrides[verified_actor] = lambda: ACTOR
     try:
         response = TestClient(app).post("/api/v1/agent/messages", json={"message": "Tuition"})
         assert response.status_code == 503
-        assert response.json()["detail"]["code"] == "DOMAIN_SERVICE_NOT_CONFIGURED"
+        assert response.json()["detail"]["code"] == "AUTHENTICATION_NOT_CONFIGURED"
     finally:
         app.dependency_overrides.clear()
 
 
-def test_scoped_run_round_trip_and_foreign_reference():
+def test_scoped_run_round_trip_and_foreign_reference(monkeypatch):
+    monkeypatch.setenv("AUTH_ENABLED", "false")
     class Runs:
         def __init__(self):
             self.values = {}
