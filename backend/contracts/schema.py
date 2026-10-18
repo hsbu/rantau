@@ -7,7 +7,7 @@ from pydantic.json_schema import models_json_schema
 from backend.contracts import http, models
 from backend.contracts.auth import ConsentRequest, ConsentSummary, LoginRequest, SessionSummary
 from backend.contracts.authority import ApprovalView, MandateRequest, MandateView
-from backend.contracts.security import SecurityCaseView
+from backend.contracts.security import SecurityCaseList, SecurityCaseView
 
 SCHEMA_MODELS = (
     models.ActorContext,
@@ -55,6 +55,7 @@ SCHEMA_MODELS = (
     MandateRequest,
     MandateView,
     SecurityCaseView,
+    SecurityCaseList,
 )
 
 
@@ -110,6 +111,7 @@ def contract_schema() -> dict[str, Any]:
         "/demo/university/tick": "TickResult",
         "/demo/audit": "AuditEntry",
         "/reconciliations/{id}": "ReconciliationCase",
+        "/security-cases": "SecurityCaseList",
         "/security-cases/{id}": "SecurityCaseView",
         "/reconciliations": "CaseCreated",
         "/reconciliations/{id}/submit": "ReconciliationCase",
@@ -172,6 +174,9 @@ def contract_schema() -> dict[str, Any]:
             },
         }
         is_auth = path.startswith(("/auth/", "/student/sharing-consents/"))
+        if path == "/security-cases":
+            operation["x-owner"] = "B"
+            operation["x-implementation"] = "implemented-requires-finance"
         if path == "/security-cases/{id}":
             operation["x-owner"] = "B"
             operation["x-implementation"] = "implemented-requires-finance"

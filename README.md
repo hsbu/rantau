@@ -251,7 +251,18 @@ related funding owners and explicitly scoped reviewers use the trusted resource
 adapter. Missing and inaccessible cases both return the same 404; unavailable
 case storage returns a sanitized 503. Responses are `no-store`. This read endpoint
 does not expose hold placement/clearing or reviewer decisions. Agent invocation
-and a case UI remain separate work.
+is recorded under B-07 and the read-only sponsor case panel under B-06 in
+`docs/progress/progress-b.md`.
+
+`GET /api/v1/security-cases` returns `SecurityCaseList`, a bounded page of the
+same seven fields for cases in the caller's relationship scope (cases they
+opened, or the tenant page for an explicitly scoped reviewer). The storage bound
+is 100 cases ordered by `updated_at DESC`; an actor with no case receives
+`{"cases": []}` rather than a 404, and the same session revalidation, `no-store`
+and sanitized-503 rules apply. It is read-only: no hold-clear or case-decision
+route is exposed. The sponsor workspace shows the signed-in sponsor's own cases
+from this endpoint; clearing a hold or deciding a case still happens in separate
+trusted review tooling.
 
 Auth tests use a fresh temporary PostgreSQL instance when `initdb` and `pg_ctl`
 are on PATH. Its files remain ignored under `.generated/`. Alternatively set

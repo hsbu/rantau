@@ -10,6 +10,7 @@ type Approval = components["schemas"]["ApprovalView"];
 type Session = components["schemas"]["SessionSummary"];
 type DecisionResult = components["schemas"]["SponsorDecisionResult"];
 type Decision = components["schemas"]["SponsorDecisionRequest"]["decision"];
+type SecurityCase = components["schemas"]["SecurityCaseView"];
 type Mode = "checking" | "signed-out" | "wrong-role" | "ready";
 
 const identifier = /^[A-Za-z0-9_.:-]{1,128}$/;
@@ -17,6 +18,13 @@ const digest = /^[0-9a-f]{64}$/;
 const approvalStates = new Set<Approval["state"]>([
   "REQUESTED", "PENDING", "APPROVED", "REJECTED", "EXPIRED", "REVOKED",
   "INVALIDATED_BY_CHANGE", "CONSUMED",
+]);
+const caseStates = new Set<SecurityCase["state"]>([
+  "OPEN", "UNDER_REVIEW", "RESOLVED", "ESCALATED",
+]);
+const caseReasons = new Set<SecurityCase["reason"]>([
+  "UNKNOWN_BENEFICIARY", "BENEFICIARY_MISMATCH", "BENEFICIARY_CHANGE_REQUESTED",
+  "PROMPT_INJECTION", "SCAM_INDICATOR", "POLICY_REVIEW",
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -64,6 +72,23 @@ function isDecisionResult(value: unknown): value is DecisionResult {
     && typeof value.recorded_at === "string" && Number.isFinite(Date.parse(value.recorded_at));
 }
 
+function isSecurityCase(value: unknown): value is SecurityCase {
+  if (!isRecord(value)) return false;
+  return typeof value.case_id === "string" && identifier.test(value.case_id)
+    && typeof value.resource_id === "string" && identifier.test(value.resource_id)
+    && typeof value.state === "string" && caseStates.has(value.state as SecurityCase["state"])
+    && typeof value.reason === "string" && caseReasons.has(value.reason as SecurityCase["reason"])
+    && typeof value.created_at === "string" && Number.isFinite(Date.parse(value.created_at))
+    && typeof value.updated_at === "string" && Number.isFinite(Date.parse(value.updated_at))
+    && typeof value.audit_event_id === "string" && identifier.test(value.audit_event_id);
+}
+
+function isSecurityCaseList(value: unknown): value is { cases: SecurityCase[] } {
+  return isRecord(value) && Object.keys(value).length === 1 && Object.hasOwn(value, "cases")
+    && Array.isArray(value.cases) && value.cases.length <= 100
+    && value.cases.every(isSecurityCase);
+}
+
 async function errorCode(response: Response): Promise<string> {
   try {
     const value: unknown = await response.json();
@@ -86,13 +111,15 @@ function formatExpiry(value: string): string {
   }).format(new Date(value));
 }
 
-function stateLabel(state: Approval["state"]): string {
-  return state.replaceAll("_", " ").toLowerCase();
+function humanise(value: string): string {
+  return value.replaceAll("_", " ").toLowerCase();
 }
 
 export function SponsorDashboard() {
   const [mode, setMode] = useState<Mode>("checking");
   const [approvals, setApprovals] = useState<Approval[]>([]);
+  const [cases, setCases] = useState<SecurityCase[]>([]);
+  const [casesNotice, setCasesNotice] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -136,6 +163,31 @@ export function SponsorDashboard() {
     }
   }, []);
 
+  const loadCases = useCallback(async () => {
+    setCasesNotice("");
+    try {
+      const response = await fetch("/sponsor/api/cases", {
+        credentials: "same-origin", cache: "no-store",
+      });
+      if (response.status === 401) {
+        setCases([]);
+        setCasesNotice("Your session expired. Sign in again to see security cases.");
+        return;
+      }
+      if (!response.ok) {
+        setCases([]);
+        setCasesNotice("Security cases are unavailable right now. Your payment states are unchanged.");
+        return;
+      }
+      const value: unknown = await response.json();
+      if (!isSecurityCaseList(value)) throw new Error("Invalid security case response");
+      setCases(value.cases);
+    } catch {
+      setCases([]);
+      setCasesNotice("We could not confirm the security case list. Refresh to try again.");
+    }
+  }, []);
+
   const checkSession = useCallback(async () => {
     setMode("checking");
     try {
@@ -156,15 +208,16 @@ export function SponsorDashboard() {
       if (value.role !== "SPONSOR") {
         setMode("wrong-role");
         setApprovals([]);
+        setCases([]);
         return;
       }
       setMode("ready");
-      await loadInbox();
+      await Promise.all([loadInbox(), loadCases()]);
     } catch {
       setMode("signed-out");
       setError("We could not check your session. Please try again.");
     }
-  }, [loadInbox]);
+  }, [loadInbox, loadCases]);
 
   useEffect(() => { void checkSession(); }, [checkSession]);
 
@@ -205,11 +258,12 @@ export function SponsorDashboard() {
       if (value.role !== "SPONSOR") {
         setMode("wrong-role");
         setApprovals([]);
+        setCases([]);
         return;
       }
       setMode("ready");
       setNotice("Signed in. Review each request before choosing a decision.");
-      await loadInbox();
+      await Promise.all([loadInbox(), loadCases()]);
     } catch {
       setError("We could not confirm sign-in. Check the session before trying again.");
     } finally {
@@ -229,6 +283,8 @@ export function SponsorDashboard() {
         return;
       }
       setApprovals([]);
+      setCases([]);
+      setCasesNotice("");
       setConfirmation(undefined);
       setPassword("");
       setNotice("");
@@ -364,6 +420,29 @@ export function SponsorDashboard() {
             busyId={busyId} uncertain={uncertain} onChoose={(decision) => setConfirmation({ item, decision })} />)}
         </div>
       </section>}
+
+      <section className={styles.section} aria-labelledby="cases-title">
+        <div className={styles.sectionHeading}>
+          <div><p className={styles.eyebrow}>Security review</p><h2 id="cases-title">Security cases</h2></div>
+          <button className={styles.textButton} onClick={() => void loadCases()}>Refresh</button>
+        </div>
+        <p className={styles.muted}>Read-only. Clearing a hold or deciding a case happens in a separate trusted
+          review and is never available from this page.</p>
+        {casesNotice && <p className={styles.error} role="alert">{casesNotice}</p>}
+        {!casesNotice && cases.length === 0 &&
+          <p className={styles.empty}>No security case is open in your name.</p>}
+        <ul className={styles.caseList}>
+          {cases.map(item => <li key={item.case_id} className={styles.caseRow}>
+            <div>
+              <span className={styles.purpose}>{humanise(item.reason)}</span>
+              <h3>{item.case_id}</h3>
+              <p className={styles.muted}>Related payment {item.resource_id} · opened {formatExpiry(item.created_at)} ·
+                updated {formatExpiry(item.updated_at)}</p>
+            </div>
+            <span className={styles.state}>{humanise(item.state)}</span>
+          </li>)}
+        </ul>
+      </section>
     </div>}
 
     {confirmation && <dialog ref={confirmationDialog} className={styles.confirmDialog}
@@ -406,7 +485,7 @@ function ApprovalCard({ item, busy, busyId, uncertain, onChoose }: {
       <div><span className={styles.purpose}>{item.purpose === "TUITION" ? "Tuition" : "Allowance"}</span>
         <h3>{item.beneficiary_label}</h3></div>
       <span className={`${styles.state} ${item.state === "PENDING" ? styles.statePending : ""}`}>
-        {stateLabel(item.state)}
+        {humanise(item.state)}
       </span>
     </div>
     <dl className={styles.amounts}>

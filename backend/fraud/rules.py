@@ -29,7 +29,9 @@ _TEXT_RULES: tuple[tuple[AdvisorySignal, re.Pattern[str]], ...] = (
         AdvisorySignal.BENEFICIARY_CHANGE,
         re.compile(
             r"\b(change|replace|switch|update)\b.{0,50}"
-            r"\b(beneficiar\w*|payee|recipient|account details)\b",
+            r"\b(beneficiar\w*|payee|recipient|account details)\b"
+            r"|\b(new|different|another|alternate|revised)\b.{0,20}"
+            r"\b(beneficiar\w*|payee|recipient|account)\b",
             re.I,
         ),
     ),

@@ -183,6 +183,109 @@ def test_malformed_identifiers_do_not_echo_input_and_no_mutation_route_is_expose
     assert malformed.status_code == 422
     assert malformed.json() == {"detail": {"code": "INVALID_AUTH_REQUEST"}}
     assert student.post(f"/api/v1/security-cases/{case.case_id}", headers=ORIGIN).status_code == 405
+    assert student.post("/api/v1/security-cases", headers=ORIGIN).status_code == 405
+
+
+def test_case_lists_are_relationship_scoped_and_field_limited(case_api):
+    database, student, case = case_api
+    owned = student.get("/api/v1/security-cases")
+    assert owned.status_code == 200, owned.text
+    assert owned.headers["cache-control"] == "no-store"
+    assert [item["case_id"] for item in owned.json()["cases"]] == [case.case_id]
+    assert set(owned.json()["cases"][0]) == FIELDS
+    assert "private_evidence_alias" not in owned.text and "stu_001" not in owned.text
+    # A funding sponsor who did not open the case gets an empty page, not a leak.
+    sponsor = client_for("sponsor").get("/api/v1/security-cases")
+    assert sponsor.status_code == 200 and sponsor.json() == {"cases": []}
+    # An unrelated student sees nothing from another actor's relationship scope.
+    stranger = client_for("stranger").get("/api/v1/security-cases")
+    assert stranger.status_code == 200 and stranger.json() == {"cases": []}
+    # The reviewer scope sees the tenant page.
+    reviewer = client_for("reviewer").get("/api/v1/security-cases")
+    assert reviewer.status_code == 200
+    assert [item["case_id"] for item in reviewer.json()["cases"]] == [case.case_id]
+    with database.connection() as connection:
+        assert connection.execute("SELECT count(*) AS n FROM transfers").fetchone()["n"] == 0
+
+
+def test_case_list_page_is_bounded_to_the_most_recent_cases(case_api):
+    database, student, case = case_api
+    with database.connection() as connection:
+        connection.execute(
+            "INSERT INTO security_cases (tenant_id, case_id, resource_id, reason_code, state, "
+            "opened_by, updated_at, audit_event_id) "
+            "SELECT %s, 'case_bulk_' || g, 'intent_bulk_' || g, 'POLICY_REVIEW', 'OPEN', "
+            "'stu_001', clock_timestamp() + (g || ' seconds')::interval, 'audit_bulk_' || g "
+            "FROM generate_series(1, 150) g",
+            (TENANT,),
+        )
+    body = student.get("/api/v1/security-cases").json()["cases"]
+    assert len(body) == 100  # storage bound, never an unbounded page
+    assert [item["case_id"] for item in body[:2]] == ["case_bulk_150", "case_bulk_149"]
+    assert body[-1]["case_id"] == "case_bulk_51"
+    assert case.case_id not in {item["case_id"] for item in body}
+
+
+def test_case_list_requires_the_current_session_and_read_scope(case_api):
+    database, student, _ = case_api
+    assert student.get("/api/v1/security-cases").status_code == 200
+    with database.connection() as connection:
+        connection.execute("UPDATE actors SET scopes='{}' WHERE actor_id='stu_001'")
+    denied = student.get("/api/v1/security-cases")
+    assert denied.status_code == 404
+    assert denied.json() == {"detail": "Resource unavailable"}
+    assert denied.headers["cache-control"] == "no-store"
+
+
+def test_a_foreign_tenant_alias_cannot_list_another_tenants_cases(case_api, monkeypatch):
+    database, _, case = case_api
+    with database.connection() as connection:
+        connection.execute(
+            "INSERT INTO actors (tenant_id,actor_id,role,scopes) "
+            "VALUES ('foreign','stu_001','STUDENT',ARRAY['student:read'])"
+        )
+        connection.execute(
+            "INSERT INTO auth_credentials (tenant_id,actor_id,username,password_hash) "
+            "SELECT 'foreign',actor_id,username,password_hash FROM auth_credentials "
+            "WHERE tenant_id='demo_001' AND actor_id='stu_001'"
+        )
+    monkeypatch.setenv("AUTH_TENANT_ID", "foreign")
+    response = client_for("student").get("/api/v1/security-cases")
+    assert response.status_code == 200
+    assert response.json() == {"cases": []}
+    assert case.case_id not in response.text
+
+
+def test_case_list_storage_failures_are_sanitized(case_api):
+    database, student, _ = case_api
+    with database.connection() as connection:
+        connection.execute("ALTER TABLE security_cases RENAME TO unavailable_cases")
+    try:
+        response = student.get("/api/v1/security-cases")
+        assert response.status_code == 503
+        assert response.json() == {"detail": {"code": "SECURITY_CASE_UNAVAILABLE"}}
+        assert response.headers["cache-control"] == "no-store"
+    finally:
+        with database.connection() as connection:
+            connection.execute("ALTER TABLE unavailable_cases RENAME TO security_cases")
+
+
+def test_the_endpoint_catalogue_exports_the_safe_list_contract():
+    from backend.contracts.schema import contract_schema
+
+    schema = contract_schema()
+    operation = schema["paths"]["/api/v1/security-cases"]["get"]
+    assert operation["x-owner"] == "B"
+    assert operation["x-implementation"] == "implemented-requires-finance"
+    assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/SecurityCaseList"
+    }
+    definitions = schema["components"]["schemas"]
+    assert set(definitions["SecurityCaseList"]["properties"]) == {"cases"}
+    assert definitions["SecurityCaseList"]["properties"]["cases"]["items"] == {
+        "$ref": "#/components/schemas/SecurityCaseView"
+    }
+    assert set(definitions["SecurityCaseView"]["properties"]) == FIELDS
 
 
 def test_the_existing_endpoint_catalogue_exports_the_safe_response_contract():
