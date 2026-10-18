@@ -34,7 +34,8 @@ def test_actor_override_cannot_replace_required_trusted_configuration(monkeypatc
         app.dependency_overrides.clear()
 
 
-def test_scoped_run_round_trip_and_foreign_reference():
+def test_scoped_run_round_trip_and_foreign_reference(monkeypatch):
+    monkeypatch.setenv("AUTH_ENABLED", "false")
     class Runs:
         def __init__(self):
             self.values = {}

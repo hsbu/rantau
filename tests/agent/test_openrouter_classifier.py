@@ -55,6 +55,8 @@ async def test_openrouter_transport_uses_configured_model_schema_and_redacts():
     assert payload["response_format"]["type"] == "json_schema"
     assert payload["provider"]["require_parameters"] is True
     assert payload["provider"]["data_collection"] == "deny"
+    assert payload["max_tokens"] == 2048
+    assert "reasoning" not in payload
     assert payload["messages"][0]["role"] == "system"
     content = payload["messages"][1]["content"]
     for private in (
@@ -66,6 +68,37 @@ async def test_openrouter_transport_uses_configured_model_schema_and_redacts():
     ):
         assert private not in content
     await classifier.close()
+
+
+async def test_configured_reasoning_budget_and_effort():
+    requests = []
+
+    def handler(request):
+        requests.append(json.loads(request.content))
+        return httpx.Response(200, json=response_body(
+            '{"intent":"TUITION","needs_clarification":false,"tuition":null}'
+        ))
+
+    client = AsyncOpenAI(
+        base_url=OPENROUTER_BASE_URL, api_key="synthetic-test-key", max_retries=0,
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    classifier = OpenRouterIntentClassifier(Settings(
+        _env_file=None, openrouter_model="provider/configurable-model",
+        openrouter_max_tokens=4096, openrouter_reasoning_effort="none",
+    ), client)
+    try:
+        await classifier.classify("Plan tuition")
+        assert requests[0]["max_tokens"] == 4096
+        assert requests[0]["reasoning"] == {"effort": "none"}
+        assert requests[0]["provider"]["require_parameters"] is True
+    finally:
+        await classifier.close()
+
+
+def test_empty_reasoning_effort_keeps_provider_default():
+    settings = Settings(_env_file=None, openrouter_reasoning_effort="")
+    assert settings.openrouter_reasoning_effort is None
 
 
 async def test_openrouter_multi_turn_extraction_reaches_only_a_verified_preview():

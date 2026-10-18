@@ -7,6 +7,7 @@ from backend.main import app
 
 
 def test_liveness_does_not_claim_domain_readiness(monkeypatch):
+    monkeypatch.setenv("AUTH_ENABLED", "false")
     monkeypatch.setattr("backend.main.database_available", AsyncMock(return_value=False))
     client = TestClient(app)
     assert client.get("/health").json() == {"status": "ok", "simulation": True}
