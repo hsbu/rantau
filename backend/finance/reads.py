@@ -112,6 +112,16 @@ class FinanceReads:
                 audit_event_id=audit["audit_event_id"],
             )
 
+    def payment_for_intent(self, actor: ActorContext, alias: str) -> PaymentResult | None:
+        """Recover a submitted outcome after response loss without starting another payment."""
+        with self.database.connection() as connection:
+            self._visible_intent(connection, actor, alias)
+            row = connection.execute(
+                "SELECT alias FROM transfers WHERE tenant_id = %s AND intent_alias = %s",
+                (actor.tenant_id, alias),
+            ).fetchone()
+        return self.payment_result(actor, row["alias"]) if row else None
+
     def beneficiary(self, actor: ActorContext, alias: str) -> TrustedBeneficiary:
         with self.database.connection() as connection:
             self.auth.current_actor(connection, actor)

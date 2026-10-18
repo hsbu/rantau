@@ -97,6 +97,7 @@ def sign_in(username="student"):
 def assess(client, text):
     return client.post(
         "/api/v1/agent/messages",
+        headers=ORIGIN,
         json={"message": text, "conversation_id": "fraud_boundary"},
     )
 

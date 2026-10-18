@@ -14,10 +14,11 @@ from backend.contracts.models import (
     CaseSubmission,
     ReconciliationCase,
     ScopeDenied,
+    ServiceUnavailable,
 )
 from backend.finance.audit import AuditEvent, AuditWriter
 from backend.finance.authorization import GateFactory, evaluate_gate
-from backend.finance.records import Row, fetch
+from backend.finance.records import Row, fetch, lock_intent
 from backend.finance.simclock import sim_now
 from backend.finance.states import require_transition
 from backend.university.ledger import OverpaymentError, post_receipt
@@ -56,30 +57,51 @@ class CaseService:
 
     def create(self, actor: ActorContext, submission: CaseSubmission) -> ReconciliationCase:
         with self.database.connection() as connection:
-            transfer = _own_transfer(connection, actor, submission)
-            existing = _active_case(connection, actor.tenant_id, transfer["alias"])
-            case = existing or _insert_case(connection, actor, transfer)
-            _attach_evidence(connection, actor, case, transfer)
-            return self._view(connection, actor, case["alias"], "RECONCILIATION_CASE_OPENED")
+            return self.create_in_transaction(connection, actor, submission)
+
+    def create_in_transaction(
+        self, connection: PolicyConnection, actor: ActorContext, submission: CaseSubmission
+    ) -> ReconciliationCase:
+        """Caller owns the commit; use C account/obligation/intent lock order."""
+        if connection.autocommit or connection.closed:
+            raise ServiceUnavailable("Reconciliation transaction unavailable")
+        transfer = _own_transfer(connection, actor, submission)
+        lock_intent(connection, actor.tenant_id, transfer["intent_alias"])
+        transfer = _own_transfer(connection, actor, submission)
+        existing = _active_case(connection, actor.tenant_id, transfer["alias"])
+        case = existing or _insert_case(connection, actor, transfer)
+        _attach_evidence(connection, actor, case, transfer)
+        return self._view(connection, actor, case["alias"], "RECONCILIATION_CASE_OPENED")
 
     def submit(self, actor: ActorContext, case_alias: str) -> ReconciliationCase:
         with self.database.connection() as connection:
-            case = _own_case(connection, actor, case_alias, lock=True)
-            transfer = fetch_transfer(connection, actor.tenant_id, case["transfer_alias"])
-            _attach_evidence(connection, actor, case, transfer)
-            case = _own_case(connection, actor, case_alias, lock=True)
-            if C(case["state"]) == C.EVIDENCE_REQUIRED:
-                return self._view(connection, actor, case_alias, "RECONCILIATION_NEEDS_EVIDENCE")
-            decision = evaluate_gate(
-                self.gate,
-                connection,
-                actor,
-                ActionIntent(action="SUBMIT_RECONCILIATION", resource_id=case_alias, terms_hash=""),
-            )
-            if decision.decision != Decision.ALLOW:
-                raise ScopeDenied("Resource unavailable")
-            _move(connection, case, C.SUBMITTED)
-            return self._view(connection, actor, case_alias, "RECONCILIATION_SUBMITTED")
+            return self.submit_in_transaction(connection, actor, case_alias)
+
+    def submit_in_transaction(
+        self, connection: PolicyConnection, actor: ActorContext, case_alias: str
+    ) -> ReconciliationCase:
+        """Use the existing submission gate on the caller's protected transaction."""
+        if connection.autocommit or connection.closed:
+            raise ServiceUnavailable("Reconciliation transaction unavailable")
+        peek = _own_case(connection, actor, case_alias)
+        transfer = fetch_transfer(connection, actor.tenant_id, peek["transfer_alias"])
+        lock_intent(connection, actor.tenant_id, transfer["intent_alias"])
+        case = _own_case(connection, actor, case_alias, lock=True)
+        transfer = fetch_transfer(connection, actor.tenant_id, case["transfer_alias"])
+        _attach_evidence(connection, actor, case, transfer)
+        case = _own_case(connection, actor, case_alias, lock=True)
+        if C(case["state"]) == C.EVIDENCE_REQUIRED:
+            return self._view(connection, actor, case_alias, "RECONCILIATION_NEEDS_EVIDENCE")
+        decision = evaluate_gate(
+            self.gate,
+            connection,
+            actor,
+            ActionIntent(action="SUBMIT_RECONCILIATION", resource_id=case_alias, terms_hash=""),
+        )
+        if decision.decision != Decision.ALLOW:
+            raise ScopeDenied("Resource unavailable")
+        _move(connection, case, C.SUBMITTED)
+        return self._view(connection, actor, case_alias, "RECONCILIATION_SUBMITTED")
 
     def get(self, actor: ActorContext, case_alias: str) -> ReconciliationCase:
         with self.database.connection() as connection:

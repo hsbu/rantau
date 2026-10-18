@@ -39,7 +39,13 @@ class IntentService:
 
     def create(self, actor: ActorContext, proposal: IntentProposal) -> Created | Refused:
         with self.database.connection() as connection:
-            return self._create(connection, actor, proposal, FIRST_REVISION, None)
+            return self.create_in_transaction(connection, actor, proposal)
+
+    def create_in_transaction(
+        self, connection: PolicyConnection, actor: ActorContext, proposal: IntentProposal
+    ) -> Created | Refused:
+        """Compose a proposal with durable caller correlation on the same gated transaction."""
+        return self._create(connection, actor, proposal, FIRST_REVISION, None)
 
     def revise(
         self, actor: ActorContext, intent_alias: str, proposal: IntentProposal

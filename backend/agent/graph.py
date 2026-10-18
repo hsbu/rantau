@@ -1,4 +1,4 @@
-"""Fixed LangGraph paths with scoped conversation drafts and read-only capabilities."""
+"""Fixed read/triage paths and explicit, protected tuition continuation commands."""
 
 from collections.abc import Hashable
 from typing import TypedDict
@@ -6,11 +6,14 @@ from uuid import uuid4
 
 from langgraph.graph import END, START, StateGraph
 
+from backend.agent.actions import TuitionActions, action_command, action_reply, proposal_of
 from backend.agent.classifier import (
     ClassificationUnavailable,
     IntentClassification,
     IntentClassifier,
 )
+from backend.agent.protection import AgentProtection
+from backend.agent.recovery import RecoveryWorkflow, recovery_command
 from backend.agent.state import (
     ConversationKey,
     ConversationState,
@@ -40,8 +43,14 @@ class AgentGraph:
         tools: AgentTools,
         *,
         conversations: ConversationStore | None = None,
+        actions: TuitionActions | None = None,
+        recovery: RecoveryWorkflow | None = None,
     ) -> None:
         self.conversations = conversations if conversations is not None else InMemoryConversations()
+        self.actions = actions
+        self.recovery = recovery
+        self.protection = AgentProtection(actions) if actions else None
+        self.tools = tools
 
         async def classify(state: GraphState) -> GraphState:
             try:
@@ -72,6 +81,11 @@ class AgentGraph:
                     classification.tuition or TuitionInput(), conversation.tuition, state["actor"]
                 )
                 conversation = conversation.model_copy(update={"tuition": tuition})
+            elif intent in {Intent.TRACK, Intent.RECOVER} and self.recovery is not None:
+                response, selected = await self.recovery.investigate(
+                    state["message"], conversation.recovery, state["actor"], intent
+                )
+                conversation = conversation.model_copy(update={"recovery": selected})
             else:
                 response = await tools.safe_handle(intent, state["message"], state["actor"])
             return {
@@ -125,6 +139,16 @@ class AgentGraph:
         if actor.role != Role.STUDENT or "student:read" not in actor.scopes:
             raise ScopeDenied("Resource unavailable")
         if conversation_id is None:
+            if self.recovery and recovery_command(message):
+                return self.recovery.reply(
+                    "Select a payment in a current conversation before recovery submission/recheck."
+                ).model_copy(update={"run_id": f"run_{uuid4().hex}"})
+            if self.actions and action_command(message):
+                return action_reply(
+                    "A current conversation and reviewed tuition preview are "
+                    "required before confirmation.",
+                    "clarify_tuition",
+                ).model_copy(update={"run_id": f"run_{uuid4().hex}"})
             response, _ = await self._turn(message, actor, ConversationState())
             return response
         key = ConversationKey(
@@ -134,13 +158,72 @@ class AgentGraph:
             conversation_id=conversation_id,
         )
         async with self.conversations.turn(key) as session:
-            response, updated = await self._turn(message, actor, session.state)
+            command = action_command(message) if self.actions else None
+            recovery = recovery_command(message) if self.recovery else None
+            guarded = None
+            if self.protection is not None:
+                guarded = await self.protection.check(message, actor, key, session.state.tuition)
+            if guarded is not None:
+                response = guarded.model_copy(update={"run_id": f"run_{uuid4().hex}"})
+                updated = session.state
+            elif recovery:
+                assert self.recovery is not None
+                response, selected = await self.recovery.handle(
+                    recovery, session.state.recovery, actor
+                )
+                updated = session.state.model_copy(
+                    update={"recovery": selected, "active_intent": Intent.RECOVER}
+                )
+                response = response.model_copy(update={"run_id": f"run_{uuid4().hex}"})
+            elif command:
+                updated = session.state
+                proposal = proposal_of(updated.tuition)
+                if updated.active_intent not in {Intent.TUITION, Intent.VERIFY_MESSAGE} or (
+                    proposal is None
+                ):
+                    response = action_reply(
+                        "Review a complete tuition preview first, then say 'confirm tuition'.",
+                        "clarify_tuition",
+                    )
+                else:
+                    assert self.actions is not None
+                    if command == "REQUEST":
+                        preview, fresh = await self.tools.plan_tuition(
+                            TuitionInput(), updated.tuition, actor
+                        )
+                        updated = updated.model_copy(update={"tuition": fresh})
+                        if proposal_of(fresh) != proposal or not any(
+                            e.tool == "build_tuition_preview" and e.status == "OK"
+                            for e in preview.tool_events
+                        ):
+                            response = preview
+                        else:
+                            response = await self.actions.handle(command, key, proposal, actor)
+                    else:
+                        response = await self.actions.handle(command, key, proposal, actor)
+                response = response.model_copy(update={"run_id": f"run_{uuid4().hex}"})
+            else:
+                response, updated = await self._turn(message, actor, session.state)
+                if self.actions and any(
+                    e.tool == "build_tuition_preview" and e.status == "OK"
+                    for e in response.tool_events
+                ):
+                    response = response.model_copy(
+                        update={
+                            "message": response.message
+                            + " To save these terms and request any required owner approval, "
+                            "say 'confirm tuition'."
+                        }
+                    )
             session.state = updated
             session.response = response
             return response
 
     async def _turn(
-        self, message: str, actor: ActorContext, conversation: ConversationState
+        self,
+        message: str,
+        actor: ActorContext,
+        conversation: ConversationState,
     ) -> tuple[AgentResponse, ConversationState]:
         output = await self.graph.ainvoke(
             {"message": message, "actor": actor, "conversation": conversation},

@@ -12,7 +12,7 @@ createServer(async (request, response) => {
   let text = "";
   for await (const chunk of request) text += chunk;
   const body = JSON.parse(text);
-  received = { body, cookie: request.headers.cookie, actorHeader: request.headers["x-actor-id"], authorization: request.headers.authorization };
+  received = { body, cookie: request.headers.cookie, origin: request.headers.origin, actorHeader: request.headers["x-actor-id"], authorization: request.headers.authorization };
   if (body.message === "expired-session") {
     response.statusCode = 401; return response.end(JSON.stringify({ detail: "private diagnostic must not reach browser" }));
   }

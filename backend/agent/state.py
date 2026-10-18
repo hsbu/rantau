@@ -38,6 +38,7 @@ class TuitionDraft(Contract):
     obligation_id: Identifier | None = None
     source_account_id: Identifier | None = None
     quote_id: Identifier | None = None
+    beneficiary_id: Identifier | None = None
     requested_amount_minor: Minor | None = None
     route_preference: Literal["LOWEST_COST", "EARLIEST_DELIVERY"] = "LOWEST_COST"
     awaiting: Literal["OBLIGATION", "FUNDING", "QUOTE", "AMOUNT"] | None = None
@@ -46,9 +47,16 @@ class TuitionDraft(Contract):
     quote_options: tuple[Identifier, ...] = ()
 
 
+class RecoveryDraft(Contract):
+    payment_id: Identifier | None = None
+    obligation_id: Identifier | None = None
+    case_id: Identifier | None = None
+
+
 class ConversationState(Contract):
     active_intent: Intent | None = None
     tuition: TuitionDraft = Field(default_factory=TuitionDraft)
+    recovery: RecoveryDraft = Field(default_factory=RecoveryDraft)
 
     def model_context(self) -> str:
         # IDs, actor/session details, balances, quotes and permissions stay server-side.

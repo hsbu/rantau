@@ -11,7 +11,7 @@ type Message = { id: number; role: "user" | "assistant"; text: string };
 const defaultPrompts = ["Help me pay my tuition", "Has my tuition been credited?", "Something went wrong with my payment"];
 const errorText = {
   session: "Your session is unavailable or has expired. Sign in again before continuing. This chat has been cleared for privacy.",
-  unavailable: "The agent service is not connected yet. Please try again later, or explore the sample conversation.",
+  unavailable: "The agent service is unavailable. If you confirmed or continued a payment, check its status in Payments before retrying. You can also explore the sample conversation.",
   invalid: "The service returned an unreadable response. No financial outcome can be confirmed. Check the original request status before repeating a payment request.",
   uncertain: "We could not confirm the response. Check the original request status before repeating a financial request. This message was not retried automatically.",
 };

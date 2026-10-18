@@ -1,0 +1,347 @@
+"""Explicit tuition commands; durable correlation never substitutes for B/C authorization."""
+
+import hashlib
+import json
+from typing import Literal
+
+from psycopg.types.json import Jsonb
+
+from backend.agent.persistence import _database_call, _lock_id, _Storage
+from backend.agent.state import ConversationKey, TuitionDraft
+from backend.approvals.finance_authority import StoredAuthority
+from backend.approvals.service import ApprovalConflict, ApprovalService
+from backend.approvals.store import database_time, terms_of
+from backend.authz.policy_repository import PolicyConnection
+from backend.contracts.enums import ApprovalState, Intent, PaymentState
+from backend.contracts.http import AgentResponse, ResourceReference, ToolEvent
+from backend.contracts.models import (
+    ActorContext,
+    Contract,
+    IntentProposal,
+    PaymentIntent,
+    ScopeDenied,
+    ServiceUnavailable,
+)
+from backend.finance.outcomes import Refused
+from backend.finance.records import intent_from_row, lock_intent
+from backend.finance.wiring import FinanceServices
+
+Command = Literal["REQUEST", "CONTINUE"]
+
+
+def action_command(message: str) -> Command | None:
+    text = message.strip().casefold().rstrip(".!?")
+    if text in {"confirm tuition", "request tuition approval", "request approval"}:
+        return "REQUEST"
+    if text in {"check", "continue", "check approval", "continue tuition"}:
+        return "CONTINUE"
+    return None
+
+
+def proposal_of(draft: TuitionDraft) -> IntentProposal | None:
+    if draft.awaiting or not all(
+        (draft.obligation_id, draft.source_account_id, draft.beneficiary_id, draft.quote_id)
+    ):
+        return None
+    assert draft.source_account_id and draft.beneficiary_id and draft.quote_id
+    return IntentProposal(
+        obligation_id=draft.obligation_id,
+        source_account_id=draft.source_account_id,
+        beneficiary_id=draft.beneficiary_id,
+        quote_id=draft.quote_id,
+        purpose="TUITION",
+    )
+
+
+def action_reply(
+    text: str, tool: str, status: str = "PENDING", payment_id: str | None = None
+) -> AgentResponse:
+    event = ToolEvent.model_validate({"tool": tool, "status": status})
+    return AgentResponse(
+        run_id="pending",
+        requested_action=Intent.TUITION,
+        message="Simulated Rantau payment workflow. " + text,
+        tool_events=(event,),
+        resources=(ResourceReference(kind="payment", id=payment_id),) if payment_id else (),
+    )
+
+
+class Correlation(Contract):
+    action_key: str
+    intent_id: str
+    terms_hash: str
+    execution_key: str
+
+
+class ActionTermsChanged(Exception):
+    """An existing confirmed request must be explicitly cancelled/revised before replacement."""
+
+
+class TuitionActions(_Storage):
+    def __init__(self, finance: FinanceServices, approval: ApprovalService) -> None:
+        super().__init__(finance.database, finance.auth)
+        self.finance, self.approval = finance, approval
+
+    def _context(
+        self, connection: PolicyConnection, key: ConversationKey, actor: ActorContext
+    ) -> int:
+        if (key.tenant_id, key.actor_id, key.session_id) != (
+            actor.tenant_id,
+            actor.actor_id,
+            actor.session_id,
+        ):
+            raise ScopeDenied("Resource unavailable")
+        self._require(connection, actor)
+        # Do not lock demo_state before C locks the funding account: reset takes
+        # account locks first. Revalidate and lock the scenario after creation.
+        row = connection.execute(
+            "SELECT run_no FROM demo_state WHERE tenant_id=%s", (actor.tenant_id,)
+        ).fetchone()
+        return int(row["run_no"]) if row else 0
+
+    @staticmethod
+    def _key(key: ConversationKey, scenario: int, proposal: IntentProposal) -> str:
+        return hashlib.sha256(
+            json.dumps([key.model_dump(), scenario, proposal.model_dump()], sort_keys=True).encode()
+        ).hexdigest()
+
+    def _prepare(
+        self, key: ConversationKey, proposal: IntentProposal, actor: ActorContext, *, create: bool
+    ) -> Correlation | Refused | None:
+        with self.database.connection() as connection:
+            scenario = self._context(connection, key, actor)
+            action_key = self._key(key, scenario, proposal)
+            connection.execute(
+                "SELECT pg_advisory_xact_lock(%s)", (_lock_id("agent-action", (action_key,)),)
+            )
+            row = connection.execute(
+                "SELECT action_key,intent_id,terms_hash,execution_key FROM agent_actions "
+                "WHERE action_key = %s",
+                (action_key,),
+            ).fetchone()
+            if row:
+                self._require(connection, actor)
+                return Correlation.model_validate(row)
+            if not create:
+                return None
+            # One active confirmed request per conversation. A changed preview never
+            # silently replaces terms or reuses the previous owner's approval.
+            previous = connection.execute(
+                "SELECT a.intent_id FROM agent_actions a JOIN payment_intents i "
+                "ON i.tenant_id=a.tenant_id AND i.alias=a.intent_id "
+                "WHERE a.tenant_id=%s AND a.actor_id=%s AND a.session_id=%s "
+                "AND a.conversation_id=%s AND a.scenario_run_no=%s "
+                "AND i.state NOT IN ('CANCELLED','FAILED','REJECTED','EXPIRED')",
+                (key.tenant_id, key.actor_id, key.session_id, key.conversation_id, scenario),
+            ).fetchone()
+            if previous:
+                raise ActionTermsChanged()
+            outcome = self.finance.intents.create_in_transaction(connection, actor, proposal)
+            if isinstance(outcome, Refused):
+                return outcome
+            if self._scenario(connection, actor.tenant_id) != scenario:
+                raise ServiceUnavailable("Scenario changed during proposal creation")
+            self._require(connection, actor)
+            result = Correlation(
+                action_key=action_key,
+                intent_id=outcome.intent.id,
+                terms_hash=outcome.intent.terms_hash,
+                execution_key="agent_" + action_key,
+            )
+            connection.execute(
+                "INSERT INTO agent_actions (action_key,tenant_id,actor_id,session_id,"
+                "conversation_id,scenario_run_no,proposal,intent_id,terms_hash,execution_key) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (
+                    action_key,
+                    key.tenant_id,
+                    key.actor_id,
+                    key.session_id,
+                    key.conversation_id,
+                    scenario,
+                    Jsonb(proposal.model_dump()),
+                    result.intent_id,
+                    result.terms_hash,
+                    result.execution_key,
+                ),
+            )
+            return result
+
+    def _current(self, actor: ActorContext, record: Correlation) -> tuple[PaymentIntent, str]:
+        with self.database.connection() as connection:
+            self._require(connection, actor)
+            intent = intent_from_row(
+                lock_intent(connection, actor.tenant_id, record.intent_id).intent
+            )
+            if intent.requested_by != actor.actor_id or intent.terms_hash != record.terms_hash:
+                raise ScopeDenied("Resource unavailable")
+            authority = StoredAuthority(actor.tenant_id)
+            if authority.hold(connection, intent).held:
+                return intent, "HELD"
+            approval = authority.approval(connection, intent)
+            now = database_time(connection)
+            if intent.quote_expiry <= now:
+                return intent, "EXPIRED"
+            if approval is not None:
+                if terms_of(approval) != terms_of(intent):
+                    return intent, "INVALID"
+                if approval.expires_at <= now:
+                    return intent, "EXPIRED"
+                return intent, approval.state.value
+            return intent, "NONE"
+
+    async def handle(
+        self, command: Command, key: ConversationKey, proposal: IntentProposal, actor: ActorContext
+    ) -> AgentResponse:
+        try:
+            record = await _database_call(
+                lambda: self._prepare(key, proposal, actor, create=command == "REQUEST")
+            )
+            if isinstance(record, Refused):
+                return action_reply(
+                    "The protected backend refused this proposal. No debit occurred.",
+                    "create_payment_intent",
+                    "DENIED",
+                )
+            if record is None:
+                return action_reply(
+                    "No confirmed proposal exists in this conversation. "
+                    "Review the preview and say 'confirm tuition'.",
+                    "get_approval_status",
+                )
+            if command == "REQUEST":
+                intent, approval = await _database_call(lambda: self._current(actor, record))
+                if intent.state == PaymentState.AWAITING_APPROVAL and approval in {
+                    "NONE",
+                    "PENDING",
+                }:
+                    await _database_call(lambda: self.approval.request(actor, record.intent_id))
+                    return action_reply(
+                        "AWAITING_APPROVAL. The funding owner must review the "
+                        "exact request in their approval workspace. Say 'check' or "
+                        "'continue' afterward. No payment was executed.",
+                        "request_approval",
+                    )
+                if intent.state == PaymentState.DRAFT and approval == "NONE":
+                    return action_reply(
+                        "Proposal saved. Say 'continue' to request protected "
+                        "execution of these exact terms. No debit occurred.",
+                        "create_payment_intent",
+                        "OK",
+                    )
+                return action_reply(
+                    "Proposal already saved. Say 'check' or 'continue' to "
+                    "reload current authority and payment status. No new execution "
+                    "was requested.",
+                    "create_payment_intent",
+                    "OK",
+                )
+            return await self._continue(actor, record)
+        except ActionTermsChanged:
+            return action_reply(
+                "This conversation already has a confirmed request. Cancel or revise it in "
+                "Payments before confirming changed terms. Existing approval cannot authorize "
+                "this changed preview. No new request or debit occurred.",
+                "create_payment_intent",
+                "DENIED",
+            )
+        except ApprovalConflict:
+            return action_reply(
+                "Approval is no longer reviewable for these terms. Refresh the "
+                "proposal and obtain current owner approval. No execution requested.",
+                "request_approval",
+                "DENIED",
+            )
+        except ServiceUnavailable:
+            return action_reply(
+                "The outcome could not be confirmed. Say 'check' to reload this "
+                "same proposal/payment before any retry; do not create another "
+                "payment request.",
+                "get_approval_status",
+                "UNAVAILABLE",
+            )
+
+    async def _continue(self, actor: ActorContext, record: Correlation) -> AgentResponse:
+        # Recover committed submissions before considering another executor invocation.
+        existing = await _database_call(
+            lambda: self.finance.reads.payment_for_intent(actor, record.intent_id)
+        )
+        if existing is not None:
+            await _database_call(
+                lambda: self.finance.transfers.settle(actor.tenant_id, existing.payment_id)
+            )
+            result = await _database_call(
+                lambda: self.finance.reads.payment_result(actor, existing.payment_id)
+            )
+            return action_reply(
+                f"Payment status: {result.transfer_status.value}; tuition is not "
+                "confirmed paid by provider status. Verify university posting.",
+                "get_payment_status",
+                "OK",
+                result.payment_id,
+            )
+        intent, approval = await _database_call(lambda: self._current(actor, record))
+        if approval in {
+            "HELD",
+            "EXPIRED",
+            "INVALID",
+            "REJECTED",
+            "CONSUMED",
+            "REVOKED",
+            "INVALIDATED_BY_CHANGE",
+        } or intent.state in {
+            PaymentState.ON_HOLD,
+            PaymentState.REJECTED,
+            PaymentState.CANCELLED,
+            PaymentState.EXPIRED,
+            PaymentState.FAILED,
+            PaymentState.PROCESSING,
+            PaymentState.DELIVERED,
+        }:
+            stopped_state = (
+                intent.state.value
+                if intent.state
+                in {
+                    PaymentState.ON_HOLD,
+                    PaymentState.REJECTED,
+                    PaymentState.CANCELLED,
+                    PaymentState.EXPIRED,
+                    PaymentState.FAILED,
+                    PaymentState.PROCESSING,
+                    PaymentState.DELIVERED,
+                }
+                else approval
+            )
+            return action_reply(
+                f"Execution stopped: {stopped_state}. "
+                "Review the current request; no new debit was requested.",
+                "get_approval_status",
+                "DENIED",
+            )
+        if intent.state in {PaymentState.AWAITING_APPROVAL, PaymentState.AUTHORIZED} and (
+            approval != ApprovalState.APPROVED.value
+        ):
+            return action_reply(
+                "AWAITING_APPROVAL. No current exact owner approval is available; "
+                "chat text cannot grant approval. No payment was executed.",
+                "get_approval_status",
+            )
+        outcome = await _database_call(
+            lambda: self.finance.executor.execute(
+                actor, record.intent_id, record.execution_key, record.terms_hash
+            )
+        )
+        if isinstance(outcome, Refused):
+            return action_reply(
+                "The protected backend blocked execution after rechecking current "
+                "authority, terms, holds and limits. No new debit occurred.",
+                "execute_payment",
+                "DENIED",
+            )
+        return action_reply(
+            f"Payment status: {outcome.transfer_state.value}; tuition is not "
+            "confirmed paid by provider status. Verify university posting.",
+            "execute_payment",
+            "OK",
+            outcome.payment_id,
+        )
