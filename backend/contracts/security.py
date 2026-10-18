@@ -18,3 +18,9 @@ class SecurityCaseView(Contract):
     created_at: AwareDatetime
     updated_at: AwareDatetime
     audit_event_id: Identifier
+
+
+class SecurityCaseList(Contract):
+    """Bounded relationship-scoped page of the same seven approved public fields."""
+
+    cases: tuple[SecurityCaseView, ...]

@@ -167,6 +167,7 @@ HTTP_ENDPOINTS = (
     ("GET", "/api/v1/reconciliations/{id}"),
     ("POST", "/api/v1/reconciliations"),
     ("POST", "/api/v1/reconciliations/{id}/submit"),
+    ("GET", "/api/v1/security-cases"),
     ("GET", "/api/v1/security-cases/{id}"),
     ("GET", "/api/v1/audit"),
     ("GET", "/api/v1/kb/universities/{id}/payment-policy"),

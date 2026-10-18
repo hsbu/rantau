@@ -388,6 +388,7 @@ GET  /api/v1/transfers/{id}                 # provider status
 GET  /api/v1/reconciliations/{id}
 POST /api/v1/reconciliations                # evidence case
 POST /api/v1/reconciliations/{id}/submit
+GET  /api/v1/security-cases                # scoped, read-only, bounded page
 GET  /api/v1/security-cases/{id}
 GET  /api/v1/audit?resource_id=...         # scoped, redacted
 GET  /api/v1/kb/universities/{id}/payment-policy

@@ -5,12 +5,14 @@ type SessionSummary = components["schemas"]["SessionSummary"];
 type DecisionResult = components["schemas"]["SponsorDecisionResult"];
 type Currency = components["schemas"]["Currency"];
 type ApprovalState = components["schemas"]["ApprovalState"];
+type SecurityCase = components["schemas"]["SecurityCaseView"];
 
 type Operation =
   | "login"
   | "session"
   | "logout"
   | "approvals"
+  | "cases"
   | { kind: "decision"; approvalId: string };
 
 const noStore = { "Cache-Control": "no-store" };
@@ -21,6 +23,13 @@ const states = new Set<ApprovalState>([
   "INVALIDATED_BY_CHANGE", "CONSUMED",
 ]);
 const currencies = new Set<Currency>(["IDR", "CNY"]);
+const caseStates = new Set<SecurityCase["state"]>([
+  "OPEN", "UNDER_REVIEW", "RESOLVED", "ESCALATED",
+]);
+const caseReasons = new Set<SecurityCase["reason"]>([
+  "UNKNOWN_BENEFICIARY", "BENEFICIARY_MISMATCH", "BENEFICIARY_CHANGE_REQUESTED",
+  "PROMPT_INJECTION", "SCAM_INDICATOR", "POLICY_REVIEW",
+]);
 const roles = new Set<SessionSummary["role"]>([
   "STUDENT", "SPONSOR", "UNIVERSITY_SERVICE", "DEMO_ADMIN",
 ]);
@@ -88,6 +97,24 @@ function validDecisionResult(value: unknown): value is DecisionResult {
     && typeof value.intent_id === "string" && identifier.test(value.intent_id)
     && typeof value.current_terms_hash === "string" && digest.test(value.current_terms_hash)
     && typeof value.recorded_at === "string" && Number.isFinite(Date.parse(value.recorded_at));
+}
+
+function validCase(value: unknown): value is SecurityCase {
+  if (!record(value) || !exactKeys(value, [
+    "case_id", "resource_id", "state", "reason", "created_at", "updated_at", "audit_event_id",
+  ])) return false;
+  return typeof value.case_id === "string" && identifier.test(value.case_id)
+    && typeof value.resource_id === "string" && identifier.test(value.resource_id)
+    && typeof value.state === "string" && caseStates.has(value.state as SecurityCase["state"])
+    && typeof value.reason === "string" && caseReasons.has(value.reason as SecurityCase["reason"])
+    && typeof value.created_at === "string" && Number.isFinite(Date.parse(value.created_at))
+    && typeof value.updated_at === "string" && Number.isFinite(Date.parse(value.updated_at))
+    && typeof value.audit_event_id === "string" && identifier.test(value.audit_event_id);
+}
+
+function validCaseList(value: unknown): value is { cases: SecurityCase[] } {
+  return record(value) && exactKeys(value, ["cases"]) && Array.isArray(value.cases)
+    && value.cases.length <= 100 && value.cases.every(validCase);
 }
 
 async function requestBody(request: Request, operation: Operation): Promise<string | null> {
@@ -188,6 +215,7 @@ function endpoint(operation: Operation): { path: string; method: "GET" | "POST";
   if (operation === "session") return { path: "/api/v1/auth/session", method: "GET", cookie: true };
   if (operation === "logout") return { path: "/api/v1/auth/logout", method: "POST", cookie: true };
   if (operation === "approvals") return { path: "/api/v1/sponsor/approvals", method: "GET", cookie: true };
+  if (operation === "cases") return { path: "/api/v1/security-cases", method: "GET", cookie: true };
   if (typeof operation === "object" && operation.approvalId !== "." && operation.approvalId !== ".."
     && identifier.test(operation.approvalId)) {
     return {
@@ -278,6 +306,7 @@ export async function relay(request: Request, operation: Operation): Promise<Res
   let valid = false;
   if (operation === "login" || operation === "session") valid = validSession(value);
   else if (operation === "approvals") valid = validApprovalList(value);
+  else if (operation === "cases") valid = validCaseList(value);
   else if (typeof operation === "object") valid = validDecisionResult(value);
   if (!valid) return failure(502, "INVALID_BACKEND_RESPONSE");
 

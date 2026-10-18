@@ -48,6 +48,10 @@
 .expiry { margin: 14px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
 .cardActions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--line); }
 .empty, .loading { margin: 0; padding: 22px; border: 1px dashed #becbbf; border-radius: 9px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.caseList { list-style: none; display: grid; gap: 10px; margin: 16px 0 0; padding: 0; }
+.caseRow { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; padding: 16px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.caseRow h3 { margin: 9px 0 0; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.caseRow .muted { margin-top: 6px; }
 .error, .notice { margin: 0 0 18px; padding: 12px 15px; border-radius: 7px; font-size: 12px; line-height: 1.7; }
 .error { border: 1px solid #d7aca4; background: #fbefec; color: #71372f; }
 .notice { border: 1px solid #bdcdbc; background: var(--soft); color: #31573d; }
@@ -64,6 +68,7 @@
   .intro { padding: 40px 0 24px; }
   .cards { grid-template-columns: 1fr; }
   .card { padding: 18px; }
+  .caseRow { padding: 14px; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
