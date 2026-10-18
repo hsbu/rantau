@@ -11,6 +11,7 @@ from backend.authz.router import router as auth_router
 from backend.config import Settings
 from backend.demo.http import router as demo_router
 from backend.finance.http import router as finance_router
+from backend.fraud.router import router as security_router
 
 app = FastAPI(title="Rantau", version="0.1.0")
 app.include_router(agent_router)
@@ -18,6 +19,7 @@ app.include_router(auth_router)
 app.include_router(finance_router)
 app.include_router(demo_router)
 app.include_router(approval_router)
+app.include_router(security_router)
 
 
 @app.get("/health")

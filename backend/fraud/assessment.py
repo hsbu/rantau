@@ -143,8 +143,7 @@ class FraudAssessor:
     def __init__(self, classifier: SemanticFraudClassifier | None = None) -> None:
         self.classifier = classifier
 
-    async def assess(self, message: str, facts: TrustedFraudFacts) -> FraudEvaluation:
-        hard = hard_findings(message, facts)
+    async def _signals(self, message: str) -> tuple[tuple[str, ...], bool]:
         signals = set(local_advisory_signals(message))
         semantic_available = False
         if self.classifier is not None:
@@ -155,6 +154,19 @@ class FraudAssessor:
             except FraudClassifierUnavailable:
                 pass
         indicators = tuple(sorted({item.value for item in signals}))
+        return indicators, semantic_available
+
+    async def assess_advisory(self, message: str) -> FraudAssessment:
+        """Assess untrusted prose without inventing beneficiary facts or financial effects."""
+        indicators, _ = await self._signals(message)
+        return FraudAssessment(
+            indicators=indicators,
+            next_action="REVIEW_REQUIRED" if indicators else "VERIFY_WITH_TRUSTED_SOURCE",
+        )
+
+    async def assess(self, message: str, facts: TrustedFraudFacts) -> FraudEvaluation:
+        hard = hard_findings(message, facts)
+        indicators, semantic_available = await self._signals(message)
         assessment = FraudAssessment(
             indicators=indicators,
             next_action="REVIEW_REQUIRED" if hard or indicators else "VERIFY_WITH_TRUSTED_SOURCE",

@@ -173,6 +173,16 @@ the same account/obligation/intent locks as execution before touching security
 rows. `backend.fraud.finance_access.build_security_service` exposes this backend
 service for payment-intent resources; no public hold-clearing endpoint is added.
 
+The default Chat `VERIFY_MESSAGE` path uses B's `SecurityAgentReadPort` for
+advisory assessment. It rechecks the current student session before and after
+classification, combines bounded local cues with optional redacted OpenRouter
+signals, and falls back to local cues if semantic assessment is unavailable.
+It does not infer beneficiary legitimacy or create financial authority. With no
+signals, the result still requests verification with a trusted source. This
+message-only path does not place or release holds; transaction-bound hold
+integration remains separate. Request-scoped classifier clients are closed when
+the request completes.
+
 `backend.approvals.service.ApprovalService` persists B-03's owner requests,
 decisions and allowance mandates in PostgreSQL. `APPROVAL_TTL_SECONDS` defaults
 to 600 (valid range 1–3600); approval expiry is also capped by quote expiry.
@@ -221,11 +231,23 @@ restores consumption/audit, and caller idempotency must resolve prior outcomes
 before invoking authorization again. Do not cache or reuse preview decisions.
 Tests cover both the isolated adapter and actual default HTTP wiring with real
 sessions, B authority and C's simulated SQL ledger. Test-only adapters are never
-installed in application wiring. Browser sign-in/decision integration, the
-complete agent-driven flow remain separate checks. Real-session HTTP tests also
+installed in application wiring. Sponsor browser sign-in, approve/reject and
+student continuation against the real backend were manually verified on
+2026-10-17; see B-04 in `docs/progress/progress-b.md` for database evidence.
+The complete agent-driven flow remains a separate check. Real-session HTTP tests also
 verify simulated T1 allowance execution, cumulative mandate limits, revocation,
 and current beneficiary ownership/purpose checks before debit. Admin provisioning and
 session/consent reset semantics are also separate coordinated work.
+
+`GET /api/v1/security-cases/{id}` returns a scoped `SecurityCaseView` with
+`case_id`, `resource_id`, `state`, `reason`, `created_at`, `updated_at` and
+`audit_event_id`. Reporter identity and evidence references remain internal.
+Reads require a current real session and the existing role-specific read scope;
+related funding owners and explicitly scoped reviewers use the trusted resource
+adapter. Missing and inaccessible cases both return the same 404; unavailable
+case storage returns a sanitized 503. Responses are `no-store`. This read endpoint
+does not expose hold placement/clearing or reviewer decisions. Agent invocation
+and a case UI remain separate work.
 
 Auth tests use a fresh temporary PostgreSQL instance when `initdb` and `pg_ctl`
 are on PATH. Its files remain ignored under `.generated/`. Alternatively set
@@ -280,7 +302,8 @@ mutations through fixed-path same-origin handlers.
 3. In the browser, `/student/payments` shows the trust timeline, pending requests with exact
    terms, quotes, receipts and untrusted messages (English or `?lang=id`). `/demo` offers
    scenario reset, clock, fault injection, the university tick and the redacted audit trail
-   for a demo administrator. Browser sign-in is not built yet.
+   for a demo administrator. `/sponsor` provides sponsor browser sign-in and
+   approval decisions. Dedicated student and administrator sign-in pages are not built yet.
 4. With Docker running, the same setup commands can be run through
    `docker compose run --rm backend uv run --no-sync python -m backend.demo.reset --migrate`
    (not verified on this machine).
