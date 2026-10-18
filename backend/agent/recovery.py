@@ -3,7 +3,7 @@
 import re
 from dataclasses import dataclass
 
-from backend.agent.explanations import explain_tuition_record
+from backend.agent.explanations import explain_tuition_record, format_money, utc_time
 from backend.agent.persistence import _database_call, _Storage
 from backend.agent.state import RecoveryDraft
 from backend.authz.policy_repository import PolicyConnection
@@ -12,6 +12,7 @@ from backend.contracts.http import AgentResponse, ResourceReference, ToolEvent
 from backend.contracts.models import (
     ActorContext,
     CaseSubmission,
+    Money,
     PaymentResult,
     ScopeDenied,
     ServiceUnavailable,
@@ -20,6 +21,7 @@ from backend.contracts.models import (
 from backend.finance.records import Row, lock_intent
 from backend.finance.simclock import sim_now
 from backend.finance.wiring import FinanceServices
+from backend.kb.research import OfficialSourceLookup, explain_research, research_event_status
 from backend.university.obligations import read_obligation
 
 
@@ -39,10 +41,116 @@ def recovery_command(message: str) -> str | None:
     return {"submit recovery": "SUBMIT", "check recovery": "CHECK"}.get(text)
 
 
+def payment_selection_command(message: str) -> tuple[str, int | None] | None:
+    text = message.strip().casefold().rstrip(".!?")
+    if text in {"list payments", "list my payments", "show payments", "show my payments"}:
+        return "LIST", None
+    match = re.fullmatch(r"(?:(?:select |track |recover )?payment\s+)([0-9]{1,2})", text)
+    return ("SELECT", int(match[1])) if match else None
+
+
 class RecoveryWorkflow(_Storage):
-    def __init__(self, finance: FinanceServices) -> None:
+    def __init__(
+        self, finance: FinanceServices, *, research: OfficialSourceLookup | None = None
+    ) -> None:
         super().__init__(finance.database, finance.auth)
         self.finance = finance
+        self.research = research
+
+    def _choices(self, actor: ActorContext) -> tuple[RecoverySnapshot, ...]:
+        with self.database.connection() as c:
+            self._require(c, actor)
+            scenario = self._scenario(c, actor.tenant_id)
+        intents = self.finance.reads.intent_list(actor)
+        if len(intents) > 100:
+            raise ServiceUnavailable("Narrow the payment search in Payments")
+        choices: list[RecoverySnapshot] = []
+        for item in intents:
+            if item.purpose != "TUITION" or item.obligation_id is None:
+                continue
+            payment = self.finance.reads.payment_for_intent(actor, item.id)
+            if payment is None:
+                continue
+            try:
+                snapshot = self.snapshot(actor, payment.payment_id)
+            except ScopeDenied:
+                # C may expose a funding-owner view; recovery requires this student's link.
+                continue
+            if snapshot.scenario != scenario:
+                raise ScopeDenied("Resource unavailable")
+            choices.append(snapshot)
+            if len(choices) == 10:
+                break
+        with self.database.connection() as c:
+            self._require(c, actor)
+            if self._scenario(c, actor.tenant_id) != scenario:
+                raise ScopeDenied("Resource unavailable")
+        return tuple(choices)
+
+    async def list_payments(
+        self, actor: ActorContext, intent: Intent
+    ) -> tuple[AgentResponse, RecoveryDraft]:
+        choices = await _database_call(lambda: self._choices(actor))
+        lines = [
+            "Up to 10 eligible tuition payments in your current scope. Listing makes no changes."
+        ]
+        for index, item in enumerate(choices, 1):
+            amount = format_money(
+                Money(
+                    currency=item.obligation.currency, amount_minor=item.obligation.amount_due_minor
+                )
+            )
+            lines.append(
+                f"Payment {index}: tuition expected {amount}; provider "
+                f"{item.payment.transfer_status.value}; university {item.obligation.state.value}; "
+                f"tuition due {utc_time(item.obligation.due_at)}."
+            )
+        lines.append(
+            "Say 'select payment 1' (or another listed number) to inspect its linked records. "
+            "Selection does not submit a case or execute a payment."
+            if choices
+            else "No eligible tuition payment was found. Review the Payments workspace."
+        )
+        draft = RecoveryDraft(payment_options=tuple(x.payment.payment_id for x in choices))
+        return AgentResponse(
+            run_id="pending",
+            requested_action=intent,
+            message="\n".join(lines),
+            tool_events=(ToolEvent(tool="list_student_payments", status="OK"),),
+        ), draft
+
+    async def select_payment(
+        self,
+        command: tuple[str, int | None],
+        draft: RecoveryDraft,
+        actor: ActorContext,
+        intent: Intent,
+    ) -> tuple[AgentResponse, RecoveryDraft]:
+        if command[0] == "LIST":
+            return await self.list_payments(actor, intent)
+        index = command[1]
+        if index is None or not 1 <= index <= len(draft.payment_options):
+            return self.reply(
+                "Select an advertised payment number, or say 'list payments' to refresh choices. "
+                "No case or payment was submitted.",
+                intent,
+            ), draft
+        payment_id = draft.payment_options[index - 1]
+        snapshot = await _database_call(lambda: self.snapshot(actor, payment_id))
+        response = await self.describe_with_guidance(actor, snapshot, intent)
+        return response.model_copy(
+            update={
+                "tool_events": (
+                    ToolEvent(tool="select_student_payment", status="OK", resource_id=payment_id),
+                )
+                + response.tool_events,
+            }
+        ), RecoveryDraft(
+            payment_id=payment_id,
+            obligation_id=snapshot.obligation.id,
+            case_id=snapshot.case_id,
+            payment_options=draft.payment_options,
+        )
 
     def _link(self, connection: PolicyConnection, actor: ActorContext, payment_id: str) -> Row:
         self._require(connection, actor)
@@ -99,7 +207,9 @@ class RecoveryWorkflow(_Storage):
         self, message: str, draft: RecoveryDraft, actor: ActorContext, intent: Intent
     ) -> tuple[AgentResponse, RecoveryDraft]:
         references = set(re.findall(r"\btransfer_[A-Za-z0-9_-]+\b", message))
-        if len(references) > 1 or (not references and draft.payment_id is None):
+        if not references and draft.payment_id is None:
+            return await self.list_payments(actor, intent)
+        if len(references) > 1:
             return self.reply(
                 "Select one payment reference, such as transfer_001, to check.", intent
             ), RecoveryDraft()
@@ -107,9 +217,39 @@ class RecoveryWorkflow(_Storage):
         assert payment_id
         snapshot = await _database_call(lambda: self.snapshot(actor, payment_id))
         selected = RecoveryDraft(
-            payment_id=payment_id, obligation_id=snapshot.obligation.id, case_id=snapshot.case_id
+            payment_id=payment_id,
+            obligation_id=snapshot.obligation.id,
+            case_id=snapshot.case_id,
+            payment_options=draft.payment_options,
         )
-        return self.describe(snapshot, intent), selected
+        return await self.describe_with_guidance(actor, snapshot, intent), selected
+
+    async def describe_with_guidance(
+        self, actor: ActorContext, snapshot: RecoverySnapshot, intent: Intent = Intent.RECOVER
+    ) -> AgentResponse:
+        if (
+            self.research is None
+            or snapshot.obligation.university_id != "uni_cn_01"
+            or snapshot.payment.transfer_status != PaymentState.DELIVERED
+            or not 0 < snapshot.obligation.balance_minor < snapshot.obligation.amount_due_minor
+        ):
+            return self.describe(snapshot, intent)
+        result = await self.research.lookup()
+        # Retrieval grants no authority; refresh scope and records after the external wait.
+        fresh = await _database_call(lambda: self.snapshot(actor, snapshot.payment.payment_id))
+        response = self.describe(fresh, intent)
+        return response.model_copy(
+            update={
+                "message": response.message
+                + ("\n" + explain_research(result) if fresh.obligation.balance_minor else ""),
+                "tool_events": response.tool_events
+                + (
+                    ToolEvent(
+                        tool="lookup_shortfall_sources", status=research_event_status(result)
+                    ),
+                ),
+            }
+        )
 
     async def handle(
         self, command: str, draft: RecoveryDraft, actor: ActorContext
@@ -135,7 +275,7 @@ class RecoveryWorkflow(_Storage):
                     lambda: self.finance.obligations.recheck(actor, snapshot.obligation.id)
                 )
             current = await _database_call(lambda: self.snapshot(actor, payment_id))
-            response = self.describe(current)
+            response = await self.describe_with_guidance(actor, current)
             if events:
                 response = response.model_copy(
                     update={

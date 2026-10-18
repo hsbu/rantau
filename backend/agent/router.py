@@ -1,5 +1,6 @@
 """Scoped agent HTTP seam; trusted services are deliberately not replaced by fakes."""
 
+import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Annotated, Protocol
@@ -10,6 +11,7 @@ from backend.agent.graph import AgentGraph
 from backend.contracts.http import AgentMessage, AgentResponse
 from backend.contracts.models import ActorContext, ScopeDenied, ServiceUnavailable
 from backend.dependencies import auth_settings, verified_actor
+from backend.kb.search import research_deadline
 
 
 class RunRepository(Protocol):
@@ -28,7 +30,7 @@ class AgentServices:
 
 async def agent_services(request: Request) -> AsyncIterator[AgentServices]:
     from backend.agent.actions import action_command
-    from backend.agent.recovery import recovery_command
+    from backend.agent.recovery import payment_selection_command, recovery_command
     from backend.agent.wiring import configured_agent_services
 
     require_classifier = request.method == "POST"
@@ -39,7 +41,9 @@ async def agent_services(request: Request) -> AsyncIterator[AgentServices]:
             body = None
         if isinstance(body, dict) and isinstance(body.get("message"), str):
             require_classifier = not (
-                action_command(body["message"]) or recovery_command(body["message"])
+                action_command(body["message"])
+                or recovery_command(body["message"])
+                or payment_selection_command(body["message"])
             )
     async with configured_agent_services(require_classifier=require_classifier) as services:
         yield services
@@ -58,6 +62,7 @@ async def message(
         request.headers.get("origin") != auth_settings().auth_trusted_origin
     ):
         raise HTTPException(403, detail={"code": "UNTRUSTED_ORIGIN"})
+    token = research_deadline.set(time.monotonic() + 21)
     try:
         result = await services.graph.run(body.message, actor, body.conversation_id)
         await services.runs.put(result, actor)
@@ -66,6 +71,8 @@ async def message(
         raise HTTPException(status_code=404, detail="Resource unavailable") from None
     except ServiceUnavailable:
         raise HTTPException(status_code=503, detail="Trusted service unavailable") from None
+    finally:
+        research_deadline.reset(token)
 
 
 @router.get("/runs/{run_id}", response_model=AgentResponse)

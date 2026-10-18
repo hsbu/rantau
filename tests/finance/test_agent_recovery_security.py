@@ -410,7 +410,8 @@ def test_recovery_run_metadata_and_draft_contain_ids_only(recovery_runtime):
         state = c.execute("SELECT state FROM agent_conversations").fetchone()["state"]
         selected = state["recovery"]
         assert selected["payment_id"] == payment
-        assert set(selected) == {"payment_id", "obligation_id", "case_id"}
+        assert set(selected) == {"payment_id", "obligation_id", "case_id", "payment_options"}
+        assert selected["payment_options"] == []
         runs = c.execute("SELECT metadata FROM agent_runs").fetchall()
         payload = json.dumps([state, runs])
         for secret in ("private@example.org", "sk-sensitive-token", "123456789012"):

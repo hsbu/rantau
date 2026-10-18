@@ -11,6 +11,7 @@ from backend.agent.tools import AgentTools
 from backend.config import Settings
 from backend.contracts.enums import Intent
 from backend.kb.research import OfficialSourceLookup, explain_research
+from backend.kb.search import SearchSourceLookup
 
 
 class DemoClassifier:
@@ -108,6 +109,11 @@ def main() -> None:
         action="store_true",
         help="Read curated official sources without a model or private financial data",
     )
+    mode.add_argument(
+        "--search-shortfall",
+        action="store_true",
+        help="Use one billed OpenRouter official-domain search; no private or financial data",
+    )
     parser.add_argument(
         "--web-guidance", action="store_true", help="Enable official-source reads in live demo"
     )
@@ -119,8 +125,9 @@ def main() -> None:
         parser.error("--message requires --openrouter")
     if args.web_guidance and not args.openrouter:
         parser.error("--web-guidance requires --openrouter")
-    if args.research_shortfall:
-        result = asyncio.run(OfficialSourceLookup().lookup())
+    if args.research_shortfall or args.search_shortfall:
+        lookup = SearchSourceLookup(Settings()) if args.search_shortfall else OfficialSourceLookup()
+        result = asyncio.run(lookup.lookup())
         print(explain_research(result))
     else:
         asyncio.run(

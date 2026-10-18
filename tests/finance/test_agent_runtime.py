@@ -30,6 +30,7 @@ def runtime(services, monkeypatch):
         "DATABASE_URL": services.database.dsn,
         "OPENROUTER_API_KEY": "synthetic-runtime-key",
         "OPENROUTER_MODEL": "provider/configurable-runtime-model",
+        "AGENT_WEB_RESEARCH_ENABLED": "false",
     }.items():
         monkeypatch.setenv(name, value)
     payloads, clients = [], []
