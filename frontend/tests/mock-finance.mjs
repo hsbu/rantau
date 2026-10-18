@@ -16,12 +16,33 @@ const payment = {
 };
 
 const unpaid = { ...detail, state: "UNPAID", provider_status: null };
+const partial = (topup) => ({
+  ...detail, state: "PARTIALLY_POSTED", posted_minor: 1850000, balance_minor: 150000,
+  shortfall_minor: 150000, topup_permitted: topup,
+});
+const options = {
+  obligation_id: "obl_2026_demo_01", beneficiary_id: "benef_uni_cn_01",
+  beneficiary_label: "Fictional university •••• DEMO",
+  accounts: [
+    { id: "acct_idr_01", label: "•••• dr_01", funded_by_requester: false },
+    { id: "acct_idr_stu_01", label: "•••• u_01", funded_by_requester: true },
+  ],
+};
+const created = { id: "intent_new", terms_hash: "hash", tier: "T2", state: "AWAITING_APPROVAL",
+  approval_required: true, quote_expires_at: "2026-10-17T10:00:00Z" };
 const intent = (state) => ({
   id: "intent_001", purpose: "TUITION", state, tier: "T2", obligation_id: "obl_2026_demo_01",
   source_currency: "IDR", destination_currency: "CNY", source_total_minor: 46025000,
   destination_amount_minor: 2000000, quote_id: "quote_001", quote_expiry: "2026-10-17T10:00:00Z",
   terms_hash: "hash", beneficiary_label: "Fictional university •••• DEMO", funded_by_requester: false,
+  hold_reason: state === "ON_HOLD" ? "UNKNOWN_BENEFICIARY" : null,
 });
+const trail = (resource) => [
+  { audit_event_id: `a_${resource}_1`, run_no: 1, action: "PAYMENT_DEBITED", resource_id: resource,
+    decision: "ALLOW", reason_code: null, created_at: "2026-10-17T09:00:00Z" },
+  { audit_event_id: `a_${resource}_2`, run_no: 1, action: "TRANSFER_DELIVERED", resource_id: resource,
+    decision: null, reason_code: null, created_at: "2026-10-17T09:01:00Z" },
+];
 const quotes = ["mock_remit_a", "mock_remit_b"].map((provider, index) => ({
   id: `quote_00${index + 1}`, provider, source_country: "ID", destination_country: "CN",
   source_currency: "IDR", destination_currency: "CNY", source_principal_minor: 46000000,
@@ -60,9 +81,21 @@ createServer(async (request, response) => {
   if (!signedIn) { response.statusCode = 401; return response.end("{}"); }
   const cookie = request.headers.cookie ?? "";
   const pending = cookie.includes("variant=pending") ? "AWAITING_APPROVAL"
-    : cookie.includes("variant=authorized") ? "AUTHORIZED" : null;
-  const shown = pending ? unpaid : cookie.includes("variant=recovered") ? recovered : detail;
+    : cookie.includes("variant=authorized") ? "AUTHORIZED"
+    : cookie.includes("variant=held") ? "ON_HOLD" : null;
+  const shown = pending || cookie.includes("variant=unpaid") ? unpaid
+    : cookie.includes("variant=recovered") ? recovered
+    : cookie.includes("variant=partialoff") ? partial(false)
+    : cookie.includes("variant=partial") ? partial(true) : detail;
   if (url === "/api/v1/tuition/obligations") return response.end(JSON.stringify([shown]));
+  if (request.method === "POST" && (url === "/api/v1/payment-intents" || url.endsWith("/revisions"))) {
+    response.statusCode = 201; return response.end(JSON.stringify(created));
+  }
+  if (url.endsWith("/approval-requests")) {
+    return response.end(JSON.stringify({ approval_id: "approval_1", intent_id: "intent_new", state: "AWAITING_APPROVAL" }));
+  }
+  if (url.startsWith("/api/v1/audit?resource_id=")) return response.end(JSON.stringify(trail(url.split("=")[1])));
+  if (url.endsWith("/payment-options")) return response.end(JSON.stringify(options));
   if (url === "/api/v1/payment-intents") return response.end(JSON.stringify(pending ? [intent(pending)] : []));
   if (url === "/api/v1/documents") return response.end(JSON.stringify([document]));
   if (url.startsWith("/api/v1/quotes")) return response.end(JSON.stringify(quotes));

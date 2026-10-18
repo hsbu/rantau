@@ -9,6 +9,7 @@ const PATHS: Record<string, string> = {
   "advance-clock": "/api/v1/demo/clock/advance",
   fault: "/api/v1/demo/faults",
   tick: "/api/v1/demo/university/tick",
+  document: "/api/v1/demo/documents",
 };
 
 export async function POST(request: Request, context: { params: Promise<{ action: string }> }) {
@@ -25,7 +26,7 @@ export async function POST(request: Request, context: { params: Promise<{ action
   let body: string;
   try {
     body = await request.text();
-    if (body.length > 1000) return failure(413);
+    if (body.length > 6000) return failure(413);
     JSON.parse(body || "{}");
   } catch { return failure(400); }
   try {

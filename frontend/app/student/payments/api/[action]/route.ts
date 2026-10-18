@@ -5,8 +5,28 @@ const failure = (status: number) => Response.json({ error: "Finance service unav
 const ID = /^[A-Za-z0-9_.:-]{1,128}$/;
 
 // Fixed upstream paths only. No actor, role or arbitrary URL is ever accepted from the browser.
-type Target = { path: string; payload?: object; headers?: Record<string, string> };
+type Target = {
+  path: string; payload?: object; headers?: Record<string, string>;
+  // A follow-up call built from the first response, e.g. asking the owner to approve a new request.
+  after?: (created: unknown) => Target | null;
+};
+const approvalRequest = (created: unknown): Target | null => {
+  const id = (created as { id?: unknown } | null)?.id;
+  return typeof id === "string" && ID.test(id)
+    ? { path: `/api/v1/payment-intents/${id}/approval-requests` } : null;
+};
+const proposal = (b: Record<string, string>) =>
+  ["obligation_id", "quote_id", "source_account_id", "beneficiary_id"].every(key => ID.test(b[key] ?? ""))
+    ? { obligation_id: b.obligation_id, source_account_id: b.source_account_id,
+        beneficiary_id: b.beneficiary_id, quote_id: b.quote_id, purpose: "TUITION" }
+    : null;
 const ACTIONS: Record<string, (body: Record<string, string>) => Target | null> = {
+  "create-intent": b => { const payload = proposal(b);
+    return payload ? { path: "/api/v1/payment-intents", payload, after: approvalRequest } : null; },
+  "revise-intent": b => { const payload = proposal(b);
+    return payload && ID.test(b.id ?? "")
+      ? { path: `/api/v1/payment-intents/${b.id}/revisions`, payload, after: approvalRequest } : null; },
+  "request-approval": b => ID.test(b.id ?? "") ? approvalRequest({ id: b.id }) : null,
   "cancel-intent": b => ID.test(b.id ?? "") ? { path: `/api/v1/payment-intents/${b.id}/cancel` } : null,
   // The key is derived server-side from the intent so a retry can never become a second payment.
   "execute-intent": b => ID.test(b.id ?? "")
@@ -40,18 +60,24 @@ export async function POST(request: Request, context: { params: Promise<{ action
   const target = build(body);
   const base = upstream();
   if (!target || !base) return failure(target ? 503 : 400);
+  const send = (next: Target) => fetch(new URL(next.path, base), {
+    method: "POST", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(15000),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: request.headers.get("cookie") ?? "",
+      Origin: request.headers.get("origin") ?? "",
+      ...next.headers,
+    },
+    body: next.payload ? JSON.stringify(next.payload) : undefined,
+  });
+  const relay = async (response: Response) => new Response(await response.text(), {
+    status: response.status, headers: { ...headers, "Content-Type": "application/json" },
+  });
   try {
-    const response = await fetch(new URL(target.path, base), {
-      method: "POST", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(15000),
-      headers: {
-        "Content-Type": "application/json",
-        Cookie: request.headers.get("cookie") ?? "",
-        Origin: request.headers.get("origin") ?? "",
-        ...target.headers,
-      },
-      body: target.payload ? JSON.stringify(target.payload) : undefined,
-    });
-    const text = await response.text();
-    return new Response(text, { status: response.status, headers: { ...headers, "Content-Type": "application/json" } });
+    const first = await send(target);
+    const followUp = first.ok && target.after ? target.after(await first.clone().json().catch(() => null)) : null;
+    if (!followUp) return await relay(first);
+    const second = await send(followUp);
+    return await relay(second.ok ? first : second);
   } catch { return failure(502); }
 }

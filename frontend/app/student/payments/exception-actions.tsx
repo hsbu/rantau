@@ -1,9 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 import styles from "./payments.module.css";
-import { type Lang, safeNextStep, ui } from "./status-labels";
+import { type Lang, ui } from "./status-labels";
+import { useRelay } from "./use-relay";
 
 type Props = {
   lang: Lang;
@@ -15,29 +14,7 @@ type Props = {
 };
 
 export function ExceptionActions(props: Props) {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-
-  async function run(action: string, body: Record<string, string>) {
-    setBusy(true);
-    setMessage(null);
-    try {
-      const response = await fetch(`/student/payments/api/${action}`, {
-        method: "POST", credentials: "same-origin", cache: "no-store",
-        headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-      });
-      if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        const code = error?.reason_code as keyof typeof safeNextStep | undefined;
-        setMessage(code && safeNextStep[code] ? safeNextStep[code][props.lang] : ui.unavailable[props.lang]);
-      }
-      router.refresh();
-    } finally {
-      setBusy(false);
-    }
-  }
-
+  const { busy, message, run } = useRelay(props.lang);
   return <div>
     <div className={styles.actions}>
       <button disabled={busy} onClick={() => run("recheck-obligation", { id: props.obligationId })}>

@@ -3,12 +3,14 @@
 from backend.authz.policy_repository import PolicyConnection
 from backend.authz.service import AuthService
 from backend.authz.storage import Database
-from backend.contracts.enums import Currency, PaymentState, Tier
+from backend.contracts.enums import Currency, PaymentState, ReasonCode, Role, Tier
 from backend.contracts.http import AuditEntry
 from backend.contracts.models import (
     ActorContext,
+    FundingAccountOption,
     FxQuote,
     PaymentIntentView,
+    PaymentOptions,
     PaymentResult,
     PermissionSummary,
     ScopeDenied,
@@ -33,6 +35,41 @@ class FinanceReads:
         self.auth = auth
         self.obligations = obligations
         self.quote_service = quote_service or QuoteService()
+
+    def payment_options(self, actor: ActorContext, obligation_alias: str) -> PaymentOptions:
+        """Accounts the student may use and the verified university payee, masked."""
+        if actor.role != Role.STUDENT:
+            raise ScopeDenied("Resource unavailable")
+        obligation = self.obligations.get(actor, obligation_alias)
+        with self.database.connection() as connection:
+            accounts = connection.execute(
+                "SELECT alias, owner_id, masked_number FROM funding_accounts "
+                "WHERE tenant_id = %s AND active "
+                "AND (owner_id = %s OR %s = ANY(permitted_requesters)) "
+                "ORDER BY alias",
+                (actor.tenant_id, actor.actor_id, actor.actor_id),
+            ).fetchall()
+            payee = connection.execute(
+                "SELECT alias, masked_display FROM beneficiaries WHERE tenant_id = %s "
+                "AND owner_id = %s AND purpose_type = 'TUITION' AND verified "
+                "ORDER BY alias LIMIT 1",
+                (actor.tenant_id, obligation.university_id),
+            ).fetchone()
+        if payee is None or not accounts:
+            raise ScopeDenied("Resource unavailable")
+        return PaymentOptions(
+            obligation_id=obligation_alias,
+            accounts=tuple(
+                FundingAccountOption(
+                    id=row["alias"],
+                    label=row["masked_number"],
+                    funded_by_requester=row["owner_id"] == actor.actor_id,
+                )
+                for row in accounts
+            ),
+            beneficiary_id=payee["alias"],
+            beneficiary_label=payee["masked_display"],
+        )
 
     def quotes(self, actor: ActorContext, obligation_alias: str) -> tuple[FxQuote, ...]:
         balance = self.obligations.get(actor, obligation_alias).balance_minor
@@ -91,6 +128,7 @@ class FinanceReads:
             terms_hash=row["terms_hash"],
             beneficiary_label=beneficiary["masked_display"] if beneficiary else "Unavailable",
             funded_by_requester=row["funding_owner_id"] == actor.actor_id,
+            hold_reason=_hold_reason(connection, actor.tenant_id, row),
         )
 
     def payment_result(self, actor: ActorContext, transfer_alias: str) -> PaymentResult:
@@ -223,3 +261,18 @@ def _may_see_resource(connection: PolicyConnection, actor: ActorContext, resourc
         (tenant, resource_id),
     ).fetchone()
     return bool(case and case["student_id"] == actor.actor_id)
+
+
+def _hold_reason(connection: PolicyConnection, tenant_id: str, intent: Row) -> ReasonCode | None:
+    """Why a request is held, from its latest audited decision; unknown reasons stay hidden."""
+    if PaymentState(intent["state"]) != PaymentState.ON_HOLD:
+        return None
+    latest = connection.execute(
+        "SELECT reason_code FROM audit_events WHERE tenant_id = %s AND resource_id = %s "
+        "AND reason_code IS NOT NULL ORDER BY created_at DESC LIMIT 1",
+        (tenant_id, intent["alias"]),
+    ).fetchone()
+    try:
+        return ReasonCode(latest["reason_code"]) if latest else None
+    except ValueError:
+        return None

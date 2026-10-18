@@ -20,3 +20,7 @@
 .form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
 .form select, .form input { padding: 7px 8px; border: 1px solid #bac8bf; border-radius: 8px; }
 .lang { font-size: .85rem; }
+.routes { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
+.routes li { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.routes button { border: 1px solid #2f5d54; background: #2f5d54; color: #fff; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.routes button:disabled { opacity: .6; cursor: progress; }

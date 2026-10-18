@@ -23,6 +23,7 @@ from backend.contracts.models import (
     Identifier,
     IntentProposal,
     PaymentIntentView,
+    PaymentOptions,
     PaymentResult,
     ReconciliationCase,
     ScopeDenied,
@@ -90,6 +91,13 @@ def get_obligation(
     obligation_id: Identifier, actor: Actor, services: Services
 ) -> TuitionObligationDetail:
     return services.obligations.get(actor, obligation_id)
+
+
+@router.get("/tuition/obligations/{obligation_id}/payment-options", response_model=PaymentOptions)
+def get_payment_options(
+    obligation_id: Identifier, actor: Actor, services: Services
+) -> PaymentOptions:
+    return services.reads.payment_options(actor, obligation_id)
 
 
 @router.post(

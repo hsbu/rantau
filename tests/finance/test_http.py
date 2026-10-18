@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.contracts.enums import FaultMode
+from backend.demo.reset import reset_demo_fixture
 from backend.finance.wiring import build_services, finance_services
 from backend.main import app
 from tests.finance.conftest import PASSWORD, TENANT
@@ -404,3 +405,75 @@ def test_a_full_http_flow_leaves_no_secrets_in_application_logs(api, caplog):
         "acct_idr_01",
     ):
         assert secret not in caplog.text
+
+
+def test_payment_options_list_masked_accounts_and_only_the_verified_payee(api):
+    reset_demo_fixture(api.database, TENANT, "forged_beneficiary")
+    response = client_for("student").get(
+        f"/api/v1/tuition/obligations/{OBLIGATION}/payment-options"
+    )
+    options = response.json()
+    assert response.status_code == 200
+    assert options["beneficiary_id"] == "benef_uni_cn_01"
+    assert {account["id"] for account in options["accounts"]} == {"acct_idr_01", "acct_idr_stu_01"}
+    assert all(account["label"].startswith("••••") for account in options["accounts"])
+    assert {a["id"]: a["funded_by_requester"] for a in options["accounts"]} == {
+        "acct_idr_01": False,
+        "acct_idr_stu_01": True,
+    }
+    assert "benef_unverified_01" not in response.text and "fingerprint" not in response.text
+
+
+def test_payment_options_are_closed_to_sponsors_and_strangers(api):
+    path = f"/api/v1/tuition/obligations/{OBLIGATION}/payment-options"
+    assert client_for("sponsor").get(path).status_code == 404
+    assert (
+        client_for("student")
+        .get("/api/v1/tuition/obligations/obl_nope/payment-options")
+        .status_code
+        == 404
+    )
+
+
+def test_a_held_request_reports_its_reason_for_a_precise_next_step(api):
+    reset_demo_fixture(api.database, TENANT, "forged_beneficiary")
+    student = client_for("student")
+    held = create(student, beneficiary_id="benef_unverified_01")
+    assert held.status_code == 403 and held.json()["reason_code"] == "UNKNOWN_BENEFICIARY"
+    listed = student.get("/api/v1/payment-intents").json()
+    assert listed[0]["state"] == "ON_HOLD" and listed[0]["hold_reason"] == "UNKNOWN_BENEFICIARY"
+
+
+def test_only_held_requests_carry_a_hold_reason(api):
+    student = client_for("student")
+    create(student)
+    assert student.get("/api/v1/payment-intents").json()[0]["hold_reason"] is None
+
+
+def test_the_student_can_read_the_audit_proof_of_their_payment_and_a_stranger_cannot(
+    api, password_hash
+):
+    student = client_for("student")
+    intent_id = create(student).json()["id"]
+    approve(api, intent_id)
+    paid = student.post(
+        f"/api/v1/payment-intents/{intent_id}/execute",
+        headers=ORIGIN | {"Idempotency-Key": "k-proof"},
+    ).json()
+    trail = student.get("/api/v1/audit", params={"resource_id": paid["payment_id"]}).json()
+    assert {"PAYMENT_DEBITED", "TRANSFER_DELIVERED"} <= {entry["action"] for entry in trail}
+    assert "k-proof" not in str(trail) and "acct_idr_01" not in str(trail)
+    with api.database.connection() as connection:
+        connection.execute(
+            "INSERT INTO actors (tenant_id, actor_id, role, scopes) VALUES (%s, 'stu_002', "
+            "'STUDENT', ARRAY['student:read'])",
+            (TENANT,),
+        )
+        connection.execute(
+            "INSERT INTO auth_credentials (tenant_id, actor_id, username, password_hash) "
+            "VALUES (%s, 'stu_002', 'stranger', %s)",
+            (TENANT, password_hash),
+        )
+    stranger = client_for("stranger")
+    denied = stranger.get("/api/v1/audit", params={"resource_id": paid["payment_id"]})
+    assert denied.status_code == 404

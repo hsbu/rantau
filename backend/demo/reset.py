@@ -1,9 +1,10 @@
-"""Reset the isolated demo tenant: only Dev C tables, never identities or audit history."""
+"""Reset the isolated demo tenant: Dev C tables and open authority, never identities or history."""
 
 import argparse
 
 from backend.authz.storage import Database
 from backend.config import Settings
+from backend.demo.authority_reset import close_authority_state
 from backend.demo.scenarios import ScenarioSpec, scenario
 from backend.demo.seed import seed_scenario
 from backend.finance.migrations import migrate_all
@@ -44,6 +45,7 @@ def reset_demo_fixture(database: Database, tenant_id: str, scenario_id: str) -> 
         )
         for table in RESETTABLE_TABLES:
             connection.execute(f"DELETE FROM {table} WHERE tenant_id = %s", (tenant_id,))  # noqa: S608
+        close_authority_state(connection, tenant_id)
         run_no = _next_run(connection, tenant_id, spec)
         seed_scenario(connection, tenant_id, spec)
     return run_no

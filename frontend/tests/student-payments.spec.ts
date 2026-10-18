@@ -71,7 +71,7 @@ test("a pending request shows the waiting-for-sponsor state with exact terms and
   await expect(page.getByText("Waiting for the funding owner's approval of these exact terms.")).toBeVisible();
   await expect(page.getByText("IDR 46,025,000").first()).toBeVisible();
   await expect(page.getByText("Fictional university")).toBeVisible();
-  await expect(page.getByText("mock_remit_a")).toBeVisible();
+  await expect(page.getByText("mock_remit_a").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue the approved payment" })).toHaveCount(0);
 });
 
@@ -119,4 +119,100 @@ test("an unresolved exception keeps the reconciliation step as a problem", async
   await page.goto("/student/payments");
   const timeline = page.getByRole("list", { name: "trust states" });
   await expect(timeline.getByText("Reconciliation")).toHaveAttribute("data-status", "problem");
+});
+
+async function lastCalls(request: import("@playwright/test").APIRequestContext) {
+  return (await (await request.get(`${MOCK}/__calls`)).json()) as { url: string; body: string }[];
+}
+
+test("choosing a route creates the request and then asks the funding owner to approve", async ({ context, page, request }) => {
+  await context.addCookies([{ name: "variant", value: "unpaid", url: origin }]);
+  await page.goto("/student/payments");
+  await expect(page.getByRole("button", { name: "Choose this route" })).toHaveCount(2);
+  await page.getByRole("button", { name: "Choose this route" }).first().click();
+  await expect.poll(async () => (await lastCalls(request)).some(call => call.url.endsWith("/approval-requests"))).toBe(true);
+  const calls = await lastCalls(request);
+  const created = calls.find(call => call.url === "/api/v1/payment-intents");
+  expect(JSON.parse(created!.body)).toEqual({
+    obligation_id: "obl_2026_demo_01", source_account_id: "acct_idr_01",
+    beneficiary_id: "benef_uni_cn_01", quote_id: "quote_001", purpose: "TUITION",
+  });
+  expect(calls.some(call => call.url === "/api/v1/payment-intents/intent_new/approval-requests")).toBe(true);
+});
+
+test("the student can pick which permitted account pays", async ({ context, page, request }) => {
+  await context.addCookies([{ name: "variant", value: "unpaid", url: origin }]);
+  await page.goto("/student/payments");
+  await page.getByRole("combobox").selectOption("acct_idr_stu_01");
+  await page.getByRole("button", { name: "Choose this route" }).last().click();
+  await expect.poll(async () => (await lastCalls(request)).some(call => call.url === "/api/v1/payment-intents")).toBe(true);
+  const created = (await lastCalls(request)).filter(call => call.url === "/api/v1/payment-intents").at(-1)!;
+  expect(JSON.parse(created.body).source_account_id).toBe("acct_idr_stu_01");
+  expect(JSON.parse(created.body).quote_id).toBe("quote_002");
+});
+
+test("a pending request can be switched to another route, which asks for a fresh approval", async ({ context, page, request }) => {
+  await context.addCookies([{ name: "variant", value: "pending", url: origin }]);
+  await page.goto("/student/payments");
+  await expect(page.getByRole("button", { name: "Ask the funding owner to approve" })).toBeVisible();
+  await page.getByRole("button", { name: "Switch to this route" }).click();
+  await expect.poll(async () => (await lastCalls(request)).some(call => call.url === "/api/v1/payment-intents/intent_001/revisions")).toBe(true);
+  const revision = (await lastCalls(request)).find(call => call.url.endsWith("/revisions"))!;
+  expect(JSON.parse(revision.body).quote_id).toBe("quote_002");
+});
+
+test("a permitted shortfall offers a top-up and a forbidden one explains why not", async ({ context, page }) => {
+  await context.addCookies([{ name: "variant", value: "partial", url: origin }]);
+  await page.goto("/student/payments");
+  await expect(page.getByRole("button", { name: "Request a top-up with this route" }).first()).toBeVisible();
+  await context.clearCookies();
+  await context.addCookies([
+    { name: "session", value: "ok", url: origin }, { name: "variant", value: "partialoff", url: origin },
+  ]);
+  await page.goto("/student/payments");
+  await expect(page.getByRole("button", { name: "Request a top-up with this route" })).toHaveCount(0);
+  await expect(page.getByText("A top-up is not allowed here.", { exact: false })).toBeVisible();
+  await expect(page.getByText("A shortfall remains: CNY 1,500.00", { exact: false })).toBeVisible();
+});
+
+test("the relay rejects malformed identifiers before contacting the backend", async ({ context, request }) => {
+  const before = (await lastCalls(request)).length;
+  const bad = await context.request.post("/student/payments/api/create-intent", {
+    headers: { origin },
+    data: { obligation_id: "obl_2026_demo_01", quote_id: "../admin", source_account_id: "acct_idr_01", beneficiary_id: "benef_uni_cn_01" },
+  });
+  expect(bad.status()).toBe(400);
+  expect((await lastCalls(request)).length).toBe(before);
+});
+
+test("every quote shows its exchange rate as exact text", async ({ context, page }) => {
+  await context.addCookies([{ name: "variant", value: "unpaid", url: origin }]);
+  await page.goto("/student/payments");
+  await expect(page.getByText("1 IDR = 0.0004347826 CNY").first()).toBeVisible();
+});
+
+test("a held request explains the precise reason and the safe next step", async ({ context, page }) => {
+  await context.addCookies([{ name: "variant", value: "held", url: origin }]);
+  await page.goto("/student/payments");
+  await expect(page.getByText("The payee is not verified. Use the verified university payee.")).toBeVisible();
+  await page.goto("/student/payments?lang=id");
+  await expect(page.getByText("Penerima belum terverifikasi.", { exact: false })).toBeVisible();
+});
+
+test("the student sees redacted audit proof of what happened", async ({ page }) => {
+  await page.goto("/student/payments");
+  await expect(page.getByRole("heading", { name: "What happened" })).toBeVisible();
+  await expect(page.getByText("Funds debited (simulated)")).toBeVisible();
+  await expect(page.getByText("Provider delivered").last()).toBeVisible();
+});
+
+test("the demo page can plant the documented forged invoice for the attack scenarios", async ({ context, page, request }) => {
+  await context.addCookies([{ name: "admin", value: "ok", url: origin }]);
+  await page.goto("/demo");
+  await page.getByRole("button", { name: "Use the forged-invoice sample" }).click();
+  await page.getByRole("button", { name: "Plant untrusted document" }).click();
+  await expect.poll(async () => (await lastCalls(request)).some(call => call.url === "/api/v1/demo/documents")).toBe(true);
+  const planted = (await lastCalls(request)).find(call => call.url === "/api/v1/demo/documents")!;
+  expect(JSON.parse(planted.body)).toMatchObject({ kind: "INVOICE", title: "Urgent tuition invoice" });
+  expect(planted.body).toContain("benef_unverified_01");
 });
