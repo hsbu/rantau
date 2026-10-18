@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 import pytest
 
 from backend.agent.explanations import (
     comparable_quotes,
+    display_rate,
     explain_quotes,
     explain_tuition_record,
     format_money,
@@ -42,7 +44,7 @@ def test_quote_costs_include_fees_and_compare_same_recipient_amount():
     assert "CNY 20,000.00" in text
     assert "Lowest quoted total for the same recipient amount: quote_001" in text
     assert "difference from the highest comparable quoted total is IDR 25,000" in text
-    assert f"1 IDR = {QUOTE.rate} CNY" in text
+    assert f"1 IDR = {display_rate(QUOTE.rate)} CNY" in text
     assert "Expires 2026-11-01T09:15:00Z" in text
     assert "not live exchange rates" in text
     assert "delivery does not establish university tuition posting" in text
@@ -88,6 +90,10 @@ async def test_graph_displays_scoped_quotes_without_execution_or_raw_account_det
     assert "IDR 46,025,000" in result.message
     assert "IDR 46,050,000" in result.message
     assert "expected CNY 20,000.00; posted CNY 0.00; remaining CNY 20,000.00" in result.message
+    assert (
+        f"Simulated tuition due date: {OBLIGATION.due_at.isoformat().replace('+00:00', 'Z')}"
+        in result.message
+    )
     assert "No payment has been requested or executed" in result.message
     assert "quotes" in port.calls
     assert all(
@@ -95,6 +101,25 @@ async def test_graph_displays_scoped_quotes_without_execution_or_raw_account_det
         for call in port.calls
     )
     assert "acct_idr_01" not in result.model_dump_json()
+
+
+def test_tuition_due_date_is_exact_and_normalized_without_changing_money():
+    local = OBLIGATION.due_at.astimezone(timezone(timedelta(hours=8)))
+    record = OBLIGATION.model_copy(update={"due_at": local})
+    assert explain_tuition_record(record) == explain_tuition_record(OBLIGATION)
+    assert "Simulated tuition due date: 2026-11-21T09:00:00Z" in explain_tuition_record(record)
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("0.0004347826086956521739130435", "0.00043478"),
+        ("0.000000000000123456789", "1.234568E-13"),
+        ("1", "1"),
+    ],
+)
+def test_rate_display_is_readable_and_never_rounds_a_positive_rate_to_zero(raw, expected):
+    assert display_rate(Decimal(raw)) == expected
 
 
 def test_expected_posted_and_remaining_keep_exact_partial_credit():
