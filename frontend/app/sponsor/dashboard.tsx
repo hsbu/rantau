@@ -1,5 +1,7 @@
 "use client";
 
+import { ApprovalSummary, type SummaryLanguage } from "./approval-summary";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { components } from "../../lib/api-contracts/generated";
@@ -96,15 +98,6 @@ async function errorCode(response: Response): Promise<string> {
   } catch { return ""; }
 }
 
-function money(currency: "IDR" | "CNY", minor: number): string {
-  if (!Number.isSafeInteger(minor) || minor < 0) return "Amount unavailable";
-  const value = BigInt(minor);
-  const scale = currency === "CNY" ? BigInt(100) : BigInt(1);
-  const major = new Intl.NumberFormat("en-US").format(value / scale);
-  const fraction = currency === "CNY" ? `.${String(value % scale).padStart(2, "0")}` : "";
-  return `${currency} ${major}${fraction}`;
-}
-
 function formatExpiry(value: string): string {
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium", timeStyle: "short",
@@ -116,6 +109,7 @@ function humanise(value: string): string {
 }
 
 export function SponsorDashboard() {
+  const [language, setLanguage] = useState<SummaryLanguage>("en");
   const [mode, setMode] = useState<Mode>("checking");
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [cases, setCases] = useState<SecurityCase[]>([]);
@@ -358,12 +352,15 @@ export function SponsorDashboard() {
   return <main className={styles.page}>
     <header className={styles.header}>
       <Link className={styles.wordmark} href="/">rantau<span>✳</span></Link>
-      {mode === "ready" && <button className={styles.textButton} onClick={() => void signOut()} disabled={busy}>Sign out</button>}
+      <div className={styles.headerActions}><Link href="/student/sign-in">Student workspace</Link>
+        {mode === "ready" && <button className={styles.textButton} onClick={() => void signOut()} disabled={busy}>Sign out</button>}</div>
     </header>
 
     <section className={styles.intro}>
       <p className={styles.eyebrow}>Sponsor workspace</p>
       <h1>Review payment requests</h1>
+      <label className={styles.summaryLanguage}>Summary language <select aria-label="Summary language" value={language}
+        onChange={event => setLanguage(event.target.value === "id" ? "id" : "en")}><option value="en">English</option><option value="id">Bahasa Indonesia</option></select></label>
       <p>Check the recipient and full cost before recording a decision.</p>
       <div className={styles.safety} role="note">
         <span aria-hidden="true">ⓘ</span>
@@ -396,6 +393,7 @@ export function SponsorDashboard() {
     {mode === "wrong-role" && <section className={styles.signIn}>
       <h2>This workspace is for sponsors</h2>
       <p className={styles.muted}>Your current session does not have a sponsor role.</p>
+      <Link href="/student/sign-in">Open student workspace →</Link>
       <button className={styles.primary} onClick={() => void signOut()} disabled={busy}>Sign out</button>
     </section>}
 
@@ -409,7 +407,7 @@ export function SponsorDashboard() {
         {busy && approvals.length === 0 && <p className={styles.loading} role="status">Loading approvals…</p>}
         <div className={styles.cards}>
           {pending.map(item => <ApprovalCard key={item.approval_id} item={item} busy={busy}
-            busyId={busyId} uncertain={uncertain} onChoose={(decision) => setConfirmation({ item, decision })} />)}
+            busyId={busyId} uncertain={uncertain} language={language} onChoose={(decision) => setConfirmation({ item, decision })} />)}
         </div>
       </section>
 
@@ -417,7 +415,7 @@ export function SponsorDashboard() {
         <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>Past decisions</p><h2 id="history-title">Request history</h2></div></div>
         <div className={styles.cards}>
           {history.map(item => <ApprovalCard key={item.approval_id} item={item} busy={busy}
-            busyId={busyId} uncertain={uncertain} onChoose={(decision) => setConfirmation({ item, decision })} />)}
+            busyId={busyId} uncertain={uncertain} language={language} onChoose={(decision) => setConfirmation({ item, decision })} />)}
         </div>
       </section>}
 
@@ -449,20 +447,18 @@ export function SponsorDashboard() {
       onCancel={event => { event.preventDefault(); setConfirmation(undefined); }}>
       <section className={styles.confirm} aria-labelledby="confirm-title" aria-describedby="confirm-copy">
         <p className={styles.eyebrow}>Confirm your decision</p>
-        <h2 id="confirm-title">{confirmation.decision === "APPROVED" ? "Approve this request?" : "Reject this request?"}</h2>
+        <h2 id="confirm-title">{language === "id"
+          ? confirmation.decision === "APPROVED" ? "Setujui permintaan ini?" : "Tolak permintaan ini?"
+          : confirmation.decision === "APPROVED" ? "Approve this request?" : "Reject this request?"}</h2>
         <p id="confirm-copy">{confirmation.decision === "APPROVED" ? "You are authorizing an attempt to pay" : "You are rejecting the request for"} <strong>{confirmation.item.beneficiary_label}</strong> ({confirmation.item.purpose.toLowerCase()}).</p>
-        <dl className={styles.amounts}>
-          <div><dt>From</dt><dd>{confirmation.item.source_label}</dd></div>
-          <div><dt>Amount</dt><dd>{money(confirmation.item.source_currency, confirmation.item.source_principal_minor)}</dd></div>
-          <div><dt>Fee</dt><dd>{money(confirmation.item.source_currency, confirmation.item.fee_minor)}</dd></div>
-          <div className={styles.total}><dt>Total debit</dt><dd>{money(confirmation.item.source_currency, confirmation.item.source_total_minor)}</dd></div>
-          <div className={styles.destination}><dt>Recipient receives</dt><dd>{money(confirmation.item.destination_currency, confirmation.item.destination_amount_minor)}</dd></div>
-        </dl>
+        <ApprovalSummary item={confirmation.item} language={language} />
         <div className={styles.confirmActions}>
           <button className={styles.secondary} onClick={() => setConfirmation(undefined)} disabled={busy}>Go back</button>
           <button className={confirmation.decision === "APPROVED" ? styles.primary : styles.reject}
             onClick={() => void decide(confirmation.item, confirmation.decision)} disabled={busy}>
-            {busy ? "Recording…" : confirmation.decision === "APPROVED" ? "Confirm approval" : "Confirm rejection"}
+            {busy ? "Recording…" : language === "id"
+              ? confirmation.decision === "APPROVED" ? "Konfirmasi persetujuan" : "Konfirmasi penolakan"
+              : confirmation.decision === "APPROVED" ? "Confirm approval" : "Confirm rejection"}
           </button>
         </div>
       </section>
@@ -472,8 +468,9 @@ export function SponsorDashboard() {
   </main>;
 }
 
-function ApprovalCard({ item, busy, busyId, uncertain, onChoose }: {
+function ApprovalCard({ item, busy, busyId, uncertain, language, onChoose }: {
   item: Approval;
+  language: SummaryLanguage;
   busy: boolean;
   busyId?: string;
   uncertain: boolean;
@@ -488,13 +485,7 @@ function ApprovalCard({ item, busy, busyId, uncertain, onChoose }: {
         {humanise(item.state)}
       </span>
     </div>
-    <dl className={styles.amounts}>
-      <div><dt>From</dt><dd>{item.source_label}</dd></div>
-      <div><dt>Amount</dt><dd>{money(item.source_currency, item.source_principal_minor)}</dd></div>
-      <div><dt>Fee</dt><dd>{money(item.source_currency, item.fee_minor)}</dd></div>
-      <div className={styles.total}><dt>Total debit</dt><dd>{money(item.source_currency, item.source_total_minor)}</dd></div>
-      <div className={styles.destination}><dt>Recipient receives</dt><dd>{money(item.destination_currency, item.destination_amount_minor)}</dd></div>
-    </dl>
+    <ApprovalSummary item={item} language={language} />
     <p className={styles.expiry}>Request expires {formatExpiry(item.expires_at)}</p>
     {item.state === "PENDING" && <div className={styles.cardActions}>
       <button className={styles.secondary} onClick={() => onChoose("REJECTED")} disabled={!actionable}

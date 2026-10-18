@@ -93,6 +93,9 @@ export function ChatWorkspace({ transport = connectedTransport, preview = false,
         <Link href="/student/chat" className={styles.viewTab} aria-current={!preview ? "page" : undefined}>Chat</Link>
         <Link href="/student/chat/preview" className={styles.viewTab} aria-current={preview ? "page" : undefined}>Scenarios</Link>
       </nav>
+      {!preview && <nav className={styles.workspaceLinks} aria-label="Student workspace">
+        <Link href="/student/payments">Payments</Link><Link href="/student/sign-in">Sign in / account</Link>
+      </nav>}
     </header>
     <div className={styles.safetyBanner}>{preview
       ? <>Scenario preview · Scripted responses, no model calls, authentication or payment actions.</>
@@ -127,6 +130,8 @@ export function ChatWorkspace({ transport = connectedTransport, preview = false,
           </article>)}
           {busy && <p role="status" className={styles.loading}>Reviewing your request<span aria-hidden="true"> · · ·</span></p>}
           {error && <div role="alert" aria-label="Chat error" className={styles.error}><strong>{error === "session" ? "Session required" : "Let’s pause here"}</strong><p>{errorText[error]}</p>
+            {error === "session" && <Link href="/student/sign-in">Student sign-in →</Link>}
+            {error !== "session" && <Link href="/student/payments">Check Payments →</Link>}
             {error === "unavailable" && <Link href="/student/chat/preview">Explore the fixture preview ↗</Link>}</div>}
           {preview && messages.length > 0 && !busy && !error && <button type="button" className={styles.nextPrompt} onClick={() => void send(prompts[promptIndex])}>{prompts[promptIndex]} <span aria-hidden="true">→</span></button>}
         </div>

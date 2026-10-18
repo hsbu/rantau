@@ -33,6 +33,7 @@ export default async function StudentPayments({ searchParams }: Props) {
     </p>
     {!list.ok && <p className={styles.notice} role="alert">
       {list.reason === "signin" ? ui.signIn[lang] : ui.unavailable[lang]}
+      {list.reason === "signin" && <> <Link href="/student/sign-in?next=payments">{lang === "id" ? "Masuk sebagai mahasiswa →" : "Student sign-in →"}</Link></>}
     </p>}
     {list.ok && list.data.length === 0 && <p>{ui.none[lang]}</p>}
     {list.ok && await Promise.all(list.data.map(item => <ObligationCard key={item.id} item={item} lang={lang}

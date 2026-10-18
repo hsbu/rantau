@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 
 // Sponsor workspace fixtures; the relay validates every field strictly.
 const TOKEN = "a".repeat(43);
+const STUDENT_TOKEN = "s".repeat(43);
 const MALFORMED_TOKEN = "m".repeat(43);
 const SET_COOKIE = `session=${TOKEN}; HttpOnly; Path=/; SameSite=Strict; Max-Age=3600`;
 const CLEAR_COOKIE = 'session=""; HttpOnly; Path=/; SameSite=Strict; Max-Age=0';
@@ -62,11 +63,14 @@ createServer(async (request, response) => {
     try { body = JSON.parse(text); } catch { return send(response, 422, { code: "INVALID_REQUEST" }); }
     if (body.password === "wrong") return send(response, 401, { detail: "private diagnostic" });
     if (body.password === "throttled") return send(response, 429, { detail: "private diagnostic" });
+    if (body.username === "student") return send(response, 200, { authenticated: true, role: "STUDENT" },
+      { "Set-Cookie": SET_COOKIE.replace(TOKEN, STUDENT_TOKEN) });
     return send(response, 200, sessionSummary, { "Set-Cookie": SET_COOKIE });
   }
 
   const token = cookieToken(request);
   if (url === "/api/v1/auth/session" && request.method === "GET") {
+    if (token === STUDENT_TOKEN) return send(response, 200, { authenticated: true, role: "STUDENT" });
     if (token !== TOKEN && token !== MALFORMED_TOKEN) {
       return send(response, 401, { detail: "private diagnostic must not reach browser" });
     }

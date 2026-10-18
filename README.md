@@ -498,8 +498,8 @@ permission, requiring a separate proposal/approval for any additional payment.
 Recovery stores only selected payment/obligation/case IDs in the existing scoped
 conversation JSON; no new migration or HTTP fields are required. Update backend
 workers together: older strict draft readers do not understand the new recovery
-field and fail closed rather than restore it. Browser transcript restoration and
-a dedicated student sign-in entry remain separate work.
+field and fail closed rather than restore it. Browser transcript restoration
+remains separate work.
 
 The approved A-03-F1 adapters implement the same memory/run interfaces using
 PostgreSQL. Explicitly apply the existing B/C migrations followed by
@@ -513,8 +513,21 @@ This command creates no identities, sessions or financial fixtures. It does not
 run at application startup. Complete the existing explicit authentication bootstrap
 and C scenario seed for an isolated demo database, and configure authentication,
 `DATABASE_URL`, `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` locally. Chat uses the
-existing verified student cookie; a new student sign-in screen is not part of this
-wiring change. Never put credentials or API keys in browser code or chat.
+verified student cookie. Open `/student/sign-in` with the configured student
+credentials; successful sign-in continues to Chat. `/student/sign-in?next=payments`
+continues to Payments. Only these fixed local destinations are supported. The page
+reuses the existing login/session/logout relay and never selects an actor or role.
+An existing student session can continue or sign out from the same page; another
+role must sign out before using student credentials. Never put credentials or
+API keys in browser code or chat.
+
+Student tuition summaries show the exact outstanding amount and stored synthetic
+tuition deadline in UTC, separately from quote expiry, provider delivery and
+university posting windows. Displayed exchange-rate precision is rounded; exact
+integer amounts, fees and backend calculations are unchanged. In the sponsor
+workspace, **Summary language** switches exact-term summaries and confirmation
+headings between English and Bahasa Indonesia. Language changes send no decision;
+the existing explicit confirmation, terms hash and session checks remain required.
 
 The default HTTP dependency now calls `backend.agent.wiring.configured_agent_services`.
 It constructs B's real `AuthService`, C's `FinanceAgentReadPort`/scoped database reads,

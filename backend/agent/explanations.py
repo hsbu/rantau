@@ -1,6 +1,7 @@
 """Deterministic display of validated synthetic quotes; never payment authority."""
 
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from backend.contracts.enums import CURRENCY_SCALE, Currency
 from backend.contracts.models import FxQuote, Money, TuitionObligation
@@ -30,8 +31,16 @@ def explain_tuition_record(obligation: TuitionObligation) -> str:
     return (
         f"Simulated university tuition record: expected {expected}; posted {posted}; "
         f"remaining {remaining}. These posted funds refer to the university record; "
-        "a credit to a student's bank account alone does not establish tuition completion."
+        "a credit to a student's bank account alone does not establish tuition completion. "
+        f"Simulated tuition due date: {utc_time(obligation.due_at)}."
     )
+
+
+def display_rate(rate: str | Decimal) -> str:
+    """Bound display precision without converting exact rates to binary floats."""
+    exact = Decimal(rate)
+    rounded = format(exact, ".8f").rstrip("0").rstrip(".")
+    return rounded if rounded != "0" else format(exact, ".6E")
 
 
 def comparable_quotes(
@@ -74,7 +83,7 @@ def explain_quotes(quotes: tuple[FxQuote, ...], destination: Money, now: datetim
         lines.append(
             f"{quote.id}: principal {principal} + fee {fee} = total {total}; "
             f"simulated recipient amount {format_money(destination)}. "
-            f"Rate: 1 IDR = {quote.rate} CNY. "
+            f"Displayed rate (rounded): 1 IDR = {display_rate(quote.rate)} CNY. "
             f"Expires {utc_time(quote.expires_at)}; "
             f"estimated provider delivery {utc_time(quote.estimated_delivery_at)}."
         )
