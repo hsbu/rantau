@@ -1,7 +1,8 @@
 import { dateTime, money } from "../chat/chat-types";
 import type { Schema } from "./finance-api";
+import { readableRate } from "./format";
 import styles from "./payments.module.css";
-import { type Lang, safeNextStep, ui } from "./status-labels";
+import { type Lang, actionLabels, safeNextStep, ui } from "./status-labels";
 import type { TrustStep } from "./trust";
 
 export function SimulatedBanner({ lang }: { lang: Lang }) {
@@ -25,12 +26,13 @@ export function QuoteBreakdown({ quotes, lang }: { quotes: Schema["FxQuote"][]; 
     <caption>{ui.quotes[lang]}</caption>
     <thead><tr>
       <th>Route</th><th>{ui.principal[lang]}</th><th>{ui.fee[lang]}</th>
-      <th>{ui.total[lang]}</th><th>{ui.recipient[lang]}</th><th>{ui.eta[lang]}</th>
+      <th>{ui.rate[lang]}</th><th>{ui.total[lang]}</th><th>{ui.recipient[lang]}</th><th>{ui.eta[lang]}</th>
     </tr></thead>
     <tbody>{quotes.map(quote => <tr key={quote.id}>
       <td>{quote.provider}</td>
       <td>{money(quote.source_currency, quote.source_principal_minor)}</td>
       <td>{money(quote.source_currency, quote.fee_minor)}</td>
+      <td>1 {quote.source_currency} = {readableRate(quote.rate)} {quote.destination_currency}</td>
       <td><strong>{money(quote.source_currency, quote.source_total_minor)}</strong></td>
       <td>{money(quote.destination_currency, quote.destination_amount_minor)}</td>
       <td>{dateTime(quote.estimated_delivery_at)}</td>
@@ -68,5 +70,18 @@ export function UntrustedDocuments({ documents, lang }: { documents: Schema["Unt
       <p>{ui.sender[lang]}: {document.claimed_sender}</p>
       <pre>{document.body}</pre>
     </article>)}
+  </section>;
+}
+
+export function ActivityLog({ entries, lang }: { entries: Schema["AuditEntry"][]; lang: Lang }) {
+  return <section aria-label="activity">
+    <h3>{ui.activityTitle[lang]}</h3>
+    <ul className={styles.routes}>
+      {entries.map(entry => <li key={entry.audit_event_id}>
+        <span>{dateTime(entry.created_at)}</span>
+        <span>{actionLabels[entry.action]?.[lang] ?? entry.action}</span>
+        {entry.decision && <span>{entry.decision}</span>}
+      </li>)}
+    </ul>
   </section>;
 }

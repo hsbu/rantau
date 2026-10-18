@@ -1,40 +1,23 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 import styles from "./payments.module.css";
-import { type Lang, safeNextStep, ui } from "./status-labels";
+import { type Lang, ui } from "./status-labels";
+import { useRelay } from "./use-relay";
 
-type Props = { lang: Lang; intentId: string; canContinue: boolean };
+type Props = { lang: Lang; intentId: string; canContinue: boolean; canRequestApproval: boolean };
 
-export function IntentActions({ lang, intentId, canContinue }: Props) {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-
-  async function run(action: "cancel-intent" | "execute-intent") {
-    setBusy(true);
-    setMessage(null);
-    try {
-      const response = await fetch(`/student/payments/api/${action}`, {
-        method: "POST", credentials: "same-origin", cache: "no-store",
-        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: intentId }),
-      });
-      if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        const code = error?.reason_code as keyof typeof safeNextStep | undefined;
-        setMessage(code && safeNextStep[code] ? safeNextStep[code][lang] : ui.unavailable[lang]);
-      }
-      router.refresh();
-    } finally {
-      setBusy(false);
-    }
-  }
-
+export function IntentActions({ lang, intentId, canContinue, canRequestApproval }: Props) {
+  const { busy, message, run } = useRelay(lang);
+  const body = { id: intentId };
   return <div>
     <div className={styles.actions}>
-      {canContinue && <button disabled={busy} onClick={() => run("execute-intent")}>{ui.continueIntent[lang]}</button>}
-      <button disabled={busy} onClick={() => run("cancel-intent")}>{ui.cancelIntent[lang]}</button>
+      {canRequestApproval && <button disabled={busy} onClick={() => run("request-approval", body)}>
+        {ui.requestApproval[lang]}
+      </button>}
+      {canContinue && <button disabled={busy} onClick={() => run("execute-intent", body)}>
+        {ui.continueIntent[lang]}
+      </button>}
+      <button disabled={busy} onClick={() => run("cancel-intent", body)}>{ui.cancelIntent[lang]}</button>
     </div>
     {message && <p className={styles.notice} role="alert">{message}</p>}
   </div>;

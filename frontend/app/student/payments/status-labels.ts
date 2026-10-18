@@ -87,6 +87,15 @@ export const ui = {
   recipient: { en: "Recipient receives", id: "Penerima mendapat" },
   expires: { en: "Expires", id: "Berakhir" },
   eta: { en: "Estimated delivery", id: "Perkiraan tiba" },
+  rate: { en: "Rate", id: "Kurs" },
+  activityTitle: { en: "What happened", id: "Yang terjadi" },
+  plantDocument: { en: "Plant untrusted document", id: "Tanam dokumen tidak tepercaya" },
+  chooseRoute: { en: "Choose this route", id: "Pilih rute ini" },
+  requestTopup: { en: "Request a top-up with this route", id: "Minta tambahan dana dengan rute ini" },
+  changeRoute: { en: "Switch to this route", id: "Ganti ke rute ini" },
+  payFrom: { en: "Pay from", id: "Bayar dari" },
+  requestApproval: { en: "Ask the funding owner to approve", id: "Minta pemilik dana menyetujui" },
+  shortfallTitle: { en: "A shortfall remains", id: "Masih ada kekurangan" },
   cancelIntent: { en: "Cancel this payment request", id: "Batalkan permintaan pembayaran ini" },
   continueIntent: { en: "Continue the approved payment", id: "Lanjutkan pembayaran yang disetujui" },
   youPay: { en: "You pay", id: "Anda membayar" },
@@ -106,3 +115,20 @@ export const ui = {
     paid: { en: "Tuition paid", id: "Uang kuliah lunas" },
   },
 } satisfies Record<string, Label | Record<string, Label>>;
+
+// Audit actions are open-ended strings from the backend; unknown ones fall back to the raw code.
+export const actionLabels: Record<string, Label> = {
+  INTENT_CREATED: { en: "Payment request created", id: "Permintaan pembayaran dibuat" },
+  INTENT_CANCELLED: { en: "Request cancelled", id: "Permintaan dibatalkan" },
+  INTENT_SUPERSEDED: { en: "Replaced by a new route", id: "Diganti dengan rute baru" },
+  INTENT_REFUSED: { en: "Request refused", id: "Permintaan ditolak" },
+  PAYMENT_DEBITED: { en: "Funds debited (simulated)", id: "Dana didebit (simulasi)" },
+  EXECUTION_REFUSED: { en: "Payment refused before any debit", id: "Pembayaran ditolak sebelum didebit" },
+  TRANSFER_DELIVERED: { en: "Provider delivered", id: "Penyedia telah mengirim" },
+  TRANSFER_FAILED: { en: "Provider failed, funds returned", id: "Penyedia gagal, dana dikembalikan" },
+  TRANSFER_OUTCOME_UNKNOWN: { en: "Outcome unknown, being checked", id: "Hasil belum diketahui, sedang dicek" },
+  RECONCILIATION_CASE_OPENED: { en: "Reconciliation case opened", id: "Kasus rekonsiliasi dibuka" },
+  RECONCILIATION_SUBMITTED: { en: "Case submitted to the university", id: "Kasus diajukan ke universitas" },
+  RECONCILIATION_REVIEWED: { en: "University reviewed the case", id: "Universitas meninjau kasus" },
+  RECONCILIATION_ESCALATED: { en: "Case escalated", id: "Kasus dieskalasi" },
+};
