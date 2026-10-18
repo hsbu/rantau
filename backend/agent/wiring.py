@@ -8,6 +8,7 @@ from starlette.concurrency import run_in_threadpool
 
 from backend.agent.actions import TuitionActions
 from backend.agent.openrouter_classifier import OpenRouterIntentClassifier
+from backend.agent.recovery import RecoveryWorkflow
 from backend.agent.router import AgentServices
 from backend.agent.services import durable_agent_services
 from backend.agent.tools import AgentTools
@@ -77,7 +78,9 @@ async def configured_agent_services(
         actions = TuitionActions(
             finance, build_approval_service(auth, settings.approval_ttl_seconds)
         )
-        yield durable_agent_services(database, auth, classifier, tools, actions)
+        yield durable_agent_services(
+            database, auth, classifier, tools, actions, RecoveryWorkflow(finance)
+        )
     finally:
         try:
             if fraud_classifier is not None:

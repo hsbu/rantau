@@ -5,9 +5,9 @@ SEC-03, SEC-08 and SEC-09 keep
 their existing real-session evidence in `tests/approvals/test_finance_integration.py`
 (cumulative mandate budget, superseded approval after revision, and the legitimate
 approved payment) and are not duplicated here. This module proves the backend/HTTP authority
-boundary; `test_agent_assessment.py` separately covers default read-only Chat
-assessment. Agent financial actions and transaction-bound hold invocation remain
-separate integration work.
+boundary; `test_agent_assessment.py` separately covers advisory Chat assessment.
+`tests/finance/test_agent_recovery_security.py` covers the approved scoped agent
+hold/recovery integration; the complete joint agent attack matrix remains separate.
 """
 
 from pathlib import Path
@@ -31,8 +31,17 @@ from tests.finance.factories import balance, count, proposal, scalar
 
 ORIGIN = {"Origin": "http://testserver"}
 BACKEND = Path(__file__).resolve().parents[2] / "backend"
-# No LLM tool, agent module or public route may reach hold/case mutation internals.
-MUTATION_HELPERS = ("clear_hold", "place_hold", "decide_case", "security_holds", "security_cases")
+# Scoped hold placement is approved; privileged review and release stay backend-only.
+PRIVILEGED_HELPERS = (
+    "clear_hold",
+    "decide_case",
+    "review_case",
+    "review_submitted",
+    "post_receipt",
+    "record_approval",
+    "trust_beneficiary",
+    "reset_demo_fixture",
+)
 # Unrelated actors keep exactly one role inbox; the other role route stays 404.
 STRANGERS = (
     ("other_student", "/api/v1/student/approvals", 200, "/api/v1/sponsor/approvals", 404),
@@ -311,7 +320,7 @@ def test_sec_06_unrelated_actors_cannot_read_private_records(security_api):
     assert {table: count(database, table) for table in before} == before
 
 
-def test_sec_07_hold_and_case_mutation_is_unreachable_from_public_and_agent_surfaces():
+def test_sec_07_hold_clearing_and_case_review_stay_outside_public_and_agent_surfaces():
     paths = app.openapi()["paths"]
     assert not [path for path in paths if "hold" in path.lower()]
     assert list(paths["/api/v1/security-cases/{id}"]) == ["get"]
@@ -320,5 +329,5 @@ def test_sec_07_hold_and_case_mutation_is_unreachable_from_public_and_agent_surf
     assert not [
         path.name
         for path in modules
-        if any(helper in path.read_text(encoding="utf-8") for helper in MUTATION_HELPERS)
+        if any(helper in path.read_text(encoding="utf-8") for helper in PRIVILEGED_HELPERS)
     ]

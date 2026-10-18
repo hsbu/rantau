@@ -30,6 +30,12 @@ TOOLS = frozenset(
         "execute_payment",
         "get_payment_status",
         "assess_fraud_risk",
+        "place_security_hold",
+        "create_security_case",
+        "get_security_case",
+        "create_reconciliation_case",
+        "submit_reconciliation_case",
+        "get_reconciliation_status",
         "lookup_shortfall_sources",
     }
 )

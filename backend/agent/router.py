@@ -28,6 +28,7 @@ class AgentServices:
 
 async def agent_services(request: Request) -> AsyncIterator[AgentServices]:
     from backend.agent.actions import action_command
+    from backend.agent.recovery import recovery_command
     from backend.agent.wiring import configured_agent_services
 
     require_classifier = request.method == "POST"
@@ -37,7 +38,9 @@ async def agent_services(request: Request) -> AsyncIterator[AgentServices]:
         except ValueError:
             body = None
         if isinstance(body, dict) and isinstance(body.get("message"), str):
-            require_classifier = action_command(body["message"]) is None
+            require_classifier = not (
+                action_command(body["message"]) or recovery_command(body["message"])
+            )
     async with configured_agent_services(require_classifier=require_classifier) as services:
         yield services
 
@@ -51,7 +54,7 @@ router = APIRouter(prefix="/api/v1/agent", tags=["agent"])
 async def message(
     body: AgentMessage, actor: Actor, services: Services, request: Request
 ) -> AgentResponse:
-    if services.graph.actions is not None and (
+    if (services.graph.actions is not None or services.graph.recovery is not None) and (
         request.headers.get("origin") != auth_settings().auth_trusted_origin
     ):
         raise HTTPException(403, detail={"code": "UNTRUSTED_ORIGIN"})

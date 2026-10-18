@@ -12,6 +12,8 @@ from backend.agent.classifier import (
     IntentClassification,
     IntentClassifier,
 )
+from backend.agent.protection import AgentProtection
+from backend.agent.recovery import RecoveryWorkflow, recovery_command
 from backend.agent.state import (
     ConversationKey,
     ConversationState,
@@ -42,9 +44,12 @@ class AgentGraph:
         *,
         conversations: ConversationStore | None = None,
         actions: TuitionActions | None = None,
+        recovery: RecoveryWorkflow | None = None,
     ) -> None:
         self.conversations = conversations if conversations is not None else InMemoryConversations()
         self.actions = actions
+        self.recovery = recovery
+        self.protection = AgentProtection(actions) if actions else None
         self.tools = tools
 
         async def classify(state: GraphState) -> GraphState:
@@ -76,6 +81,11 @@ class AgentGraph:
                     classification.tuition or TuitionInput(), conversation.tuition, state["actor"]
                 )
                 conversation = conversation.model_copy(update={"tuition": tuition})
+            elif intent in {Intent.TRACK, Intent.RECOVER} and self.recovery is not None:
+                response, selected = await self.recovery.investigate(
+                    state["message"], conversation.recovery, state["actor"], intent
+                )
+                conversation = conversation.model_copy(update={"recovery": selected})
             else:
                 response = await tools.safe_handle(intent, state["message"], state["actor"])
             return {
@@ -129,6 +139,10 @@ class AgentGraph:
         if actor.role != Role.STUDENT or "student:read" not in actor.scopes:
             raise ScopeDenied("Resource unavailable")
         if conversation_id is None:
+            if self.recovery and recovery_command(message):
+                return self.recovery.reply(
+                    "Select a payment in a current conversation before recovery submission/recheck."
+                ).model_copy(update={"run_id": f"run_{uuid4().hex}"})
             if self.actions and action_command(message):
                 return action_reply(
                     "A current conversation and reviewed tuition preview are "
@@ -145,10 +159,28 @@ class AgentGraph:
         )
         async with self.conversations.turn(key) as session:
             command = action_command(message) if self.actions else None
-            if command:
+            recovery = recovery_command(message) if self.recovery else None
+            guarded = None
+            if self.protection is not None:
+                guarded = await self.protection.check(message, actor, key, session.state.tuition)
+            if guarded is not None:
+                response = guarded.model_copy(update={"run_id": f"run_{uuid4().hex}"})
+                updated = session.state
+            elif recovery:
+                assert self.recovery is not None
+                response, selected = await self.recovery.handle(
+                    recovery, session.state.recovery, actor
+                )
+                updated = session.state.model_copy(
+                    update={"recovery": selected, "active_intent": Intent.RECOVER}
+                )
+                response = response.model_copy(update={"run_id": f"run_{uuid4().hex}"})
+            elif command:
                 updated = session.state
                 proposal = proposal_of(updated.tuition)
-                if updated.active_intent != Intent.TUITION or proposal is None:
+                if updated.active_intent not in {Intent.TUITION, Intent.VERIFY_MESSAGE} or (
+                    proposal is None
+                ):
                     response = action_reply(
                         "Review a complete tuition preview first, then say 'confirm tuition'.",
                         "clarify_tuition",
@@ -188,7 +220,10 @@ class AgentGraph:
             return response
 
     async def _turn(
-        self, message: str, actor: ActorContext, conversation: ConversationState
+        self,
+        message: str,
+        actor: ActorContext,
+        conversation: ConversationState,
     ) -> tuple[AgentResponse, ConversationState]:
         output = await self.graph.ainvoke(
             {"message": message, "actor": actor, "conversation": conversation},

@@ -179,8 +179,12 @@ classification, combines bounded local cues with optional redacted OpenRouter
 signals, and falls back to local cues if semantic assessment is unavailable.
 It does not infer beneficiary legitimacy or create financial authority. With no
 signals, the result still requests verification with a trusted source. This
-message-only path does not place or release holds; transaction-bound hold
-integration remains separate. Request-scoped classifier clients are closed when
+read adapter remains advisory. Separately, the agent checks the current confirmed
+tuition action before model routing: existing deterministic B hard findings or
+local prompt-injection cues place a scoped persistent hold and security case
+atomically. Model-only signals cannot select a hold, grant approval or change a
+recipient. Without a confirmed action in this session/conversation/scenario,
+message verification remains advisory and cannot target a different request. Request-scoped classifier clients are closed when
 the request completes.
 
 `backend.approvals.service.ApprovalService` persists B-03's owner requests,
@@ -458,6 +462,34 @@ confirmed terms, cancel or revise the original request in Payments before confir
 a replacement. New sessions/scenario resets cannot resume the previous action.
 Provider delivery remains separate from verified university posting.
 
+Recovery uses the existing Chat input. Enter `recover <payment reference>` (for
+example, the actual `transfer_...` reference shown in Payments) to select and
+investigate a payment. The backend derives its obligation from the persisted
+payment/intent relationship; it does not infer linkage from unrelated records.
+`submit recovery` collects the backend receipt, provider reference, delivered
+amount and authenticated student's reference claim, then submits a case through
+the existing reconciliation gate when an exception requires review. Merely
+investigating creates no case. `check recovery` polls existing provider status and
+rechecks university records without executing another payment. These two exact
+commands need no model credentials; they require a current scoped selection and
+the same trusted Origin/session protections as tuition commands.
+
+Case creation/submission and session revalidation share one transaction through
+C's `create_in_transaction` / `submit_in_transaction` helpers. Retries recover the
+same case even after response loss or independent resolution; case/review states
+and linked university postings determine the reply. Only the independent
+simulated university reviewer resolves missing-reference cases. The agent cannot
+approve reconciliation or directly post credit. Provider delivery is never a
+paid claim. Delayed posting remains pending until C's due-posting recheck; a
+shortfall displays the exact remaining balance and current synthetic top-up
+permission, requiring a separate proposal/approval for any additional payment.
+
+Recovery stores only selected payment/obligation/case IDs in the existing scoped
+conversation JSON; no new migration or HTTP fields are required. Update backend
+workers together: older strict draft readers do not understand the new recovery
+field and fail closed rather than restore it. Browser transcript restoration and
+a dedicated student sign-in entry remain separate work.
+
 The approved A-03-F1 adapters implement the same memory/run interfaces using
 PostgreSQL. Explicitly apply the existing B/C migrations followed by
 `020_agent_storage.sql` and `021_agent_actions.sql` to the configured database:
@@ -478,7 +510,9 @@ It constructs B's real `AuthService`, C's `FinanceAgentReadPort`/scoped database
 the existing OpenRouter classifier and the durable graph/run factory. The fixed
 fictional university binding is `uni_cn_01` to `benef_uni_cn_01`; only trusted server
 code supplies it. A-04 attaches protected tuition confirmation/continuation;
-case-submission and fraud/hold invocation are not attached.
+A-05 attaches scoped recovery investigation, explicit case submission and status
+rechecks. Deterministic fraud/hold integration uses the existing B services; only
+a separate authorized reviewer can clear a hold.
 SDK clients are scoped to each request and closed afterward. Missing classifier
 configuration returns 503 `CLASSIFIER_NOT_CONFIGURED` on messages; missing required
 finance/agent storage returns 503 `AGENT_STORAGE_UNAVAILABLE` before a model call.
@@ -488,7 +522,7 @@ session and storage without requiring an API key or making a model request.
 Scenarios stay scripted. The isolated CLI retains its explicit in-memory setup;
 configured PostgreSQL adapters never fall back to process-local storage on error.
 
-`PostgresConversations` retains only typed tuition selections and the previous
+`PostgresConversations` retains only typed tuition/recovery selections and the previous
 intent, scoped by tenant, student, verified session and conversation ID. Drafts
 survive process/worker changes, expire after 30 idle minutes or earlier session
 expiry, and are invalidated by a simulator reset. Storage is limited to 128 active
