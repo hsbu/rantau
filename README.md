@@ -346,6 +346,18 @@ build a typed draft preview; it cannot persist a payment intent, approve, debit,
 post tuition or clear a hold. It does not install fake authentication or a fake
 authorization gate in the application. `/quit` exits interactive mode.
 
+The KB explicitly lists two fictional simulator policies: `cn_demo_v1` keeps
+partial payments and top-ups disabled; `cn_demo_v1_topup` matches C's existing
+`shortfall_topup_on` scenario and permits top-ups while partial payments stay
+disabled. The original default record and ZJU reference remain unchanged.
+Recognition compares every policy field with its listed record, allowing only
+the verification/validity timestamps to move together to the persisted seed time.
+The validity offsets must match exactly, a future verification time is rejected,
+and the stored policy still expires; requests never renew it. Unknown identities,
+versions or changed rules stay pending. Unlisted JSON files cannot activate a
+policy. Recognizing the top-up variant supplies guidance only: it does not enable
+an agent payment action, grant approval or bypass the protected executor.
+
 Shortfall guidance checks the reviewed KB first. With `--web-guidance`, a missing
 claim triggers a bounded read of two curated ZJU pages, used only as procedural
 inspiration for the fictional university. This is source discovery, not unrestricted
