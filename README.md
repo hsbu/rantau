@@ -327,6 +327,16 @@ progress folder: [Dev A](docs/progress/progress-a.md),
 Each owner updates their task checkboxes, descriptions and validation evidence in
 the same commit/PR as the work. See `AGENTS.md` section 7 for the full workflow.
 
+`OPENROUTER_MAX_TOKENS` bounds combined reasoning and visible output (default
+2048, range 512–8192). An exhausted budget can return no JSON; the agent then
+fails safely without acting. Optionally set `OPENROUTER_REASONING_EFFORT` to an
+effort supported by the selected model; omitted/empty retains provider defaults.
+For optional-reasoning classifiers, `none` can leave more budget for the schema.
+Mandatory-reasoning models may reject `none`. These settings also pass through
+Compose. See [OpenRouter's reasoning guidance](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).
+Missing tuition funding/amount/quote selections are clarified by the deterministic
+planner; model clarification is reserved for an unclear intent.
+
 ## Interactive agent and conversation state
 
 After setting `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` in the ignored local

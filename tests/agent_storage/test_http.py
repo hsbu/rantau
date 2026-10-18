@@ -83,8 +83,8 @@ def test_http_persists_runs_with_real_cookie_sessions_and_only_test_domain_overr
     finally:
         app.dependency_overrides.clear()
     # Real sessions alone cannot enable a graph without model configuration.
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "")
+    monkeypatch.setenv("OPENROUTER_MODEL", "")
     with TestClient(app) as client:
         client.cookies.set("session", env.auth.login("student", PASSWORD, "after-logout").token)
         assert client.post("/api/v1/agent/messages", json={"message": "Policy"}).status_code == 503
