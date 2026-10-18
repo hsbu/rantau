@@ -17,6 +17,8 @@ from backend.dependencies import auth_settings
 from backend.finance.ports import FinanceAgentReadPort
 from backend.finance.reads import FinanceReads
 from backend.finance.wiring import finance_storage_ready
+from backend.fraud.agent_port import SecurityAgentReadPort
+from backend.fraud.assessment import FraudAssessor, OpenRouterFraudClassifier
 from backend.university.port import ObligationReader
 
 
@@ -52,13 +54,22 @@ async def configured_agent_services(
     auth = AuthService(database, settings.auth_tenant_id)
     obligations = ObligationReader(database, auth)
     reads = FinanceReads(database, auth, obligations)
-    tools = AgentTools(
-        FinanceAgentReadPort(reads, obligations),
-        # Fixed fictional university binding; never supplied by chat/model/web content.
-        beneficiary_map={"uni_cn_01": "benef_uni_cn_01"},
-    )
     classifier = OpenRouterIntentClassifier(settings)
+    fraud_classifier: OpenRouterFraudClassifier | None = None
     try:
+        if require_classifier:
+            fraud_classifier = OpenRouterFraudClassifier(settings)
+        tools = AgentTools(
+            SecurityAgentReadPort(
+                FinanceAgentReadPort(reads, obligations), auth, FraudAssessor(fraud_classifier)
+            ),
+            # Fixed fictional university binding; never supplied by chat/model/web content.
+            beneficiary_map={"uni_cn_01": "benef_uni_cn_01"},
+        )
         yield durable_agent_services(database, auth, classifier, tools)
     finally:
-        await classifier.close()
+        try:
+            if fraud_classifier is not None:
+                await fraud_classifier.close()
+        finally:
+            await classifier.close()
