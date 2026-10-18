@@ -399,5 +399,56 @@ is single-worker/process-local: restart, worker change or expiry loses the draft
 It stores no raw transcript, approval or cached authorization. Only the previous
 intent, pending field and option counts accompany the current redacted user text
 to the model; server IDs, balances and tool outputs stay outside model context.
-The store interface allows later PostgreSQL persistence after shared schema
-coordination; no database migration is introduced here.
+
+## Durable agent drafts and run diagnostics
+
+The approved A-03-F1 adapters implement the same memory/run interfaces using
+PostgreSQL. Explicitly apply the existing B/C migrations followed by
+`020_agent_storage.sql` to the configured database:
+
+```powershell
+uv run python -m backend.agent.migrations
+```
+
+This command creates no identities, sessions or financial fixtures. It does not
+run at application startup. A trusted integrator constructs services with
+`backend.agent.services.durable_agent_services(database, auth, classifier, tools)`;
+`auth` is B's real `AuthService`, and `tools` must use trusted scoped domain adapters.
+The default HTTP dependency remains unavailable until C-02 services are connected.
+Scenarios stay scripted. The isolated CLI retains its explicit in-memory setup;
+configured PostgreSQL adapters never fall back to process-local storage on error.
+
+`PostgresConversations` retains only typed tuition selections and the previous
+intent, scoped by tenant, student, verified session and conversation ID. Drafts
+survive process/worker changes, expire after 30 idle minutes or earlier session
+expiry, and are invalidated by a simulator reset. Storage is limited to 128 active
+drafts per tenant and 64 KiB per draft; expired/invalid-session drafts are purged
+on access. Login under a new session starts a new namespace. All resource,
+permission, policy and quote checks still run again; stored IDs grant no authority.
+To continue a saved draft, a client must reuse its `conversation_id` within the
+same valid session. The current browser keeps that ID and visible messages only
+in component memory; reload starts a new conversation. This backend change does
+not restore a browser transcript or add a chat-history interface.
+
+Workers serialize each conversation with a PostgreSQL advisory lock and a
+five-second contention limit. Database work runs in bounded worker calls, including
+on Windows' default event loop. No open transaction or auth/financial row locks span
+model/network calls. A completed state and its run metadata commit together after
+fresh session/scope/scenario checks. Errors and cancellation before commit roll
+back the write; a completed commit remains recorded if the HTTP connection is
+subsequently lost. Missing/corrupt storage produces a sanitized unavailable result.
+
+`PostgresRuns` stores append-only diagnostic metadata: intent, allowlisted tool
+events/resource references, scope and scenario identifiers. It stores no user text,
+assistant prose, model output, credentials, account balances, full quotes or approval
+objects. Records are limited to 64 events/resources and 32 KiB; identical writes
+are idempotent and conflicting writes cannot replace history. There is no automatic
+run-history deletion during the MVP, including on logout or fixture reset.
+
+`GET /api/v1/agent/runs/{run_id}` keeps the existing response shape but reconstructs
+a fixed safe message plus the saved diagnostics. It does not replay the original
+assistant response or restore chat history. Only the original currently valid
+student session can retrieve a run; logout, expiry, changed scopes/credentials or
+disabled actors deny access. These are past orchestration diagnostics, not current
+financial state or the authoritative B/C financial/security audit. New financial
+tools must update the diagnostic allowlist and domain audit integration together.
