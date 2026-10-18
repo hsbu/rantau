@@ -11,6 +11,12 @@ from backend.finance.migrations import migrate_all
 DEMO_ENVIRONMENTS = frozenset({"development", "test"})
 # Child tables first so every delete respects the logical dependencies.
 RESETTABLE_TABLES = (
+    "untrusted_documents",
+    "reconciliation_evidence",
+    "reconciliation_cases",
+    "university_receipts",
+    "sim_provider_faults",
+    "sim_provider_transfers",
     "spend_entries",
     "ledger_entries",
     "idempotency_keys",
@@ -32,6 +38,10 @@ def reset_demo_fixture(database: Database, tenant_id: str, scenario_id: str) -> 
     spec = scenario(scenario_id)
     with database.connection() as connection:
         connection.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (f"reset:{tenant_id}",))
+        # Same order as the executor (account first) so a racing payment cannot deadlock a reset.
+        connection.execute(
+            "SELECT 1 FROM funding_accounts WHERE tenant_id = %s FOR UPDATE", (tenant_id,)
+        )
         for table in RESETTABLE_TABLES:
             connection.execute(f"DELETE FROM {table} WHERE tenant_id = %s", (tenant_id,))  # noqa: S608
         run_no = _next_run(connection, tenant_id, spec)

@@ -73,4 +73,4 @@ def test_cancel_after_processing_is_rejected_and_nothing_changes(services, stude
         "SELECT state FROM payment_intents WHERE tenant_id = %s AND alias = %s",
         (TENANT, alias),
     )
-    assert state == "PROCESSING"
+    assert state == "DELIVERED"

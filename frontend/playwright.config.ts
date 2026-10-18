@@ -7,9 +7,10 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: [
     { command: "node tests/mock-agent.mjs", url: "http://127.0.0.1:8101/health", reuseExistingServer: false },
+    { command: "node tests/mock-finance.mjs", url: "http://127.0.0.1:8102/health", reuseExistingServer: false },
     {
       command: "npm run start", url: "http://127.0.0.1:3100", reuseExistingServer: false,
-      env: { PORT: "3100", HOSTNAME: "127.0.0.1", AGENT_API_ORIGIN: "http://127.0.0.1:8101" },
+      env: { PORT: "3100", HOSTNAME: "127.0.0.1", AGENT_API_ORIGIN: "http://127.0.0.1:8101", FINANCE_API_ORIGIN: "http://127.0.0.1:8102" },
     },
   ],
 });

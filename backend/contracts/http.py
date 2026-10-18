@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import AwareDatetime, Field, model_validator
 
-from backend.contracts.enums import Intent, PaymentState, Tier
+from backend.contracts.enums import FaultMode, Intent, PaymentState, Tier
 from backend.contracts.models import (
     Contract,
     Identifier,
@@ -59,6 +59,12 @@ class ExecutionResult(Contract):
     audit_event_id: Identifier
 
 
+class ExecuteRequest(Contract):
+    """Optional confirmation of the terms the client displayed; a mismatch is refused."""
+
+    terms_hash: str | None = None
+
+
 class SponsorDecisionRequest(Contract):
     decision: Literal["APPROVED", "REJECTED"]
     terms_hash: str
@@ -76,6 +82,52 @@ class CaseCreated(Contract):
     case_id: Identifier
     status: str
     evidence_missing: tuple[str, ...]
+
+
+class ScenarioInfo(Contract):
+    id: Identifier
+    description: str
+
+
+class ResetRequest(Contract):
+    scenario_id: Identifier
+
+
+class ResetResult(Contract):
+    scenario_id: Identifier
+    run_no: int
+
+
+class AdvanceClockRequest(Contract):
+    hours: Annotated[int, Field(strict=True, gt=0, le=720)]
+
+
+class FaultRequest(Contract):
+    provider: Literal["mock_remit_a", "mock_remit_b"]
+    mode: FaultMode
+    remaining: Annotated[int, Field(strict=True, ge=1, le=10)] = 1
+
+
+class DocumentInjectRequest(Contract):
+    kind: Literal["INVOICE", "EMAIL", "NOTICE"]
+    title: Annotated[str, Field(min_length=1, max_length=200)]
+    body: Annotated[str, Field(min_length=1, max_length=4000)]
+    claimed_sender: Annotated[str, Field(min_length=1, max_length=200)]
+
+
+class TickResult(Contract):
+    postings_made: int
+    cases_reviewed: tuple[Identifier, ...]
+
+
+class AuditEntry(Contract):
+    audit_event_id: Identifier
+    run_no: int
+    action: str
+    resource_id: Identifier | None
+    decision: str | None
+    reason_code: str | None
+    created_at: AwareDatetime
 
 
 class ContractCatalogue(Contract):
@@ -103,6 +155,12 @@ HTTP_ENDPOINTS = (
     ("POST", "/api/v1/payment-intents/{id}/approval-requests"),
     ("GET", "/api/v1/sponsor/approvals"),
     ("POST", "/api/v1/sponsor/approvals/{id}/decision"),
+    ("GET", "/api/v1/student/approvals"),
+    ("POST", "/api/v1/student/approvals/{id}/decision"),
+    ("GET", "/api/v1/sponsor/mandates"),
+    ("POST", "/api/v1/sponsor/mandates"),
+    ("PUT", "/api/v1/sponsor/mandates/{id}"),
+    ("DELETE", "/api/v1/sponsor/mandates/{id}"),
     ("POST", "/api/v1/payment-intents/{id}/execute"),
     ("POST", "/api/v1/payment-intents/{id}/cancel"),
     ("GET", "/api/v1/transfers/{id}"),
@@ -114,6 +172,15 @@ HTTP_ENDPOINTS = (
     ("GET", "/api/v1/kb/universities/{id}/payment-policy"),
     ("POST", "/api/v1/demo/reset"),
     ("GET", "/api/v1/demo/scenarios"),
+    ("POST", "/api/v1/demo/clock/advance"),
+    ("POST", "/api/v1/demo/faults"),
+    ("POST", "/api/v1/demo/university/tick"),
+    ("POST", "/api/v1/demo/documents"),
+    ("GET", "/api/v1/documents"),
+    ("POST", "/api/v1/payment-intents/{id}/revisions"),
+    ("GET", "/api/v1/demo/audit"),
+    ("POST", "/api/v1/tuition/obligations/{id}/recheck"),
+    ("POST", "/api/v1/transfers/{id}/recheck"),
     ("POST", "/api/v1/auth/login"),
     ("GET", "/api/v1/auth/session"),
     ("POST", "/api/v1/auth/logout"),

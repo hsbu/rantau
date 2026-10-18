@@ -5,18 +5,20 @@ from datetime import datetime, timedelta
 from psycopg.types.json import Jsonb
 
 from backend.authz.policy_repository import PolicyConnection
+from backend.contracts.enums import FaultMode
 from backend.demo.scenarios import (
     OBLIGATION_ALIAS,
     OBLIGATION_DUE_AT,
     OBLIGATION_DUE_MINOR,
-    POLICY_VERSION,
     QUOTE_ALIASES,
     ROUTINE_THRESHOLD_MINOR,
     STUDENT_ID,
+    STUDENT_NAME,
     TUITION_UNIVERSITY_ID,
     ScenarioSpec,
 )
 from backend.finance.clock import db_now
+from backend.finance.provider import set_fault
 from backend.finance.quotes import QuoteService
 from backend.kb.catalog import load_bundle
 
@@ -30,8 +32,10 @@ def seed_scenario(connection: PolicyConnection, tenant_id: str, spec: ScenarioSp
     now = db_now(connection)
     _seed_accounts(connection, tenant_id, spec)
     _seed_beneficiaries(connection, tenant_id, spec)
-    _seed_policy(connection, tenant_id, now)
-    _seed_obligation(connection, tenant_id)
+    _seed_policy(connection, tenant_id, now, spec)
+    _seed_obligation(connection, tenant_id, spec)
+    _seed_faults(connection, tenant_id, spec)
+    _seed_documents(connection, tenant_id, spec)
     QuoteService(ttl_seconds=spec.quote_ttl_seconds).issue(
         connection, tenant_id, OBLIGATION_DUE_MINOR, QUOTE_ALIASES
     )
@@ -42,7 +46,8 @@ def _seed_accounts(connection: PolicyConnection, tenant_id: str, spec: ScenarioS
         connection.execute(
             "INSERT INTO funding_accounts (tenant_id, alias, owner_id, currency, balance_minor, "
             "masked_number, timezone, per_transfer_limit_minor, daily_limit_minor, "
-            "monthly_limit_minor) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            "monthly_limit_minor, permitted_requesters) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
             (
                 tenant_id,
                 account.alias,
@@ -54,6 +59,7 @@ def _seed_accounts(connection: PolicyConnection, tenant_id: str, spec: ScenarioS
                 account.per_transfer_limit_minor,
                 account.daily_limit_minor,
                 account.monthly_limit_minor,
+                list(account.permitted_requesters),
             ),
         )
 
@@ -62,24 +68,31 @@ def _seed_beneficiaries(connection: PolicyConnection, tenant_id: str, spec: Scen
     for beneficiary in spec.beneficiaries:
         connection.execute(
             "INSERT INTO beneficiaries (tenant_id, alias, owner_id, fingerprint, masked_display, "
-            "verified) VALUES (%s, %s, %s, %s, %s, %s)",
+            "verified, purpose_type, student_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
             (
                 tenant_id,
                 beneficiary.alias,
-                TUITION_UNIVERSITY_ID,
+                beneficiary.owner_id,
                 beneficiary.fingerprint,
                 beneficiary.masked_display,
                 beneficiary.verified,
+                beneficiary.purpose_type,
+                beneficiary.student_id,
             ),
         )
 
 
-def _seed_policy(connection: PolicyConnection, tenant_id: str, now: datetime) -> None:
+def _seed_policy(
+    connection: PolicyConnection, tenant_id: str, now: datetime, spec: ScenarioSpec
+) -> None:
     policy = load_bundle().simulation.policy.model_copy(
         update={
             "verified_at": now,
             "effective_from": now - FIXTURE_VALIDITY_BEFORE,
             "effective_to": now + FIXTURE_VALIDITY_AFTER,
+            "id": spec.policy_id,
+            "version": spec.policy_id,
+            "topup_allowed": spec.topup_allowed,
         }
     )
     connection.execute(
@@ -92,7 +105,7 @@ def _seed_policy(connection: PolicyConnection, tenant_id: str, now: datetime) ->
         "routine_threshold_minor, purposes, currency_pairs) VALUES (%s, %s, %s, %s, %s, %s, %s)",
         (
             tenant_id,
-            POLICY_VERSION,
+            spec.policy_id,
             policy.effective_from,
             policy.effective_to,
             ROUTINE_THRESHOLD_MINOR,
@@ -102,10 +115,11 @@ def _seed_policy(connection: PolicyConnection, tenant_id: str, now: datetime) ->
     )
 
 
-def _seed_obligation(connection: PolicyConnection, tenant_id: str) -> None:
+def _seed_obligation(connection: PolicyConnection, tenant_id: str, spec: ScenarioSpec) -> None:
     connection.execute(
         "INSERT INTO tuition_obligations (tenant_id, alias, student_id, university_id, currency, "
-        "amount_due_minor, due_at, policy_alias) VALUES (%s, %s, %s, %s, 'CNY', %s, %s, %s)",
+        "amount_due_minor, due_at, policy_alias, student_name) "
+        "VALUES (%s, %s, %s, %s, 'CNY', %s, %s, %s, %s)",
         (
             tenant_id,
             OBLIGATION_ALIAS,
@@ -113,6 +127,29 @@ def _seed_obligation(connection: PolicyConnection, tenant_id: str) -> None:
             TUITION_UNIVERSITY_ID,
             OBLIGATION_DUE_MINOR,
             OBLIGATION_DUE_AT,
-            POLICY_VERSION,
+            spec.policy_id,
+            STUDENT_NAME,
         ),
     )
+
+
+def _seed_faults(connection: PolicyConnection, tenant_id: str, spec: ScenarioSpec) -> None:
+    for provider, mode in spec.faults:
+        set_fault(connection, tenant_id, provider, FaultMode(mode))
+
+
+def _seed_documents(connection: PolicyConnection, tenant_id: str, spec: ScenarioSpec) -> None:
+    for document in spec.documents:
+        connection.execute(
+            "INSERT INTO untrusted_documents (tenant_id, alias, student_id, kind, title, body, "
+            "claimed_sender) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            (
+                tenant_id,
+                document.alias,
+                STUDENT_ID,
+                document.kind,
+                document.title,
+                document.body,
+                document.claimed_sender,
+            ),
+        )

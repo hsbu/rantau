@@ -1,6 +1,7 @@
 """The only definition of legal payment state changes; every writer goes through it."""
 
 from collections.abc import Mapping
+from enum import StrEnum
 
 from backend.contracts.enums import PaymentState as S
 
@@ -37,6 +38,8 @@ class InvalidTransition(Exception):
     """A state change outside the documented tables; never retried blindly."""
 
 
-def require_transition(table: Mapping[S, frozenset[S]], current: S, target: S) -> None:
+def require_transition[State: StrEnum](
+    table: Mapping[State, frozenset[State]], current: State, target: State
+) -> None:
     if target not in table.get(current, frozenset()):
         raise InvalidTransition(f"{current.value} -> {target.value}")

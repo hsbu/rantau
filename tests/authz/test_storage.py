@@ -71,9 +71,15 @@ def test_migration_replays_verify_checksum_and_do_not_reseed(database):
     with database.connection() as connection:
         # Restore the disposable test DB for subsequent tests, not application data.
         connection.execute(
-            "DROP TABLE rantau_migrations, policy_decisions, student_sponsor_consents, "
+            "DROP TABLE rantau_migrations, policy_decisions, "
+            "approvals, mandates, authority_events, "
+            "security_holds, security_cases, security_events, "
+            "student_sponsor_consents, "
             "auth_sessions, auth_credentials, actors, auth_login_attempts CASCADE"
         )
+        connection.execute("DROP FUNCTION protect_authority_history()")
+        connection.execute("DROP FUNCTION protect_security_history()")
+        connection.execute("DROP FUNCTION protect_cleared_security_hold()")
 
 
 def test_readiness_remains_503_with_auth_ready_and_domain_unwired(auth_client, monkeypatch):

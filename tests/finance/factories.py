@@ -12,6 +12,7 @@ from backend.finance.quotes import QuoteService
 from tests.finance.conftest import TENANT
 
 DEFAULT_QUOTE = "quote_001"
+OBLIGATION = OBLIGATION_ALIAS
 
 
 def add_obligation(database, alias: str, due_minor: int):

@@ -6,12 +6,18 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from backend.agent.router import router as agent_router
+from backend.approvals.router import router as approval_router
 from backend.authz.router import router as auth_router
 from backend.config import Settings
+from backend.demo.http import router as demo_router
+from backend.finance.http import router as finance_router
 
 app = FastAPI(title="Rantau", version="0.1.0")
 app.include_router(agent_router)
 app.include_router(auth_router)
+app.include_router(finance_router)
+app.include_router(demo_router)
+app.include_router(approval_router)
 
 
 @app.get("/health")
@@ -38,6 +44,7 @@ async def ready() -> JSONResponse:
     dependencies = {
         "database": await database_available(settings),
         "authentication": await run_in_threadpool(authentication_ready, settings),
+        "finance_storage": await run_in_threadpool(finance_storage_available, settings),
         "domain_services": False,
         "classifier_configuration": settings.classifier_configured,
     }
@@ -49,6 +56,15 @@ async def ready() -> JSONResponse:
             "dependencies": dependencies,
         },
     )
+
+
+def finance_storage_available(settings: Settings) -> bool:
+    from backend.authz.storage import Database
+    from backend.finance.wiring import finance_storage_ready
+
+    if not settings.database_url:
+        return False
+    return finance_storage_ready(Database(settings.database_url.get_secret_value()))
 
 
 def authentication_ready(settings: Settings) -> bool:

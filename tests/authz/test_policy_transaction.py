@@ -266,13 +266,19 @@ async def test_reconciliation_submission_uses_current_identity_and_decision_audi
     assert events(service.database)[0]["action"] == "SUBMIT_RECONCILIATION"
 
 
-def test_both_migrations_replay_and_validate_checksums(database):
+def test_ordered_migrations_replay_and_validate_checksums(database):
     migrate(database)
     with database.connection() as connection:
         rows = connection.execute(
             "SELECT version FROM rantau_migrations ORDER BY version"
         ).fetchall()
-        assert [row["version"] for row in rows] == ["001_auth", "002_policy_audit"]
+        assert [row["version"] for row in rows] == [
+            "001_auth",
+            "002_policy_audit",
+            "003_authority",
+            "004_security_cases",
+            "005_security_history_guards",
+        ]
         connection.execute(
             "UPDATE rantau_migrations SET checksum = 'bad' WHERE version = '002_policy_audit'"
         )

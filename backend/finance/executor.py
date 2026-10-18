@@ -1,10 +1,12 @@
 """Protected execution: gate, re-checks, debit, ledger and transfer in one transaction.
 
-The provider call and its outcome transaction follow in the next change; a committed
-transfer stays PROCESSING with provider_submitted_at unset until then.
+The provider is called only after the debit commits; TransferService applies the outcome.
 """
 
 import hashlib
+from collections.abc import Callable
+from dataclasses import replace
+from datetime import timedelta
 from uuid import uuid4
 
 from backend.authz.policy_repository import PolicyConnection
@@ -25,9 +27,13 @@ from backend.finance.outcomes import Executed, Refused
 from backend.finance.records import LockedIntent, Row, fetch, intent_from_row, lock_intent, may_view
 from backend.finance.states import INTENT_TRANSITIONS, require_transition
 from backend.finance.terms import canonical_terms_hash
+from backend.finance.transfers import FINAL_STATES, TransferService
 
+# Keys of settled payments are kept long enough to absorb client retries.
+IDEMPOTENCY_RETENTION = timedelta(days=1)
 CLEARING_ACCOUNT = "system:provider_clearing"
 FEE_ACCOUNT = "system:fee_revenue"
+ExecutionFinalizer = Callable[[PolicyConnection, ActorContext, LockedIntent, PolicyDecision], None]
 
 
 class IdempotencyKeyReused(Exception):
@@ -35,12 +41,35 @@ class IdempotencyKeyReused(Exception):
 
 
 class ExecutionService:
-    def __init__(self, database: Database, gate: GateFactory, audit: AuditWriter | None = None):
+    def __init__(
+        self,
+        database: Database,
+        gate: GateFactory,
+        transfers: TransferService,
+        audit: AuditWriter | None = None,
+        *,
+        finalize_authorization: ExecutionFinalizer | None = None,
+    ):
         self.database = database
         self.gate = gate
+        self.transfers = transfers
         self.audit = audit or AuditWriter()
+        self.finalize_authorization = finalize_authorization
 
     def execute(
+        self,
+        actor: ActorContext,
+        intent_alias: str,
+        idempotency_key: str,
+        claimed_terms_hash: str | None = None,
+    ) -> Executed | Refused:
+        outcome = self._decide_and_debit(actor, intent_alias, idempotency_key, claimed_terms_hash)
+        if isinstance(outcome, Refused) or outcome.transfer_state in FINAL_STATES:
+            return outcome
+        state = self.transfers.settle(actor.tenant_id, outcome.payment_id)
+        return replace(outcome, transfer_state=state)
+
+    def _decide_and_debit(
         self,
         actor: ActorContext,
         intent_alias: str,
@@ -71,7 +100,12 @@ class ExecutionService:
             if decision.decision != Decision.ALLOW:
                 assert decision.reason_code is not None
                 return self._refuse(connection, actor, intent_alias, decision.reason_code, decision)
-            return self._debit(connection, actor, locked, idempotency_key, fingerprint, decision)
+            executed = self._debit(
+                connection, actor, locked, idempotency_key, fingerprint, decision
+            )
+            if self.finalize_authorization is not None:
+                self.finalize_authorization(connection, actor, locked, decision)
+            return executed
 
     def _debit(
         self,
@@ -229,7 +263,8 @@ def _insert_transfer(
     connection.execute(
         "INSERT INTO transfers (tenant_id, alias, intent_alias, account_alias, obligation_alias, "
         "beneficiary_alias, provider, provider_reference, state, source_total_minor, "
-        "destination_amount_minor) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'PROCESSING', %s, %s)",
+        "destination_amount_minor, blocks_obligation) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'PROCESSING', %s, %s, %s)",
         (
             tenant_id,
             alias,
@@ -241,6 +276,7 @@ def _insert_transfer(
             f"sim_ref_{uuid4().hex[:16]}",
             intent["source_total_minor"],
             intent["destination_amount_minor"],
+            intent["obligation_alias"] is not None,
         ),
     )
 
@@ -276,3 +312,16 @@ def _start_processing(connection: PolicyConnection, intent: Row) -> None:
     )
     if updated.rowcount != 1:
         raise ServiceUnavailable("Execution invariant failed: intent changed")
+
+
+def prune_idempotency_keys(
+    connection: PolicyConnection, tenant_id: str, older_than: timedelta
+) -> int:
+    """Drop old keys, but only for transfers that have reached a final state."""
+    deleted = connection.execute(
+        "DELETE FROM idempotency_keys k USING transfers t "
+        "WHERE k.tenant_id = %s AND t.tenant_id = k.tenant_id AND t.alias = k.transfer_alias "
+        "AND t.state IN ('DELIVERED', 'FAILED') AND k.created_at < clock_timestamp() - %s",
+        (tenant_id, older_than),
+    )
+    return deleted.rowcount

@@ -25,7 +25,7 @@ def provision_demo(
         (
             "par_001",
             "SPONSOR",
-            ["sponsor:read", "sponsor:approve", "payment:execute"],
+            ["sponsor:read", "sponsor:approve", "payment:execute", "mandate:manage"],
             "sponsor",
             hash_password(sponsor_password),
         ),

@@ -6,6 +6,7 @@ from pydantic.json_schema import models_json_schema
 
 from backend.contracts import http, models
 from backend.contracts.auth import ConsentRequest, ConsentSummary, LoginRequest, SessionSummary
+from backend.contracts.authority import ApprovalView, MandateRequest, MandateView
 
 SCHEMA_MODELS = (
     models.ActorContext,
@@ -21,6 +22,10 @@ SCHEMA_MODELS = (
     models.ReconciliationCase,
     models.DomainError,
     models.PermissionSummary,
+    models.TuitionObligationDetail,
+    models.PaymentIntentView,
+    models.UntrustedDocument,
+    models.ProviderStatusRef,
     models.FraudAssessment,
     models.ApprovalRequest,
     models.IntentProposal,
@@ -32,11 +37,40 @@ SCHEMA_MODELS = (
     http.SponsorDecisionRequest,
     http.SponsorDecisionResult,
     http.CaseCreated,
+    http.ExecuteRequest,
+    http.ScenarioInfo,
+    http.ResetRequest,
+    http.ResetResult,
+    http.AdvanceClockRequest,
+    http.FaultRequest,
+    http.TickResult,
+    http.DocumentInjectRequest,
+    http.AuditEntry,
     LoginRequest,
     SessionSummary,
     ConsentRequest,
     ConsentSummary,
+    ApprovalView,
+    MandateRequest,
+    MandateView,
 )
+
+
+FINANCE_PREFIXES = (
+    "/tuition/",
+    "/quotes",
+    "/payment-intents",
+    "/transfers",
+    "/reconciliations",
+    "/audit",
+    "/demo/",
+)
+# Approval requests and sponsor decisions belong to Dev B and are not served by this module.
+FINANCE_EXCLUDED = ("/payment-intents/{id}/approval-requests",)
+
+
+def _finance_implemented(path: str) -> bool:
+    return path.startswith(FINANCE_PREFIXES) and path not in FINANCE_EXCLUDED
 
 
 def contract_schema() -> dict[str, Any]:
@@ -49,17 +83,30 @@ def contract_schema() -> dict[str, Any]:
     responses = {
         "/agent/messages": "AgentResponse",
         "/agent/runs/{run_id}": "AgentResponse",
-        "/tuition/obligations": "TuitionObligation",
-        "/tuition/obligations/{id}": "TuitionObligation",
+        "/tuition/obligations": "TuitionObligationDetail",
+        "/tuition/obligations/{id}": "TuitionObligationDetail",
+        "/tuition/obligations/{id}/recheck": "TuitionObligationDetail",
         "/quotes": "FxQuote",
         "/payment-intents": "IntentCreated",
-        "/payment-intents/{id}": "PaymentIntent",
+        "/payment-intents/{id}": "PaymentIntentView",
         "/payment-intents/{id}/approval-requests": "ApprovalRequest",
-        "/sponsor/approvals": "Approval",
+        "/sponsor/approvals": "ApprovalView",
+        "/student/approvals": "ApprovalView",
+        "/student/approvals/{id}/decision": "SponsorDecisionResult",
+        "/sponsor/mandates": "MandateView",
+        "/sponsor/mandates/{id}": "MandateView",
         "/sponsor/approvals/{id}/decision": "SponsorDecisionResult",
         "/payment-intents/{id}/execute": "ExecutionResult",
-        "/payment-intents/{id}/cancel": "PaymentIntent",
+        "/payment-intents/{id}/cancel": "PaymentIntentView",
+        "/payment-intents/{id}/revisions": "IntentCreated",
+        "/documents": "UntrustedDocument",
         "/transfers/{id}": "PaymentResult",
+        "/transfers/{id}/recheck": "PaymentResult",
+        "/audit": "AuditEntry",
+        "/demo/scenarios": "ScenarioInfo",
+        "/demo/reset": "ResetResult",
+        "/demo/university/tick": "TickResult",
+        "/demo/audit": "AuditEntry",
         "/reconciliations/{id}": "ReconciliationCase",
         "/reconciliations": "CaseCreated",
         "/reconciliations/{id}/submit": "ReconciliationCase",
@@ -72,11 +119,30 @@ def contract_schema() -> dict[str, Any]:
         "/agent/messages": "AgentMessage",
         "/payment-intents": "IntentProposal",
         "/sponsor/approvals/{id}/decision": "SponsorDecisionRequest",
+        "/student/approvals/{id}/decision": "SponsorDecisionRequest",
+        "/sponsor/mandates": "MandateRequest",
+        "/sponsor/mandates/{id}": "MandateRequest",
         "/reconciliations": "CaseSubmission",
+        "/payment-intents/{id}/execute": "ExecuteRequest",
+        "/payment-intents/{id}/revisions": "IntentProposal",
+        "/demo/documents": "DocumentInjectRequest",
+        "/demo/reset": "ResetRequest",
+        "/demo/clock/advance": "AdvanceClockRequest",
+        "/demo/faults": "FaultRequest",
         "/auth/login": "LoginRequest",
         "/student/sharing-consents/{sponsor_id}": "ConsentRequest",
     }
-    arrays = {"/tuition/obligations", "/quotes", "/sponsor/approvals"}
+    arrays = {
+        "/tuition/obligations",
+        "/quotes",
+        "/sponsor/approvals",
+        "/audit",
+        "/documents",
+        "/demo/scenarios",
+        "/demo/audit",
+        "/student/approvals",
+        "/sponsor/mandates",
+    }
     paths: dict[str, Any] = {}
     for method, full_path in http.HTTP_ENDPOINTS:
         path = full_path.removeprefix("/api/v1")
@@ -84,14 +150,14 @@ def contract_schema() -> dict[str, Any]:
         result: dict[str, Any] = (
             {"$ref": f"#/components/schemas/{model_name}"} if model_name else {"type": "object"}
         )
-        if path in arrays:
+        if path in arrays and method == "GET":
             result = {"type": "array", "items": result}
         operation_name = path.strip("/").replace("/", "_").replace("{", "").replace("}", "")
         operation: dict[str, Any] = {
             "operationId": f"{method.lower()}_{operation_name}",
             "security": [{"Session": []}],
             "x-owner": "A" if path.startswith("/agent") else "B/C",
-            "x-implementation": "catalogue-only",
+            "x-implementation": "implemented" if _finance_implemented(path) else "catalogue-only",
             "responses": {
                 "200": {
                     "description": "Scoped response",
@@ -103,11 +169,19 @@ def contract_schema() -> dict[str, Any]:
             },
         }
         is_auth = path.startswith(("/auth/", "/student/sharing-consents/"))
-        if is_auth:
+        if _finance_implemented(path):
+            operation["x-owner"] = "C"
+        is_authority = path.startswith(
+            ("/sponsor/approvals", "/student/approvals", "/sponsor/mandates")
+        ) or path.endswith("/approval-requests")
+        if is_auth or is_authority:
             operation["x-owner"] = "B"
             operation["x-implementation"] = "implemented"
             operation["responses"]["403"] = {"description": "Trusted origin required"}
             operation["responses"]["422"] = {"description": "Invalid request (sanitized)"}
+        if is_authority:
+            operation["x-implementation"] = "implemented-requires-finance"
+            operation["responses"]["409"] = {"description": "Authority is stale or conflicting"}
         if path == "/auth/login":
             operation["security"] = []
             operation["responses"]["429"] = {"description": "Login attempt limit reached"}
@@ -129,7 +203,7 @@ def contract_schema() -> dict[str, Any]:
                     "schema": {"type": "string", "minLength": 1},
                 }
             )
-        if is_auth and method != "GET":
+        if (is_auth or is_authority) and method != "GET":
             parameters.append(
                 {
                     "name": "Origin",
@@ -142,7 +216,7 @@ def contract_schema() -> dict[str, Any]:
             operation["parameters"] = parameters
         if method in {"POST", "PUT"} and path in requests:
             operation["requestBody"] = {
-                "required": True,
+                "required": not path.endswith("/execute"),
                 "content": {
                     "application/json": {
                         "schema": {"$ref": f"#/components/schemas/{requests[path]}"}

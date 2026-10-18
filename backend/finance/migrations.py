@@ -5,7 +5,14 @@ from pathlib import Path
 
 from backend.authz.storage import Database, migrate
 
-FINANCE_MIGRATIONS = ("010_audit_events", "011_finance_core", "012_university")
+FINANCE_MIGRATIONS = (
+    "010_audit_events",
+    "011_finance_core",
+    "012_university",
+    "013_provider",
+    "014_reconciliation",
+    "015_demo_readiness",
+)
 MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "migrations"
 FINANCE_MIGRATION_LOCK = 714202603
 
