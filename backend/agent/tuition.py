@@ -280,6 +280,7 @@ class TuitionPlanner:
         )
         events.append(ToolEvent(tool="get_trusted_beneficiary", status="OK"))
         events.append(ToolEvent(tool="build_tuition_preview", status="OK"))
+        draft = draft.model_copy(update={"beneficiary_id": beneficiary.id})
         approval = (
             "Funding-owner approval is required before execution."
             if permission.approval_required

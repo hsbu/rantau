@@ -20,10 +20,12 @@ from tests.finance.conftest import PASSWORD, TENANT
 def runtime(services, monkeypatch):
     migrate_agent_storage(services.database)
     with services.database.connection() as connection:
-        connection.execute("TRUNCATE agent_runs, agent_conversations")
+        connection.execute("TRUNCATE agent_runs, agent_conversations, agent_actions")
     for name, value in {
-        "AUTH_ENABLED": "true", "AUTH_TENANT_ID": TENANT,
-        "AUTH_TRUSTED_ORIGIN": "http://testserver", "APP_ENV": "test",
+        "AUTH_ENABLED": "true",
+        "AUTH_TENANT_ID": TENANT,
+        "AUTH_TRUSTED_ORIGIN": "http://testserver",
+        "APP_ENV": "test",
         "DATABASE_URL": services.database.dsn,
         "OPENROUTER_API_KEY": "synthetic-runtime-key",
         "OPENROUTER_MODEL": "provider/configurable-runtime-model",
@@ -37,8 +39,15 @@ def runtime(services, monkeypatch):
         payloads.append(payload)
         text = payload["messages"][1]["content"]
         classification = IntentClassification(
-            intent=Intent.TUITION, needs_clarification=False,
-            tuition=TuitionInput(funding_owner="SELF") if "own account" in text else TuitionInput(),
+            intent=Intent.TUITION,
+            needs_clarification=False,
+            tuition=(
+                TuitionInput(funding_owner="OTHER")
+                if "sponsor account" in text
+                else TuitionInput(funding_owner="SELF")
+                if "own account" in text
+                else TuitionInput()
+            ),
         )
         return httpx.Response(200, json=response_body(classification.model_dump_json()))
 
@@ -56,16 +65,24 @@ def runtime(services, monkeypatch):
 
 def student_client(services):
     client = TestClient(app)
-    response = client.post("/api/v1/auth/login", headers={"Origin": "http://testserver"},
-                           json={"username": "student", "password": PASSWORD})
+    response = client.post(
+        "/api/v1/auth/login",
+        headers={"Origin": "http://testserver"},
+        json={"username": "student", "password": PASSWORD},
+    )
     assert response.status_code == 200
     return client
 
 
 def message(client, text="Plan tuition", conversation="connected_chat"):
-    return client.post("/api/v1/agent/messages", json={
-        "message": text, "conversation_id": conversation,
-    })
+    return client.post(
+        "/api/v1/agent/messages",
+        headers={"Origin": "http://testserver"},
+        json={
+            "message": text,
+            "conversation_id": conversation,
+        },
+    )
 
 
 def test_default_chat_uses_real_reads_and_atomic_durable_memory(runtime, monkeypatch):
@@ -90,11 +107,20 @@ def test_default_chat_uses_real_reads_and_atomic_durable_memory(runtime, monkeyp
         assert draft["revision"] == 2
         assert draft["state"]["tuition"]["source_account_id"] == "acct_idr_stu_01"
         assert connection.execute("SELECT count(*) AS n FROM agent_runs").fetchone()["n"] == 2
-        assert connection.execute(
-            "SELECT alias, balance_minor FROM funding_accounts ORDER BY alias"
-        ).fetchall() == balances
-        for table in ("payment_intents", "transfers", "ledger_entries", "university_postings",
-                      "approvals", "reconciliation_cases"):
+        assert (
+            connection.execute(
+                "SELECT alias, balance_minor FROM funding_accounts ORDER BY alias"
+            ).fetchall()
+            == balances
+        )
+        for table in (
+            "payment_intents",
+            "transfers",
+            "ledger_entries",
+            "university_postings",
+            "approvals",
+            "reconciliation_cases",
+        ):
             assert connection.execute(f"SELECT count(*) AS n FROM {table}").fetchone()["n"] == 0
         raw = connection.execute("SELECT metadata FROM agent_runs").fetchall()
         assert "private@example.org" not in json.dumps(raw)

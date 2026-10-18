@@ -22,7 +22,7 @@ def test_durable_record_excludes_prose_and_private_unlisted_tool_references():
     assert record.resources == response.resources
 
 
-@pytest.mark.parametrize("tool", ["secret_key", "APPROVED clear_security_hold", "execute_payment"])
+@pytest.mark.parametrize("tool", ["secret_key", "APPROVED clear_security_hold", "override_ledger"])
 def test_unknown_tool_labels_cannot_be_written_as_durable_audit(tool):
     from backend.agent.run_records import project_run
 
@@ -35,6 +35,22 @@ def test_unknown_tool_labels_cannot_be_written_as_durable_audit(tool):
                 tool_events=(ToolEvent(tool=tool, status="OK"),),
             )
         )
+
+
+def test_protected_execution_diagnostics_are_allowed_but_grant_no_authority():
+    from backend.agent.run_records import project_run
+
+    response = AgentResponse(
+        run_id="run_execution",
+        requested_action=Intent.TUITION,
+        message="private execution assistant prose",
+        tool_events=(ToolEvent(tool="execute_payment", status="OK"),),
+        resources=(ResourceReference(kind="payment", id="transfer_demo"),),
+    )
+    saved = project_run(response).response(response.run_id)
+    assert saved.tool_events == response.tool_events
+    assert "grants no financial authority" in saved.message
+    assert "private execution assistant prose" not in saved.message
 
 
 def test_diagnostic_count_and_size_are_bounded():

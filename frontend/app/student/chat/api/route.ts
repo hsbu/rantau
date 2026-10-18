@@ -35,7 +35,10 @@ export async function POST(request: Request) {
       || upstream.pathname !== "/" || upstream.search || upstream.hash) return failure(503);
     const response = await fetch(new URL("/api/v1/agent/messages", upstream), {
       method: "POST", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(25000),
-      headers: { "Content-Type": "application/json", Cookie: request.headers.get("cookie") ?? "" },
+      headers: {
+        "Content-Type": "application/json", Cookie: request.headers.get("cookie") ?? "",
+        Origin: request.headers.get("origin") ?? "",
+      },
       body: JSON.stringify(body),
     });
     if (!response.ok) return failure([401, 403, 404, 422, 503].includes(response.status) ? response.status : 502);

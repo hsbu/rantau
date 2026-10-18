@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from backend.agent.graph import AgentGraph
 from backend.contracts.http import AgentMessage, AgentResponse
 from backend.contracts.models import ActorContext, ScopeDenied, ServiceUnavailable
-from backend.dependencies import verified_actor
+from backend.dependencies import auth_settings, verified_actor
 
 
 class RunRepository(Protocol):
@@ -27,9 +27,18 @@ class AgentServices:
 
 
 async def agent_services(request: Request) -> AsyncIterator[AgentServices]:
+    from backend.agent.actions import action_command
     from backend.agent.wiring import configured_agent_services
 
-    async with configured_agent_services(require_classifier=request.method == "POST") as services:
+    require_classifier = request.method == "POST"
+    if require_classifier:
+        try:
+            body = await request.json()
+        except ValueError:
+            body = None
+        if isinstance(body, dict) and isinstance(body.get("message"), str):
+            require_classifier = action_command(body["message"]) is None
+    async with configured_agent_services(require_classifier=require_classifier) as services:
         yield services
 
 
@@ -39,7 +48,13 @@ router = APIRouter(prefix="/api/v1/agent", tags=["agent"])
 
 
 @router.post("/messages", response_model=AgentResponse)
-async def message(body: AgentMessage, actor: Actor, services: Services) -> AgentResponse:
+async def message(
+    body: AgentMessage, actor: Actor, services: Services, request: Request
+) -> AgentResponse:
+    if services.graph.actions is not None and (
+        request.headers.get("origin") != auth_settings().auth_trusted_origin
+    ):
+        raise HTTPException(403, detail={"code": "UNTRUSTED_ORIGIN"})
     try:
         result = await services.graph.run(body.message, actor, body.conversation_id)
         await services.runs.put(result, actor)

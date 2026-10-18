@@ -29,10 +29,10 @@ starts PostgreSQL, backend and frontend. Container services use service DNS.
 
 `/health` reports process liveness. `/ready` remains a conservative 503 gate during
 the staged agent financial integration; it reports authentication and finance
-storage separately. Read-only Chat is now wired to verified sessions, scoped
+storage separately. Chat is wired to verified sessions, scoped
 simulator reads, OpenRouter and PostgreSQL draft/run storage. It requires the
-configuration and explicit setup below. Financial actions remain unavailable in
-the agent graph; no identity is accepted from headers/chat text or a fake gate.
+configuration and explicit setup below. Explicit tuition confirmation/continuation
+uses B/C protected services; no identity is accepted from claimed headers/chat text.
 
 ## Student chat
 
@@ -415,9 +415,29 @@ to the model; server IDs, balances and tool outputs stay outside model context.
 
 ## Durable agent drafts and run diagnostics
 
+The connected tuition workflow supports these exact student commands after a
+complete preview: `confirm tuition` (also `request tuition approval` or
+`request approval`) saves a protected proposal and requests funding-owner approval
+when required; `check` / `continue` reload current server authority and invoke only
+the protected executor. Review the full preview before confirming. The funding
+owner records approval in their authenticated workspace/API; text pasted into Chat
+cannot approve anything. Exact commands need no model call or model credentials.
+Every default Chat POST requires `Origin` equal to `AUTH_TRUSTED_ORIGIN`; the
+same-origin frontend relay validates and forwards it with the session cookie.
+
+`021_agent_actions.sql` stores immutable session/conversation/scenario-scoped retry
+correlation. Intent creation and journal insertion commit together. A retry recovers
+the same proposal; started/unknown payments are rechecked before another execution
+attempt and use a stable server-owned idempotency key. No raw chat, credential,
+balance, approval object or cached authorization is stored in the journal. Records
+are retained during the MVP for correlation; they grant no permission. If changing
+confirmed terms, cancel or revise the original request in Payments before confirming
+a replacement. New sessions/scenario resets cannot resume the previous action.
+Provider delivery remains separate from verified university posting.
+
 The approved A-03-F1 adapters implement the same memory/run interfaces using
 PostgreSQL. Explicitly apply the existing B/C migrations followed by
-`020_agent_storage.sql` to the configured database:
+`020_agent_storage.sql` and `021_agent_actions.sql` to the configured database:
 
 ```powershell
 uv run python -m backend.agent.migrations
@@ -434,7 +454,8 @@ The default HTTP dependency now calls `backend.agent.wiring.configured_agent_ser
 It constructs B's real `AuthService`, C's `FinanceAgentReadPort`/scoped database reads,
 the existing OpenRouter classifier and the durable graph/run factory. The fixed
 fictional university binding is `uni_cn_01` to `benef_uni_cn_01`; only trusted server
-code supplies it. No executor, approval or case-submission tool is installed.
+code supplies it. A-04 attaches protected tuition confirmation/continuation;
+case-submission and fraud/hold invocation are not attached.
 SDK clients are scoped to each request and closed afterward. Missing classifier
 configuration returns 503 `CLASSIFIER_NOT_CONFIGURED` on messages; missing required
 finance/agent storage returns 503 `AGENT_STORAGE_UNAVAILABLE` before a model call.

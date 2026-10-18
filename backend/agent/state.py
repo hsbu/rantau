@@ -38,6 +38,7 @@ class TuitionDraft(Contract):
     obligation_id: Identifier | None = None
     source_account_id: Identifier | None = None
     quote_id: Identifier | None = None
+    beneficiary_id: Identifier | None = None
     requested_amount_minor: Minor | None = None
     route_preference: Literal["LOWEST_COST", "EARLIEST_DELIVERY"] = "LOWEST_COST"
     awaiting: Literal["OBLIGATION", "FUNDING", "QUOTE", "AMOUNT"] | None = None

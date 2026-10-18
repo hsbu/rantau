@@ -10,18 +10,23 @@ from backend.finance.migrations import migrate_all
 
 def migrate_agent_storage(database: Database) -> None:
     migrate_all(database)
-    raw = (Path(__file__).resolve().parents[2] / "migrations/020_agent_storage.sql").read_bytes()
+    for version in ("020_agent_storage", "021_agent_actions"):
+        _apply(database, version)
+
+
+def _apply(database: Database, version: str) -> None:
+    raw = (Path(__file__).resolve().parents[2] / "migrations" / f"{version}.sql").read_bytes()
     raw = raw.replace(b"\r\n", b"\n")
     checksum = hashlib.sha256(raw).hexdigest()
     with database.connection() as connection:
         connection.execute("SELECT pg_advisory_xact_lock(714202620)")
         previous = connection.execute(
-            "SELECT checksum FROM rantau_migrations WHERE version = '020_agent_storage'"
+            "SELECT checksum FROM rantau_migrations WHERE version = %s", (version,)
         ).fetchone()
         if previous is None:
             connection.execute(raw.decode("utf-8"))
             connection.execute(
-                "INSERT INTO rantau_migrations VALUES ('020_agent_storage', %s)", (checksum,)
+                "INSERT INTO rantau_migrations VALUES (%s, %s)", (version, checksum)
             )
         elif previous["checksum"] != checksum:
             raise ValueError("Applied agent migration checksum differs")

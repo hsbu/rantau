@@ -171,7 +171,7 @@ test("unavailable, malformed and expired-session responses fail visibly without 
   });
   await page.goto("/student/chat");
   await page.getByRole("button", { name: /Help me pay my tuition/ }).click();
-  await expect(page.getByRole("alert", { name: "Chat error" })).toContainText("not connected yet");
+  await expect(page.getByRole("alert", { name: "Chat error" })).toContainText("check its status in Payments before retrying");
   expect(calls).toBe(1);
   status = 200;
   await page.getByLabel("Message Rantau").fill("Try status");
@@ -193,7 +193,7 @@ test("server relay forwards only session cookie and bounded message; blocks clai
   expect(response.status()).toBe(200);
   expect(response.headers()["cache-control"]).toContain("no-store");
   const received = await (await request.get("http://127.0.0.1:8101/inspect")).json();
-  expect(received).toEqual({ body, cookie: "session=synthetic-test-only" });
+  expect(received).toEqual({ body, cookie: "session=synthetic-test-only", origin: headers.Origin });
   expect((await request.post("/student/chat/api", { headers, data: { ...body, actor_id: "forged" } })).status()).toBe(400);
   expect((await request.post("/student/chat/api", { headers: { Origin: "https://untrusted.example" }, data: body })).status()).toBe(403);
   const denied = await request.post("/student/chat/api", { headers, data: { ...body, message: "expired-session" } });
