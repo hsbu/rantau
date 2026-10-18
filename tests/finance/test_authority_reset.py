@@ -50,6 +50,17 @@ def insert_case(database, case_id="case_x"):
         )
 
 
+def insert_mandate(database):
+    with database.connection() as connection:
+        connection.execute(
+            "INSERT INTO mandates (mandate_id, tenant_id, owner_id, account_id, delegate_id,"
+            " beneficiary_id, revision, payload, source_label, beneficiary_label,"
+            " account_timezone) VALUES ('mand_x', %s, 'par_001', 'acct_idr_01', 'stu_001',"
+            " 'benef_student_01', 1, '{}', 'source', 'beneficiary', 'Asia/Jakarta')",
+            (TENANT,),
+        )
+
+
 def insert_consent(database):
     with database.connection() as connection:
         connection.execute(
@@ -77,6 +88,13 @@ def test_a_consumed_approval_stays_as_history(seeded):
     reset(seeded)
     assert rows(seeded, "SELECT state FROM approvals")[0]["state"] == "CONSUMED"
     assert rows(seeded, "SELECT 1 FROM authority_events") == []
+
+
+def test_a_current_mandate_is_revoked_and_the_revocation_audited(seeded):
+    insert_mandate(seeded)
+    reset(seeded)
+    assert rows(seeded, "SELECT revoked_at FROM mandates")[0]["revoked_at"]
+    assert rows(seeded, "SELECT action FROM authority_events")[0]["action"] == "MANDATE_REVOKED"
 
 
 def test_an_active_hold_does_not_leak_into_the_next_run(seeded):

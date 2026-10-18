@@ -61,3 +61,9 @@ def test_the_attack_flow_never_gets_an_approval_for_the_forged_payee(replay):
     report = replay.run("attack")
     assert any("Approval cannot even be requested" in step for step in report.steps)
     assert report.facts["approvals_consumed"] == 1
+
+
+def test_consumed_approvals_are_counted_for_the_current_run_only(replay):
+    replay.run("happy")
+    report = replay.run("hero")
+    assert report.facts["approvals_consumed"] == 1

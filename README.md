@@ -112,6 +112,12 @@ no password is supplied on its command line. Remove the two bootstrap passwords
 from local configuration after seeding; stored credentials use salted scrypt.
 Session tokens are random and only their SHA-256 digests are stored.
 
+To use the `/demo` controls in a browser, set `AUTH_DEMO_ADMIN_PASSWORD` (12–128
+characters) and run `uv run python -m backend.authz.bootstrap --seed-admin`. It adds only
+the `admin` user (`DEMO_ADMIN`, scope `demo:manage`, no payment or approval authority) to
+the existing tenant and refuses to overwrite one. Sign in with it through the sponsor
+sign-in form, then open `/demo`.
+
 The additive endpoints are:
 
 - `POST /api/v1/auth/login`: `{username, password}`; sets the host-only `session`
@@ -240,8 +246,9 @@ student continuation against the real backend were manually verified on
 2026-10-17; see B-04 in `docs/progress/progress-b.md` for database evidence.
 The complete agent-driven flow remains a separate check. Real-session HTTP tests also
 verify simulated T1 allowance execution, cumulative mandate limits, revocation,
-and current beneficiary ownership/purpose checks before debit. Admin provisioning and
-session/consent reset semantics are also separate coordinated work.
+and current beneficiary ownership/purpose checks before debit. Demo reset also revokes open approvals,
+mandates and consent, clears holds and resolves open cases (history is kept, sessions stay
+signed in); admin provisioning is `bootstrap --seed-admin`.
 
 `GET /api/v1/security-cases/{id}` returns a scoped `SecurityCaseView` with
 `case_id`, `resource_id`, `state`, `reason`, `created_at`, `updated_at` and
@@ -303,8 +310,9 @@ mutations through fixed-path same-origin handlers.
 1. Prepare the isolated database once (see the backend authentication section for
    bootstrap): `uv run python -m backend.authz.bootstrap --migrate --seed`, then
    `uv run python -m backend.demo.reset --migrate --scenario tuition_missing_reference`.
-2. Run the whole story without a browser. The sponsor's approval is **simulated** because
-   Dev B's approval store is not connected; the real gate, ledger, provider and university run:
+2. Run the whole story without a browser. The student and sponsor act through real
+   sessions (set both bootstrap passwords in the local `.env`); the sponsor's exact-terms
+   approval is a real owner decision that the executor consumes once:
 
    ```powershell
    uv run python -m backend.demo.replay --flow all

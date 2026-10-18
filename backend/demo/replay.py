@@ -175,7 +175,9 @@ class Replay:
                 ),
                 "postings": count("SELECT count(*) FROM university_postings"),
                 "approvals_consumed": count(
-                    "SELECT count(*) FROM approvals WHERE state = 'CONSUMED'"
+                    "SELECT count(*) FROM approvals a JOIN payment_intents i "
+                    "ON i.tenant_id = a.tenant_id AND i.alias = a.intent_id "
+                    "WHERE a.state = 'CONSUMED'"
                 ),
                 "audit_events_this_run": count(
                     "SELECT count(*) FROM audit_events a JOIN demo_state d "
