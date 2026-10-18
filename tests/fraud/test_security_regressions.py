@@ -4,9 +4,10 @@ Each test asserts stored state or deterministic rule output, never assistant tex
 SEC-03, SEC-08 and SEC-09 keep
 their existing real-session evidence in `tests/approvals/test_finance_integration.py`
 (cumulative mandate budget, superseded approval after revision, and the legitimate
-approved payment) and are not duplicated here. Agent-mediated cases stay blocked on
-Dev A's unwired agent surface, so this module proves only the reachable backend/HTTP
-authority boundary.
+approved payment) and are not duplicated here. This module proves the backend/HTTP authority
+boundary; `test_agent_assessment.py` separately covers default read-only Chat
+assessment. Agent financial actions and transaction-bound hold invocation remain
+separate integration work.
 """
 
 from pathlib import Path

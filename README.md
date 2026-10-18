@@ -173,6 +173,16 @@ the same account/obligation/intent locks as execution before touching security
 rows. `backend.fraud.finance_access.build_security_service` exposes this backend
 service for payment-intent resources; no public hold-clearing endpoint is added.
 
+The default Chat `VERIFY_MESSAGE` path uses B's `SecurityAgentReadPort` for
+advisory assessment. It rechecks the current student session before and after
+classification, combines bounded local cues with optional redacted OpenRouter
+signals, and falls back to local cues if semantic assessment is unavailable.
+It does not infer beneficiary legitimacy or create financial authority. With no
+signals, the result still requests verification with a trusted source. This
+message-only path does not place or release holds; transaction-bound hold
+integration remains separate. Request-scoped classifier clients are closed when
+the request completes.
+
 `backend.approvals.service.ApprovalService` persists B-03's owner requests,
 decisions and allowance mandates in PostgreSQL. `APPROVAL_TTL_SECONDS` defaults
 to 600 (valid range 1–3600); approval expiry is also capped by quote expiry.
