@@ -181,6 +181,7 @@ HTTP_ENDPOINTS = (
     ("POST", "/api/v1/payment-intents/{id}/revisions"),
     ("GET", "/api/v1/demo/audit"),
     ("POST", "/api/v1/tuition/obligations/{id}/recheck"),
+    ("GET", "/api/v1/tuition/obligations/{id}/payment-options"),
     ("POST", "/api/v1/transfers/{id}/recheck"),
     ("POST", "/api/v1/auth/login"),
     ("GET", "/api/v1/auth/session"),

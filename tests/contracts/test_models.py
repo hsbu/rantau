@@ -74,7 +74,7 @@ def test_tool_response_must_be_success_or_error():
 
 
 def test_catalogue_preserves_mvp_paths():
-    assert len(HTTP_ENDPOINTS) == 42  # Combined authority, security-case and finance catalogue.
+    assert len(HTTP_ENDPOINTS) == 43  # Combined authority, security-case and finance catalogue.
     assert ("POST", "/api/v1/sponsor/approvals/{id}/decision") in HTTP_ENDPOINTS
     assert ("POST", "/api/v1/payment-intents/{id}/execute") in HTTP_ENDPOINTS
     assert ("GET", "/api/v1/security-cases") in HTTP_ENDPOINTS

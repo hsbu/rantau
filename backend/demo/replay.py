@@ -1,68 +1,38 @@
 """Deterministic walkthrough of the demo flows against the real services.
 
-The sponsor's approval is SIMULATED here (Dev B's approval store is not connected). This tool
-runs only in development/test and is never wired into the application.
+Student and sponsor act through real sessions: the sponsor's approval is an exact-terms owner
+decision that the protected executor consumes once. Development/test only; never wired into
+the application.
 """
 
 import argparse
 from dataclasses import dataclass, field
-from datetime import timedelta
 
-from backend.authz.policy_models import MandateSnapshot
-from backend.authz.policy_repository import PolicyConnection
+from backend.approvals.finance_authority import StoredAuthority
+from backend.approvals.service import ApprovalConflict, ApprovalService
+from backend.approvals.wiring import build_approval_service
 from backend.authz.service import AuthService
 from backend.authz.storage import Database
 from backend.config import Settings
-from backend.contracts.enums import ApprovalState, Tier
 from backend.contracts.models import (
     ActorContext,
-    Approval,
     CaseSubmission,
     IntentProposal,
     PaymentIntent,
-    PaymentTerms,
+    ScopeDenied,
+    ServiceUnavailable,
 )
 from backend.demo.reset import DEMO_ENVIRONMENTS, reset_demo_fixture
 from backend.demo.scenarios import BENEFICIARY_ALIAS, OBLIGATION_ALIAS
-from backend.finance.authority import HoldState
-from backend.finance.clock import db_now
 from backend.finance.migrations import migrate_all
 from backend.finance.outcomes import Created, Executed, Refused
 from backend.finance.simclock import advance_sim_clock
 from backend.finance.wiring import FinanceServices, build_services
 from backend.university.ledger import settle_due
 
-SIMULATED_APPROVAL_NOTE = "Sponsor approval is SIMULATED (Dev B approval store not connected)."
 UNVERIFIED_PAYEE = "benef_unverified_01"
 POSTING_HOURS = 25
 FLOWS = ("happy", "hero", "attack")
-
-
-class SimulatedSponsorApproval:
-    """Stands in for the sponsor's authenticated approval for replay and demos only."""
-
-    def __init__(self) -> None:
-        self.approved: set[str] = set()
-
-    def approval(self, connection: PolicyConnection, intent: PaymentIntent) -> Approval | None:
-        if intent.id not in self.approved:
-            return None
-        terms = {name: getattr(intent, name) for name in PaymentTerms.model_fields}
-        return Approval(
-            **terms,
-            id="approval_simulated",
-            approver_actor_id=intent.funding_owner_id,
-            expires_at=db_now(connection) + timedelta(minutes=10),
-            state=ApprovalState.APPROVED,
-        )
-
-    def mandate(
-        self, connection: PolicyConnection, intent: PaymentIntent
-    ) -> MandateSnapshot | None:
-        return None
-
-    def hold(self, connection: PolicyConnection, intent: PaymentIntent) -> HoldState:
-        return HoldState(held=False, risk_floor=Tier.T0)
 
 
 @dataclass
@@ -78,8 +48,9 @@ class Report:
 @dataclass
 class Replay:
     services: FinanceServices
-    approvals: SimulatedSponsorApproval
+    approvals: ApprovalService
     student: ActorContext
+    sponsor: ActorContext
     tenant_id: str
 
     def run(self, flow: str) -> Report:
@@ -136,7 +107,7 @@ class Replay:
         report.step(
             f"Forged payee intent: {forged.intent.state.value} ({forged.decision.reason_code})"
         )
-        self._authorize(forged.intent.id)
+        report.step(self._approval_outcome(forged.intent))
         blocked = self.services.executor.execute(self.student, forged.intent.id, "replay-forged")
         assert isinstance(blocked, Refused)
         report.step(f"Execution of the forged payee: refused ({blocked.reason_code.value})")
@@ -146,7 +117,6 @@ class Replay:
 
     def _reset(self, report: Report, scenario: str) -> None:
         run_no = reset_demo_fixture(self.services.database, self.tenant_id, scenario)
-        self.approvals.approved.clear()
         report.step(f"Reset scenario {scenario} (run {run_no})")
 
     def _proposal(self, beneficiary: str = BENEFICIARY_ALIAS) -> IntentProposal:
@@ -162,22 +132,24 @@ class Replay:
     def _pay(self, report: Report, key: str = "replay-pay") -> Executed:
         created = self.services.intents.create(self.student, self._proposal())
         assert isinstance(created, Created)
-        report.step(f"Intent {created.intent.state.value}: sponsor approval required")
-        self._authorize(created.intent.id)
-        report.step(SIMULATED_APPROVAL_NOTE)
+        report.step(f"Intent {created.intent.state.value}: the funding owner must approve")
+        self._approve(created.intent)
+        report.step("Sponsor approved the exact terms in their own session")
         executed = self.services.executor.execute(self.student, created.intent.id, key)
         assert isinstance(executed, Executed)
         report.step(f"Provider status: {executed.transfer_state.value}")
         return executed
 
-    def _authorize(self, intent_alias: str) -> None:
-        self.approvals.approved.add(intent_alias)
-        with self.services.database.connection() as connection:
-            connection.execute(
-                "UPDATE payment_intents SET state = 'AUTHORIZED' "
-                "WHERE tenant_id = %s AND alias = %s AND state IN ('AWAITING_APPROVAL', 'ON_HOLD')",
-                (self.tenant_id, intent_alias),
-            )
+    def _approve(self, intent: PaymentIntent) -> None:
+        request = self.approvals.request(self.student, intent.id)
+        self.approvals.decide(self.sponsor, request.approval_id, "APPROVED", intent.terms_hash)
+
+    def _approval_outcome(self, intent: PaymentIntent) -> str:
+        try:
+            self.approvals.request(self.student, intent.id)
+        except (ApprovalConflict, ScopeDenied, ServiceUnavailable):
+            return "Approval cannot even be requested for the held payee"
+        return "Approval was requested; the executor still re-checks the hold"
 
     def _advance_and_tick(self, report: Report) -> None:
         with self.services.database.connection() as connection:
@@ -189,8 +161,7 @@ class Replay:
         return self.services.obligations.get(self.student, OBLIGATION_ALIAS).state.value
 
     def _facts(self, report: Report, executed: Executed) -> None:
-        db = self.services.database
-        with db.connection() as connection:
+        with self.services.database.connection() as connection:
 
             def count(sql: str) -> int:
                 row = connection.execute(sql).fetchone()
@@ -203,6 +174,9 @@ class Replay:
                     "SELECT count(*) FROM ledger_entries WHERE leg = 'DEBIT_FUNDING'"
                 ),
                 "postings": count("SELECT count(*) FROM university_postings"),
+                "approvals_consumed": count(
+                    "SELECT count(*) FROM approvals WHERE state = 'CONSUMED'"
+                ),
                 "audit_events_this_run": count(
                     "SELECT count(*) FROM audit_events a JOIN demo_state d "
                     "ON d.tenant_id = a.tenant_id AND d.run_no = a.run_no"
@@ -212,10 +186,11 @@ class Replay:
             }
 
 
-def build_replay(database: Database, auth: AuthService, student: ActorContext) -> Replay:
-    approvals = SimulatedSponsorApproval()
-    services = build_services(database, auth, approvals)
-    return Replay(services, approvals, student, student.tenant_id)
+def build_replay(
+    database: Database, auth: AuthService, student: ActorContext, sponsor: ActorContext
+) -> Replay:
+    services = build_services(database, auth, StoredAuthority(student.tenant_id))
+    return Replay(services, build_approval_service(auth), student, sponsor, student.tenant_id)
 
 
 def main() -> None:
@@ -225,15 +200,18 @@ def main() -> None:
     settings = Settings()
     if settings.app_env not in DEMO_ENVIRONMENTS or not settings.database_url:
         parser.error("Replay runs only in development/test with DATABASE_URL set")
-    if not settings.auth_demo_student_password:
-        parser.error("Configure AUTH_DEMO_STUDENT_PASSWORD (the bootstrap student password)")
+    if not (settings.auth_demo_student_password and settings.auth_demo_sponsor_password):
+        parser.error("Configure the bootstrap student and sponsor passwords in the local .env")
     database = Database(settings.database_url.get_secret_value())
     migrate_all(database)
     auth = AuthService(database, settings.auth_tenant_id)
     student = auth.login(
         "student", settings.auth_demo_student_password.get_secret_value(), "replay"
     ).actor
-    replay = build_replay(database, auth, student)
+    sponsor = auth.login(
+        "sponsor", settings.auth_demo_sponsor_password.get_secret_value(), "replay"
+    ).actor
+    replay = build_replay(database, auth, student, sponsor)
     print("SIMULATED DEMO: no real money, bank or university is involved.")
     for flow in FLOWS if args.flow == "all" else (args.flow,):
         report = replay.run(flow)

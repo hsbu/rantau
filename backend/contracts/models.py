@@ -97,6 +97,23 @@ class TuitionObligation(Contract):
         return self
 
 
+class FundingAccountOption(Contract):
+    """An account the requester may propose a payment from; only a masked label."""
+
+    id: Identifier
+    label: str
+    funded_by_requester: bool
+
+
+class PaymentOptions(Contract):
+    """What a student may choose when starting a payment; the server re-validates all of it."""
+
+    obligation_id: Identifier
+    accounts: tuple[FundingAccountOption, ...]
+    beneficiary_id: Identifier
+    beneficiary_label: str
+
+
 class ProviderStatusRef(Contract):
     """Provider delivery is reported separately from the university's posted balance."""
 
@@ -202,6 +219,7 @@ class PaymentIntentView(Contract):
     terms_hash: str
     beneficiary_label: str
     funded_by_requester: bool
+    hold_reason: ReasonCode | None = None
 
 
 class UntrustedDocument(Contract):

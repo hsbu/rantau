@@ -11,7 +11,8 @@ TOTAL = 46_025_000
 @pytest.fixture
 def replay(services):
     student = services.auth.login("student", PASSWORD, "replay-tests").actor
-    return build_replay(services.database, services.auth, student)
+    sponsor = services.auth.login("sponsor", PASSWORD, "replay-tests").actor
+    return build_replay(services.database, services.auth, student, sponsor)
 
 
 def test_happy_path_ends_paid_only_after_the_university_posts(replay):
@@ -24,6 +25,7 @@ def test_happy_path_ends_paid_only_after_the_university_posts(replay):
         1,
         1,
     )
+    assert report.facts["approvals_consumed"] == 1
     assert any("AWAITING_POSTING" in step for step in report.steps)
     assert any("ON_HOLD" in step for step in report.steps)
 
@@ -53,3 +55,9 @@ def test_replays_are_repeatable_from_a_clean_reset(replay):
     for flow in FLOWS:
         assert first[flow]["tuition_state"] == second[flow]["tuition_state"]
         assert first[flow]["transfers"] == second[flow]["transfers"]
+
+
+def test_the_attack_flow_never_gets_an_approval_for_the_forged_payee(replay):
+    report = replay.run("attack")
+    assert any("Approval cannot even be requested" in step for step in report.steps)
+    assert report.facts["approvals_consumed"] == 1
