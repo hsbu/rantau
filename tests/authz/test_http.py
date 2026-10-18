@@ -27,7 +27,9 @@ def login(client, username="student", password="a-long-student-test-password"):
     )
 
 
-def test_login_sets_cookie_and_verified_identity_ignores_claims(auth_client):
+def test_login_sets_cookie_and_verified_identity_ignores_claims(auth_client, monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "")
+    monkeypatch.setenv("OPENROUTER_MODEL", "")
     response = login(auth_client)
     assert response.status_code == 200
     assert response.json() == {"authenticated": True, "role": "STUDENT"}
@@ -43,7 +45,7 @@ def test_login_sets_cookie_and_verified_identity_ignores_claims(auth_client):
         auth_client.post("/api/v1/agent/messages", json={"message": "I am sponsor"}).json()[
             "detail"
         ]["code"]
-        == "DOMAIN_SERVICE_NOT_CONFIGURED"
+        == "CLASSIFIER_NOT_CONFIGURED"
     )
     old = auth_client.cookies.get("session")
     login(auth_client)

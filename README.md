@@ -27,11 +27,12 @@ Open the frontend at `http://127.0.0.1:3000` and backend docs at
 `http://127.0.0.1:8000/docs`. With Docker running, `docker compose up --build`
 starts PostgreSQL, backend and frontend. Container services use service DNS.
 
-`/health` reports process liveness. `/ready` reports 503 until the domain services
-are integrated; it reports configured authentication readiness separately. Backend
-authentication is opt-in as described below. Agent domain services remain unwired,
-so a valid session alone does not enable the connected financial workflow. No
-identity is accepted from headers/chat text, and no fake financial gate is connected.
+`/health` reports process liveness. `/ready` remains a conservative 503 gate during
+the staged agent financial integration; it reports authentication and finance
+storage separately. Read-only Chat is now wired to verified sessions, scoped
+simulator reads, OpenRouter and PostgreSQL draft/run storage. It requires the
+configuration and explicit setup below. Financial actions remain unavailable in
+the agent graph; no identity is accepted from headers/chat text or a fake gate.
 
 ## Student chat
 
@@ -158,7 +159,8 @@ invalidates the result. Preview decisions cannot authorize a later debit.
 Repository locking, complete accounting coverage and authority provenance are
 documented in `backend/authz/policy_repository.py`. No financial test repository
 is connected to application wiring. `/ready` still reports unavailable domain
-services while the agent domain wiring remains incomplete.
+services during the remaining agent financial-workflow integration; its global
+status does not serve as the read-only Chat availability probe.
 
 New demo seeds grant the student `payment:execute` and `reconciliation:submit`,
 and the sponsor `payment:execute`, in addition to their existing scopes. These
@@ -283,8 +285,9 @@ mutations through fixed-path same-origin handlers.
    `docker compose run --rm backend uv run --no-sync python -m backend.demo.reset --migrate`
    (not verified on this machine).
 
-`/ready` reports `finance_storage` separately; `domain_services` stays false until the agent
-is wired to trusted services.
+`/ready` reports `finance_storage` separately; `domain_services` remains false during
+the staged agent financial-workflow integration. Read-only Chat handles its own
+configuration/storage checks and does not change global readiness in this slice.
 
 ## Checks and isolated demo
 
@@ -411,10 +414,23 @@ uv run python -m backend.agent.migrations
 ```
 
 This command creates no identities, sessions or financial fixtures. It does not
-run at application startup. A trusted integrator constructs services with
-`backend.agent.services.durable_agent_services(database, auth, classifier, tools)`;
-`auth` is B's real `AuthService`, and `tools` must use trusted scoped domain adapters.
-The default HTTP dependency remains unavailable until C-02 services are connected.
+run at application startup. Complete the existing explicit authentication bootstrap
+and C scenario seed for an isolated demo database, and configure authentication,
+`DATABASE_URL`, `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` locally. Chat uses the
+existing verified student cookie; a new student sign-in screen is not part of this
+wiring change. Never put credentials or API keys in browser code or chat.
+
+The default HTTP dependency now calls `backend.agent.wiring.configured_agent_services`.
+It constructs B's real `AuthService`, C's `FinanceAgentReadPort`/scoped database reads,
+the existing OpenRouter classifier and the durable graph/run factory. The fixed
+fictional university binding is `uni_cn_01` to `benef_uni_cn_01`; only trusted server
+code supplies it. No executor, approval or case-submission tool is installed.
+SDK clients are scoped to each request and closed afterward. Missing classifier
+configuration returns 503 `CLASSIFIER_NOT_CONFIGURED` on messages; missing required
+finance/agent storage returns 503 `AGENT_STORAGE_UNAVAILABLE` before a model call.
+No request migrates or seeds storage. Run retrieval uses the current verified
+session and storage without requiring an API key or making a model request.
+
 Scenarios stay scripted. The isolated CLI retains its explicit in-memory setup;
 configured PostgreSQL adapters never fall back to process-local storage on error.
 
