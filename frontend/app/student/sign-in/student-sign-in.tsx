@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { CredentialsFields, validateCredentials, type FieldErrors } from "../../components/credentials-fields";
-import { WorkspaceHeader } from "../../components/workspace-header";
+import { StudentHeader } from "../../components/workspace-header";
 import uiStyles from "../../components/ui.module.css";
-import styles from "./student-sign-in.module.css";
+import { SignInLayout } from "../../components/sign-in-layout";
+import styles from "../../components/sign-in.module.css";
 
 type Mode = "checking" | "signed-out" | "student" | "other" | "unavailable";
 
@@ -77,17 +78,9 @@ export function StudentSignIn({ destination }: { destination: "/student/chat" | 
     finally { setBusy(false); }
   }
 
-  return <main id="main-content" tabIndex={-1} className={styles.page}>
-    <WorkspaceHeader label="Workspaces" links={[{ href: "/sponsor", label: "Sponsor workspace" }]} />
-    <div className={styles.layout}>
-      <div className={styles.intro}><p className="eyebrow">Student workspace</p>
-        <h1>A little closer<br />to home.</h1>
-        <p>Review what’s due, plan a payment and follow its progress with Rantau.</p>
-        <p className={styles.notice}>All payments, quotes and university records are simulated.</p>
-      </div>
-      <div className={styles.panel}>
-        <h2>Student sign-in</h2>
-        <p>Use the student credentials provided for this simulated environment.</p>
+  return <><StudentHeader current="account" />
+    <SignInLayout role="Student" title={<>A little closer<br />to home.</>}
+      description="Review what’s due, plan a payment and follow its progress with Rantau.">
         {error && <p id="signin-error" role="alert" className={styles.error}>{error}</p>}
         {mode === "checking" && <p role="status">Checking your session…</p>}
         {mode === "signed-out" && <form onSubmit={signIn} noValidate>
@@ -97,13 +90,12 @@ export function StudentSignIn({ destination }: { destination: "/student/chat" | 
         </form>}
         {mode === "student" && <><p>You’re signed in as a student.</p>
           <Link className={styles.primary} href={destination}>Continue to {destination.endsWith("payments") ? "Payments" : "Chat"} →</Link>
-          <button className={styles.secondary} onClick={() => void signOut()} disabled={busy}>Sign out</button></>}
+          <button className={`${uiStyles.button} ${uiStyles.secondary} ${styles.secondary}`} onClick={() => void signOut()} disabled={busy}>Sign out</button></>}
         {mode === "other" && <><p>This session belongs to another workspace. Sign out to use student credentials.</p>
-          <button onClick={() => void signOut()} disabled={busy}>Sign out</button></>}
+          <button className={uiStyles.button} onClick={() => void signOut()} disabled={busy}>Sign out</button></>}
         {mode === "unavailable" && <><p role="status">Your session could not be checked. No financial action was requested.</p>
-          <button onClick={() => window.location.reload()}>Check session again</button></>}
-        <Link className={styles.preview} href="/student/chat/preview">Explore scenarios without signing in ↗</Link>
-      </div>
-    </div>
-  </main>;
+          <button className={uiStyles.button} onClick={() => window.location.reload()}>Check session again</button></>}
+        <div className={styles.links}><Link href="/student/chat/preview">Explore scenarios without signing in ↗</Link>
+        <Link href="/sponsor">Sponsor workspace →</Link></div>
+    </SignInLayout></>;
 }

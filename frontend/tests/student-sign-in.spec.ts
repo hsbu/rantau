@@ -43,11 +43,11 @@ test("failed login clears passwords, stays accessible on mobile and does not exp
   for (const password of ["wrong", "throttled"]) {
     await page.getByLabel("Password", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
     await expect(page.getByLabel("Password", { exact: true })).toHaveValue("");
     await expect(page.locator("body")).not.toContainText("private diagnostic");
   }
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.body.clientWidth)).toBe(true);
 });
 
 test("uncertain session does not automatically repeat login", async ({ page }) => {

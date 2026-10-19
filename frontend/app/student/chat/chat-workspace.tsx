@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Brand } from "../../components/workspace-header";
+import { StudentHeader } from "../../components/workspace-header";
 import { useEffect, useRef, useState } from "react";
 import { ActionPanel } from "./action-panel";
 import { ChatError, visibleText } from "./chat-types";
@@ -93,16 +93,7 @@ export function ChatWorkspace({ transport = connectedTransport, preview = false,
 
   const promptIndex = Math.min(messages.filter(message => message.role === "user").length, prompts.length - 1);
   return <div className={styles.workspace}>
-    <header className={styles.nav}>
-      <Brand />
-      <nav className={styles.viewTabs} aria-label="Chat views">
-        <Link href="/student/chat" className={styles.viewTab} aria-current={!preview ? "page" : undefined}>Chat</Link>
-        <Link href="/student/chat/preview" className={styles.viewTab} aria-current={preview ? "page" : undefined}>Scenarios</Link>
-      </nav>
-      {!preview && <nav className={styles.workspaceLinks} aria-label="Student workspace">
-        <Link href="/student/payments">Payments</Link><Link href="/student/sign-in">Sign in / account</Link>
-      </nav>}
-    </header>
+    <StudentHeader current={preview ? "scenarios" : "chat"} />
     <div className={styles.safetyBanner}>{preview
       ? <>Scenario preview · Scripted responses, no model calls, authentication or payment actions.</>
       : <>Sandbox · No real funds move in this workspace.</>}

@@ -2,9 +2,12 @@ import { dateTime } from "../student/chat/chat-types";
 import { SimulatedBanner, TableScroll } from "../student/payments/components";
 import { type Schema, financeGet } from "../student/payments/finance-api";
 import styles from "../student/payments/payments.module.css";
-import { pickLang, ui } from "../student/payments/status-labels";
+import { pickLang } from "../student/payments/status-labels";
 import { DemoControls } from "./controls";
 import Link from "next/link";
+import { PageHeading, WorkspaceState } from "../components/workspace-page";
+import pageStyles from "../components/workspace-page.module.css";
+import uiStyles from "../components/ui.module.css";
 import { WorkspaceHeader } from "../components/workspace-header";
 
 export const metadata = { title: "Demo controls | Rantau" };
@@ -22,22 +25,31 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
   const lang = pickLang((await searchParams).lang);
   const scenarios = await financeGet<Schema["ScenarioInfo"][]>("/api/v1/demo/scenarios");
   if (!scenarios.ok) {
-    return <main id="main-content" tabIndex={-1} lang={lang} className={styles.page}>
-      <WorkspaceHeader label="Demo workspace" links={[{ href: "/", label: "Home" }]} />
+    return <><WorkspaceHeader label="Demo workspace" links={[{ href: "/", label: "Home" }]} /><main id="main-content" tabIndex={-1} lang={lang} className={styles.page}>
+      <PageHeading eyebrow={lang === "id" ? "Ruang administrator" : "Administrator workspace"} title="Demo"
+        description={lang === "id" ? "Kelola skenario simulasi dalam ruang administrator." : "Manage simulated scenarios in the administrator workspace."} />
       <SimulatedBanner lang={lang} />
-      <h1>Demo</h1>
-      <p className={styles.notice} role="alert">
-        {scenarios.reason === "unavailable" ? ui.unavailable[lang] : adminOnly[lang]}
+      <WorkspaceState label="Demo access" title={scenarios.reason === "unavailable"
+        ? lang === "id" ? "Demo belum tersedia." : "Demo is unavailable."
+        : lang === "id" ? "Akses administrator diperlukan." : "Administrator access required."}>
+      <p role="alert">
+        {scenarios.reason === "unavailable"
+          ? lang === "id" ? "Kontrol demo belum tersedia. Perbarui status sebelum mengulangi tindakan skenario." : "Demo controls are unavailable right now. Refresh current status before repeating a scenario action."
+          : adminOnly[lang]}
       </p>
       <p>{lang === "id" ? "Akses demo disediakan oleh administrator Anda." : "Demo access is provided by your administrator."}</p>
-      <Link href="/">{lang === "id" ? "Kembali ke beranda" : "Return home"}</Link>
-    </main>;
+      <div className={pageStyles.stateActions}>
+        {scenarios.reason === "unavailable" && <Link className={uiStyles.button} href={`?lang=${lang}`}>{lang === "id" ? "Perbarui status" : "Refresh status"}</Link>}
+        <Link className={`${uiStyles.button} ${scenarios.reason === "unavailable" ? uiStyles.secondary : ""}`} href="/">{lang === "id" ? "Kembali ke beranda" : "Return home"}</Link>
+      </div>
+      </WorkspaceState>
+    </main></>;
   }
   const trail = await financeGet<Schema["AuditEntry"][]>("/api/v1/demo/audit");
-  return <main id="main-content" tabIndex={-1} lang={lang} className={styles.page}>
-    <WorkspaceHeader label="Demo workspace" links={[{ href: "/", label: "Home" }, { href: "/student/chat", label: "Student workspace" }]} />
+  return <><WorkspaceHeader label="Demo workspace" links={[{ href: "/", label: "Home" }, { href: "/student/chat", label: "Student workspace" }]} /><main id="main-content" tabIndex={-1} lang={lang} className={styles.page}>
+    <PageHeading eyebrow={lang === "id" ? "Ruang administrator" : "Administrator workspace"} title="Demo"
+      description={lang === "id" ? "Siapkan skenario, atur waktu simulasi, dan tinjau jejak audit sesi ini." : "Prepare a scenario, control simulated time and review the current run’s audit trail."} />
     <SimulatedBanner lang={lang} />
-    <h1>Demo</h1>
     <p className={styles.notice}>{controlsNote[lang]}</p>
     {trail.ok && trail.data.length > 0 && <p data-run={currentRun(trail.data)}>
       <strong>{runLabel[lang]}:</strong> {currentRun(trail.data)}
@@ -53,7 +65,7 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
         </tr>)}</tbody>
       </table></TableScroll>
     </section>
-  </main>;
+  </main></>;
 }
 
 function currentRun(entries: Schema["AuditEntry"][]): number {
