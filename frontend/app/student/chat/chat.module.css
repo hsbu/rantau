@@ -27,7 +27,7 @@
 .newChat { padding: 10px 13px; border: 1px solid var(--line); border-radius: 7px; background: transparent; font-size: 12px !important; white-space: nowrap; color: var(--ink); }
 .newChat:hover { background: var(--soft); }
 .newChat span { margin-left: 10px; }
-.messages { height: clamp(140px, calc(100dvh - 520px), 510px); overflow-y: auto; overscroll-behavior-y: auto; padding: 30px 2px; scrollbar-width: thin; scrollbar-color: var(--scrollbar) transparent; scrollbar-gutter: stable; }
+.messages { height: clamp(240px, calc(100dvh - 410px), 570px); overflow-y: auto; overscroll-behavior-y: auto; padding: 24px 2px; scrollbar-width: thin; scrollbar-color: var(--scrollbar) transparent; scrollbar-gutter: stable; }
 .welcome { max-width: 510px; padding: 17px 0; margin: auto; }
 .agentMark { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 28px; font-weight: 600; background: var(--mark-bg); color: var(--accent-ink); }
 .welcome h2 { font-size: 27px; letter-spacing: -.04em; font-weight: 500; margin: 22px 0 12px; }
@@ -104,10 +104,10 @@
 @media (max-width: 1050px) { .main { grid-template-columns: minmax(0, 1fr) 318px; } .conversation { padding: 0 25px; } .summary { padding: 36px 22px 24px; } .chatHeader { gap: 12px; } .chatHeader h1 { font-size: 28px; } }
 @media (max-width: 760px) {
   .safetyBanner { padding: 10px 18px; font-size: 10px; } .safetyBanner a { margin-left: 5px; }
-  .main { display: block; } .conversation { padding: 0 20px; border-right: 0; } .chatHeader { padding: 28px 0 23px; }
+  .main { display: block; } .conversation { padding: 0 20px; border-right: 0; } .chatHeader { padding: 20px 0 18px; }
   .chatHeader h1 { font-size: 27px; } .chatHeader p:last-child { font-size: 11px; } .kicker { font-size: 9px; margin-bottom: 12px; }
   .newChat { padding: 10px; font-size: 10px !important; } .newChat span { margin-left: 4px; }
-  .messages { height: clamp(120px, calc(100dvh - 640px), 390px); padding-top: 22px; } .welcome { padding-top: 8px; }
+  .messages { height: clamp(240px, calc(100dvh - 540px), 440px); padding-top: 22px; } .welcome { padding-top: 8px; }
   .detailsLink { display: flex; align-items: center; min-height: 44px; font-size: 13px; }
   .composer textarea, .previewControls select { font-size: 16px; }
   .workspace button { min-height: 44px; }

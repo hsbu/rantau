@@ -31,6 +31,12 @@ REPLIES = {
         "I can help with the payment side of university life: tuition, transfer tracking "
         "and payment problems."
     ),
+    "PRIVATE_DATA": (
+        "I can’t show another person’s balance, full bank details or credentials.\n\n"
+        "I can show the masked funding options you’re permitted to use and the details "
+        "of your own tuition request. The account owner can review private details "
+        "through their authenticated account."
+    ),
     "UNSUPPORTED_FINANCIAL_ACTION": (
         "I can help with supported tuition payments, but I can’t provide loans or investments, "
         "add a new recipient, grant approval or remove a security hold.\n\n"

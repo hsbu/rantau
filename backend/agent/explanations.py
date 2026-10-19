@@ -125,6 +125,9 @@ def explain_quotes(quotes: tuple[FxQuote, ...], destination: Money, now: datetim
 
 
 def explain_selected_quote(quote: FxQuote, index: int) -> str:
+    principal = format_money(
+        Money(currency=quote.source_currency, amount_minor=quote.source_principal_minor)
+    )
     total = format_money(
         Money(currency=quote.source_currency, amount_minor=quote.source_total_minor)
     )
@@ -134,9 +137,36 @@ def explain_selected_quote(quote: FxQuote, index: int) -> str:
     )
     return (
         f"**Selected: {route_label(quote, index)}**\n\n"
+        f"- Transfer amount: {principal}\n"
         f"- Total debit: **{total}** (includes {fee} fee)\n"
         f"- University receives: {destination}\n"
         f"- Rate (rounded): 1 IDR = {display_rate(quote.rate)} CNY\n"
         f"- Estimated arrival: {display_time(quote.estimated_delivery_at)}\n"
         f"- Quote expires: {display_time(quote.expires_at)}"
+    )
+
+
+def explain_cost_difference(selected: FxQuote, current: tuple[FxQuote, ...]) -> str:
+    """Compare the already validated same-amount routes without implying authority."""
+    if len(current) < 2:
+        return ""
+    lowest = min(current, key=lambda quote: quote.source_total_minor)
+    comparison = (
+        max(current, key=lambda quote: quote.source_total_minor)
+        if selected.source_total_minor == lowest.source_total_minor
+        else lowest
+    )
+    difference = selected.source_total_minor - comparison.source_total_minor
+    destination = format_money(
+        Money(
+            currency=selected.destination_currency, amount_minor=selected.destination_amount_minor
+        )
+    )
+    if difference == 0:
+        return f"\n\nThese routes have the same quoted total for the same {destination}."
+    amount = format_money(Money(currency=selected.source_currency, amount_minor=abs(difference)))
+    direction = "less than" if difference < 0 else "more than"
+    return (
+        f"\n\nThis costs {amount} {direction} "
+        f"{route_label(comparison, current.index(comparison) + 1)} for the same {destination}."
     )

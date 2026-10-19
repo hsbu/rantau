@@ -44,7 +44,9 @@ def runtime(services, monkeypatch):
             intent=Intent.TUITION,
             needs_clarification=False,
             tuition=(
-                TuitionInput(funding_owner="OTHER")
+                TuitionInput(information_only=True)
+                if "balance and deadline only" in text
+                else TuitionInput(funding_owner="OTHER")
                 if "sponsor account" in text
                 else TuitionInput(funding_owner="SELF")
                 if "own account" in text
@@ -104,7 +106,10 @@ def test_default_chat_uses_real_reads_and_atomic_durable_memory(runtime, monkeyp
     second = message(client, "Use my own account")
     assert second.status_code == 200, second.text
     assert "Selected:" in second.json()["message"]
-    assert "No payment has been requested or executed" in second.json()["message"]
+    assert (
+        "Reviewing this preview does not request or execute a payment"
+        in second.json()["message"]
+    )
     assert "Prior intent: TUITION" in payloads[1]["messages"][1]["content"]
     assert "private@example.org" not in json.dumps(payloads)
     assert all(p["model"] == "provider/configurable-runtime-model" for p in payloads)
@@ -137,6 +142,38 @@ def test_default_chat_uses_real_reads_and_atomic_durable_memory(runtime, monkeyp
     assert "Original chat text is not retained" in saved.json()["message"]
     assert len(payloads) == 2
     assert all(client.is_closed() for client in clients)
+
+
+@pytest.mark.parametrize("with_preview", [False, True])
+def test_balance_only_question_preserves_financial_records_and_existing_draft(
+    runtime, with_preview
+):
+    from tests.finance.test_agent_details import domain
+
+    services, _, _ = runtime
+    client = student_client(services)
+    if with_preview:
+        assert message(client, "Plan tuition from my own account").status_code == 200
+    before = domain(services.database)
+    response = message(client, "Show my tuition balance and deadline only")
+    assert response.status_code == 200
+    body = response.json()
+    assert "Tuition remaining: CNY 20,000.00" in body["message"]
+    assert "University credited: CNY 0.00" in body["message"]
+    assert "21 Nov 2026, 17:00 China time" in body["message"]
+    assert "Which funding account" not in body["message"]
+    assert "Selected:" not in body["message"]
+    assert "confirm tuition" not in body["message"]
+    assert [event["tool"] for event in body["tool_events"]] == ["get_tuition_obligation"]
+    after = domain(services.database)
+    for table in before.keys() - {"agent_conversations", "agent_runs"}:
+        assert after[table] == before[table], table
+    with services.database.connection() as connection:
+        state = connection.execute("SELECT state FROM agent_conversations").fetchone()["state"]
+        assert state["tuition"]["source_account_id"] == (
+            "acct_idr_stu_01" if with_preview else None
+        )
+        assert bool(state["tuition"]["quote_id"]) == with_preview
 
 
 @pytest.mark.parametrize("setting", ["OPENROUTER_API_KEY", "OPENROUTER_MODEL"])

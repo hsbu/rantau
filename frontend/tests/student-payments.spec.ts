@@ -251,5 +251,5 @@ test("the demo page states the current run and that its controls are simulator-o
   await context.addCookies([{ name: "admin", value: "ok", url: origin }]);
   await page.goto("/demo");
   await expect(page.getByText("These controls change the simulator only.", { exact: false })).toBeVisible();
-  await expect(page.locator("[data-run]")).toHaveAttribute("data-run", "1");
+  await expect(page.locator("[data-run]")).toHaveAttribute("data-run", "7");
 });

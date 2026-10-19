@@ -7,6 +7,7 @@ from decimal import Decimal
 from backend.agent.explanations import (
     comparable_quotes,
     display_time,
+    explain_cost_difference,
     explain_quotes,
     explain_selected_quote,
     explain_tuition_record,
@@ -58,14 +59,14 @@ class TuitionPlanner:
     async def plan(
         self, inputs: TuitionInput, draft: TuitionDraft, actor: ActorContext
     ) -> tuple[AgentResponse, TuitionDraft]:
-        if inputs.restart:
+        if inputs.restart and not inputs.information_only:
             draft = TuitionDraft()
         events: list[ToolEvent] = []
         resources: tuple[ResourceReference, ...] = ()
 
         def reply(text: str, updated: TuitionDraft) -> tuple[AgentResponse, TuitionDraft]:
             trace = tuple(events)
-            if updated.awaiting is not None:
+            if updated.awaiting is not None and not inputs.information_only:
                 trace += (ToolEvent(tool="clarify_tuition", status="PENDING"),)
             return (
                 AgentResponse(
@@ -110,6 +111,8 @@ class TuitionPlanner:
             draft = TuitionDraft(obligation_id=selected, obligation_options=ids)
         resources = (ResourceReference(kind="obligation", id=selected),)
         summary = explain_tuition_record(obligation) + "\n\n"
+        if inputs.information_only:
+            return reply(summary.rstrip(), draft)
         if obligation.state == TuitionState.PAID:
             return reply(summary + "No outstanding tuition balance; no payment is needed.", draft)
         if obligation.state != TuitionState.UNPAID:
@@ -128,6 +131,21 @@ class TuitionPlanner:
             events.append(ToolEvent(tool="get_university_payment_policy", status="PENDING"))
             return reply(summary + UNKNOWN_POLICY, draft.model_copy(update={"quote_id": None}))
         events.append(ToolEvent(tool="get_university_payment_policy", status="OK"))
+        if inputs.recipient_choice:
+            draft = draft.model_copy(
+                update={
+                    "recipient_blocked": inputs.recipient_choice == "DIFFERENT_RECIPIENT",
+                    "quote_id": None,
+                }
+            )
+        if draft.recipient_blocked:
+            return reply(
+                summary + "**Revised draft — recipient needs verification**\n\n"
+                "Requested change: a different recipient. This bill can only be paid to its "
+                "verified university recipient. No new account details are saved or used.\n\n"
+                "Say `use the verified university recipient` to restore that selection.",
+                draft.model_copy(update={"awaiting": "RECIPIENT", "quote_id": None}),
+            )
         amount = draft.requested_amount_minor
         if inputs.full_balance:
             amount = None
@@ -143,7 +161,12 @@ class TuitionPlanner:
             )
         if amount is not None and amount != obligation.balance_minor:
             return reply(
-                summary + "This payment needs to cover the full outstanding balance. "
+                summary
+                + "**Revised draft — amount needs correction**\n\n"
+                + "Requested amount: "
+                + format_money(Money(currency=Currency.CNY, amount_minor=amount))
+                + ".\n\n"
+                "This payment needs to cover the full outstanding balance. "
                 "Say `full balance`, or review the existing shortfall case in Payments.",
                 draft.model_copy(update={"awaiting": "AMOUNT", "quote_id": None}),
             )
@@ -257,7 +280,7 @@ class TuitionPlanner:
                 summary
                 + explain_quotes(quotes, destination, now)
                 + "\n\nI can’t verify the university recipient yet. "
-                "No payment has been requested or executed.",
+                "Reviewing this preview does not request or execute a payment.",
                 draft,
             )
         beneficiary = await self.port.beneficiary(beneficiary_id, actor)
@@ -292,7 +315,11 @@ class TuitionPlanner:
         events.append(ToolEvent(tool="build_tuition_preview", status="OK"))
         draft = draft.model_copy(update={"beneficiary_id": beneficiary.id})
         approval = (
-            "The funding owner will need to approve these exact terms before payment."
+            (
+                "You will need to approve these exact terms before payment."
+                if permission.owner_id == actor.actor_id
+                else "The funding owner will need to approve these exact terms before payment."
+            )
             if permission.approval_required
             else "Your funding permission will be checked again before payment."
         )
@@ -305,7 +332,10 @@ class TuitionPlanner:
         alternatives = [
             f"{index}. {route_label(other, index)}: "
             f"{format_money(Money(currency=Currency.IDR, amount_minor=other.source_total_minor))} "
-            f"total; estimated arrival {display_time(other.estimated_delivery_at)}."
+            f"total; fee: "
+            f"{format_money(Money(currency=Currency.IDR, amount_minor=other.fee_minor))}.\n"
+            f"Receives the same {format_money(destination)}; "
+            f"estimated arrival {display_time(other.estimated_delivery_at)}."
             for index, other in enumerate(current, 1)
             if other.id != quote.id
         ]
@@ -313,9 +343,10 @@ class TuitionPlanner:
         return reply(
             summary
             + explain_selected_quote(quote, current.index(quote) + 1)
+            + explain_cost_difference(quote, current)
             + other_routes
             + f"\n\nFunding: {funding_label}.\nRecipient: {payee}.\n\n"
             + approval
-            + " No payment has been requested or executed.",
+            + " Reviewing this preview does not request or execute a payment.",
             draft,
         )

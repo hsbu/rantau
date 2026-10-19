@@ -17,6 +17,7 @@ Option = Annotated[int, Field(strict=True, ge=1, le=100)]
 
 
 class TuitionInput(Contract):
+    information_only: bool = False
     obligation_option: Option | None = None
     funding_option: Option | None = None
     quote_option: Option | None = None
@@ -25,6 +26,7 @@ class TuitionInput(Contract):
     amount_unclear: bool = False
     full_balance: bool = False
     route_preference: Literal["LOWEST_COST", "EARLIEST_DELIVERY"] | None = None
+    recipient_choice: Literal["VERIFIED_UNIVERSITY", "DIFFERENT_RECIPIENT"] | None = None
     restart: bool = False
 
     @model_validator(mode="after")
@@ -41,7 +43,9 @@ class TuitionDraft(Contract):
     beneficiary_id: Identifier | None = None
     requested_amount_minor: Minor | None = None
     route_preference: Literal["LOWEST_COST", "EARLIEST_DELIVERY"] = "LOWEST_COST"
-    awaiting: Literal["OBLIGATION", "FUNDING", "QUOTE", "AMOUNT"] | None = None
+    recipient_blocked: bool = False
+    revision_pending: bool = False
+    awaiting: Literal["OBLIGATION", "FUNDING", "QUOTE", "AMOUNT", "RECIPIENT"] | None = None
     obligation_options: tuple[Identifier, ...] = ()
     funding_options: tuple[Identifier, ...] = ()
     quote_options: tuple[Identifier, ...] = ()

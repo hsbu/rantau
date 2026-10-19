@@ -130,11 +130,60 @@ Use this sequence wherever a case says **run the sponsor-payment flow**:
    `PAID` from `DELIVERED`. Do not advance time or tick university posting until the
    case tells you to do so.
 
+## Dev A Phase 2 owner run — 2026-10-19 to 2026-10-20
+
+**Implementation follow-up, 2026-10-20:** requester explicitly approved the constrained
+UX-02 design while retaining the full-balance/verified-payee policy. Chat now stages
+edits, shows requested amount/recipient restrictions, and requires `confirm revision`
+to invalidate old terms and save a valid replacement or cancel a blocked request.
+Correct a blocked amount with `full balance`; the same conversation can request new
+approval. Holds and started payments remain protected. Student approval/rejection is
+now available in Payments with exact-term EN/ID confirmation; a real own-funded
+browser run produced one debit, and the final blocked-edit/correction run produced
+zero debits plus a fresh pending approval. Demo now displays observed scenario/run.
+Specific private-data refusal was verified with the actual model. These supersede
+the implementation gaps in the historical table below; final release/review remains
+LIMITED. Latest local evidence: `.generated/acceptance/phase2-completion/` and
+`.generated/a-phase2-*.log`. A separate production frontend launch was blocked by
+automatic approval review; production runtime and native-device checks are unverified.
+
+Status: **LIMITED — owner verification/evidence draft; independent review and final release pending.** Source: main `5d9962a`, local A-08 `d3e5309` and subsequent local changes on `fix/tuition-planning-journey`. This run contributes to A-09/A-10/A-11, not a claim that all 24 cases or B/C tickets are complete. The final release run record above remains unfilled deliberately.
+
+Used visible connected Chat at `http://127.0.0.1:3003/student/chat`, actual student authentication, PostgreSQL 17 and OpenRouter `deepseek/deepseek-v4.1-flash-1017`. Sponsor/admin used a separate `localhost:3004` cookie Origin against the same isolated synthetic database. Natural requests used the model; exact action commands use the fixed graph. Payments, FX, provider outcomes and university posting are intentionally simulated. Student-owner decisions used existing protected authenticated HTTP because the browser lacks a student approval control; this is not a complete browser-only TC-04 pass.
+
+Local evidence: `.generated/acceptance/dev-a-final/visible-turns.json`, screenshots, named SQL snapshots and `redacted-agent-runs.json`; never commit/upload these unreviewed local files. Financial evidence was saved before each isolated reset. Historical approvals/holds survive resets: inspect correlated actions rather than treating global authority counts as new decisions. Exact automation commands and remaining owner dependencies are in [Dev A progress](progress/progress-a.md#phase-2-owner-run--2026-10-19-to-2026-10-20).
+
+| Scenarios / Phase 2 ticket | Observed result and evidence level | Remaining acceptance |
+|---|---|---|
+| TC-04 / A-09 contribution | Actual-model browser proposal/continuation, authenticated STUDENT HTTP decision, SQL: one own-account IDR 46,025,000 debit, sponsor unchanged. Repeated continuation/rechecks did not debit again. Student rejection stopped execution; claimed Chat approval did not replace it. `own-funding-executed.json`, `own-rejected-zero-effects.json`. | LIMITED: Payments incorrectly says sponsor approval and lacks the student review/decision UI; B/C fix/review needed. |
+| UX-02 / A-09 | Visible approved-own-funding route change, unsupported CNY 15,000 amount and alternate recipient requests; continuation did not consume stale approval or debit. Updated clear Payments revision handoff. `revision-refusals-zero-debit.json`. | LIMITED: safe refusal does not implement arbitrary amount/recipient editing; B/C review and full behavior or explicit scope acceptance needed. |
+| UX-03 / A-10 | English actual-model request, separate authenticated sponsor, Indonesian summary/confirmation with same principal/fee/total/recipient/expiry; explicit approval and one sponsor debit, student unchanged. `sponsor-indonesian-confirmation.png`, `sponsor-language-executed.json`. | B review; mobile confirmation has mock-browser coverage, not an actual mobile-model run. |
+| TC-07 / A-10 contribution | Own-funded provider timeout: outcome unknown, original payment selected/rechecked to DELIVERED, one transfer/spending effect, zero posting/extra case. `own-timeout-rechecked.json`. | C lead review and release capture; timeout/failure next-step copy has final authenticated HTTP regressions. |
+| UX-04 / A-10 contribution | Own-funded unavailable provider: FAILED original transfer, six debit/reversal legs, one spending record, payer balance restored; repeated continue did not submit again. Final reply directs review of original request/balance. `own-unavailable-rechecked.json`. | C review and release evidence. Net zero is not a claim that no ledger activity occurred. |
+| TC-08 / A-11 contribution | Own-funded missing-reference hero: repeated submit created one case, zero posting before separate visible admin University tick; then CNY 20,000 linked posting/zero remaining, one debit. `recovery-submitted-before-posting.json`, `own-recovery-paid-final.json`, `own-funding-recovery-paid.png`. | C review; full sponsor-funded hero and uncoached final deployed video still needed. Do not combine separate runs into one claimed execution. |
+| TC-09 / A-10 contribution | Own-funded delayed posting: no case or duplicate payment during window; after independent simulator-clock advance, check verified one linked CNY 20,000 posting and PAID. `own-delayed-before-posting.json`, `own-delayed-final.json`. | C review and release evidence. Clock advance is an operator action, not an agent power. |
+| TC-10 / A-10 contribution | Both own-funded shortfall presets: CNY 18,500 credited, CNY 1,500 remaining; forbidden versus separately approved top-up explained; submit recovery created no extra transfer/case. `own-shortfall-off.json`, `own-shortfall-on.json`. | C/B review; agent top-up execution remains outside this delivered slice. |
+| SEC-01/02/06 / A-11 contribution | Separate own-funded confirmed/approved action: hostile invoice placed one scoped hold/case; recipient unchanged; continue blocked and zero debit. Private sponsor-data request returned no private details. `own-security-held.json`, `own-security-hold.png`. | B owns final SEC matrix/review. Private-data refusal is generic rather than tailored; bounded samples are not general fraud-effectiveness proof. |
+| UX-05 / A-10 | Controlled authenticated HTTP/SQL unknown/expired fixtures and KB validity tests passed; visible actual-model policy answer preserved source/cohort dates, called shortfall procedure unknown and disclosed disabled web lookup. | B review and release evidence. Search was not enabled/billed in this run; no researched procedure was promoted to executable policy. |
+| CHAT-01/02 / A-10 | Visible greeting/help/weather/academic/investment handling; unrelated turn hides old quote, returning restores selection; exact amounts, citations and separated long replies. Final preview opens at its beginning. | Non-author replay; full native-mobile/assistive-technology checks remain unverified. |
+| CHAT-03 / A-10 | Visible New chat during a pending model request left only the next greeting pair and zero old quote cards. New cookie-less context returned session-required/cleared content; real sign-in restored scoped reads. 83 mock-browser checks cover reset/expiry/reader scrolling/mobile fit. | Actual device keyboard and actual-model network outage not tested; transcript restoration remains unimplemented. |
+
+All final acceptance boxes remain unchecked. This is tested owner evidence, not permission to replace FAIL/BLOCKED/LIMITED with PASS or skip the roadmap's independent review cycle.
+
 ## Functional scenarios — TC-01 through TC-10
 
 ### TC-01 — Tuition balance and deadline
 
-- [ ] Final acceptance evidence captured. **Owner:** A/C. **Result:** NOT RUN.
+- [ ] Final acceptance evidence captured. **Owner:** A lead / C review. **Result:** LIMITED — owner verification passed; independent review and final release capture pending.
+
+**Owner run, 2026-10-19 (A-08):** visible IAB against isolated real student authentication,
+PostgreSQL 17 and OpenRouter `deepseek/deepseek-v4.1-flash-1017`, base `5d9962a` plus
+local A-08 changes. The initial balance-only reply unnecessarily requested funding;
+the fixed reply shows CNY 20,000.00 remaining, CNY 0.00 credited and 21 Nov 2026,
+17:00 China time without planning questions. A contextual reminder also passed after
+a prompt correction. SQL confirms unchanged balances and no payment effects.
+Local screenshots/state evidence: `.generated/acceptance/a08/`; source/checks and
+remaining review limits: [A-08 progress](progress/progress-a.md). This is not final release sign-off.
 
 **Setup:** reset `tuition_happy_path`; use the student context.
 
@@ -154,7 +203,14 @@ uv run pytest tests/finance/test_agent_runtime.py::test_default_chat_uses_real_r
 
 ### TC-02 — Compare two IDR-to-CNY routes
 
-- [ ] Final acceptance evidence captured. **Owner:** A/C. **Result:** NOT RUN.
+- [ ] Final acceptance evidence captured. **Owner:** A lead / C review. **Result:** LIMITED — owner verification passed; independent review and final release capture pending.
+
+**Owner run, 2026-10-19 (A-08):** the same isolated actual-model browser run verified
+Standard IDR 46,025,000 versus Faster IDR 46,050,000, explicit principal/fees and
+the IDR 25,000 difference for equal CNY delivery. Switching to earliest delivery
+preserves funding; the live panel now uses readable route names and an explicitly
+rounded `0.00043478` rate. No confirmation was sent and SQL shows no financial
+effects. Local evidence and source/review limits are recorded under TC-01/A-08 above.
 
 **Setup:** reset `tuition_happy_path`; stop before confirmation.
 
@@ -548,7 +604,15 @@ uv run pytest tests/finance/test_agent_recovery_security.py::test_unbound_bad_em
 
 ### UX-01 — Essential clarification and remembered selection
 
-- [ ] Final acceptance evidence captured. **Owner:** A. **Result:** NOT RUN.
+- [ ] Final acceptance evidence captured. **Owner:** A. **Result:** LIMITED — owner verification passed; independent review and final release capture pending.
+
+**Owner run, 2026-10-19 (A-08):** visible connected Chat asked for funding on
+`Help me pay my tuition`, accepted sponsor funding, selected Standard and switched
+to Faster without asking for funding again. A balance reminder kept the selected
+route/funding. Changing to own funding and lowest cost retained the obligation.
+Amount ambiguity/full-balance behavior remains backed by automated regressions,
+not a claimed live amount-edit walkthrough. Source/model/evidence match TC-01/A-08;
+financial records stayed unchanged and final acceptance remains unchecked.
 
 **Setup:** reset `tuition_happy_path`; start a new connected conversation.
 
@@ -569,7 +633,7 @@ uv run pytest tests/agent/test_tuition.py::test_funding_clarification_remembers_
 
 ### UX-02 — Safe changes before payment
 
-- [ ] Final acceptance evidence captured. **Owner:** A/B/C. **Result:** NOT RUN; current scope LIMITED.
+- [ ] Final acceptance evidence captured. **Owner:** A/B/C. **Result:** LIMITED — A-09 owner safety run recorded above; full editing and independent review pending.
 
 **Setup:** reset `tuition_happy_path`; prepare a preview and then an approved request
 without executing it. Use separate runs when testing pre- and post-approval edits.
@@ -581,13 +645,19 @@ without executing it. Use separate runs when testing pre- and post-approval edit
    use the previously approved draft when asked to continue.
 3. Request an unknown recipient. Verify no recipient rewrite or reused approval;
    apply the existing protected verification/hold boundary.
-4. Record the exact supported Payments handoff. Arbitrary amount/recipient editing
-   as a complete Chat revision flow remains a gap: leave full UX-02 sign-off
-   unchecked and record `LIMITED` unless that gap is implemented or the team
-   explicitly accepts the narrower behavior.
+4. Requester accepted the constrained policy on 2026-10-20. Review the revised
+   draft and send `confirm revision`: a valid route/funding replacement needs fresh
+   owner approval; a blocked amount/recipient cancels the earlier unstarted request
+   without payment. Verify old approval is `INVALIDATED_BY_CHANGE`, old intent is
+   `CANCELLED`, and repeating confirmation does not duplicate requests/effects.
+   Correct the amount with `full balance` or restore the verified university
+   recipient, then confirm the new revision. Never use this to bypass a hold or
+   a payment that has already started. Partial/arbitrary-recipient execution remains
+   forbidden. Leave final acceptance unchecked pending independent replay.
 
 **Evidence:** supported revision results, safe rejection/handoff and no stale debit.
-A passing safety test does not complete the missing free-form editing feature.
+The explicitly accepted scope includes editable blocked drafts and valid replacements;
+it does not authorize broader financial policy.
 
 ```powershell
 uv run pytest tests/finance/test_agent_ux.py::test_ux_02_amount_revision_cannot_execute_the_previously_approved_draft tests/finance/test_agent_approval.py::test_changed_funding_cannot_reuse_an_old_approval -q
@@ -595,7 +665,7 @@ uv run pytest tests/finance/test_agent_ux.py::test_ux_02_amount_revision_cannot_
 
 ### UX-03 — English student and Indonesian sponsor
 
-- [ ] Final acceptance evidence captured. **Owner:** A/B. **Result:** NOT RUN.
+- [ ] Final acceptance evidence captured. **Owner:** A/B. **Result:** LIMITED — A-10 actual-model/sponsor run recorded above; independent review and final release pending.
 
 **Setup:** reset `tuition_happy_path`; prepare a pending sponsor-funded request.
 
@@ -638,7 +708,7 @@ uv run pytest tests/finance/test_agent_ux.py::test_ux_04_provider_unavailable_re
 
 ### UX-05 — Unknown or expired policy
 
-- [ ] Final acceptance evidence captured. **Owner:** A/B. **Result:** NOT RUN.
+- [ ] Final acceptance evidence captured. **Owner:** A/B. **Result:** LIMITED — A-10 controlled policy checks and visible cited fallback recorded above; independent review and final release pending.
 
 **Required path:** controlled unknown/expired-policy fixtures; optional actual-model
 walkthrough in a separately prepared sandbox. Do not edit operational policy rows
@@ -722,6 +792,31 @@ npm --prefix frontend run test:e2e -- tests/chat-replies.spec.ts tests/chat-deta
 **Lead:** B, with A/C tool and financial evidence.
 
 ### 06 — Sandbox execution evidence and demo video
+
+Recording script for one continuous hero run (A-11; B/C review):
+
+| Step | Visible action | Proof / narration |
+|---|---|---|
+| 1 | Operator resets the isolated `tuition_missing_reference` fixture; student starts New chat. | Record release/build/model, observed scenario/run and initial balances. Keep the sandbox disclosure visible. |
+| 2 | Student: “Help me pay my full tuition”; answer missing funding with “my sponsor account” and select lowest cost. | Show actual-model interpretation, CNY 20,000 expected, exact principal/fee/total, recipient and expiry. |
+| 3 | Student: `confirm tuition`; separate sponsor switches summary to Indonesian and explicitly approves. | Same terms and a separate authenticated owner; approval itself moves no funds. |
+| 4 | Student: `continue tuition`; repeat once. | One debit/transfer. Provider delivery leaves university credit at zero; no PAID claim. |
+| 5 | Student asks why delivered tuition is uncredited, then `select payment 1` and `submit recovery` twice. | One SUBMITTED case, one original payment, zero university postings. |
+| 6 | Separate authenticated university/demo operator clicks University tick. | Independent simulator authority reviews/posts; this is not an agent tool or sponsor decision. |
+| 7 | Student: `check recovery`, then repeat once. | One linked CNY 20,000 posting, zero tuition remaining, one debit, one resolved case. |
+| 8 | Save final evidence and have a non-author replay without coaching. | Capture current-run SQL/tool snapshots before reset using the command below; review dialogue/screenshots and B authority/security proof alongside them. |
+
+```powershell
+uv run python -m scripts.capture_demo_evidence --output .generated/acceptance/hero/01-start.json
+# Repeat at the pre-posting and final checkpoints with new filenames.
+```
+
+The export is read-only and bounded, carries commit/model/application-source digest,
+and omits credentials, sessions, raw chat and document bodies. It is not a complete
+B authority/security export or a video. Record the attack branch from its own reset;
+do not splice separate runs into a claimed continuous hero. The final reviewed
+recording and deployment must match the selected release. Current local screenshots
+are rehearsal evidence; final video/release sign-off remains pending.
 
 - [ ] Save redacted operation logs and before/after linked database assertions with
   release commit, timestamps, scenario/run number and safe correlation references.

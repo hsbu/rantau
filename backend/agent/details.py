@@ -142,19 +142,7 @@ class AgentDetails(_Storage):
                     session_id=actor.session_id,
                     conversation_id=conversation_id,
                 )
-                action = c.execute(
-                    "SELECT * FROM agent_actions WHERE action_key=%s AND tenant_id=%s "
-                    "AND actor_id=%s AND session_id=%s AND conversation_id=%s "
-                    "AND scenario_run_no=%s",
-                    (
-                        TuitionActions._key(key, scenario, proposal),
-                        actor.tenant_id,
-                        actor.actor_id,
-                        actor.session_id,
-                        conversation_id,
-                        scenario,
-                    ),
-                ).fetchone()
+                action = TuitionActions.record_for_proposal(c, key, scenario, proposal)
                 if action:
                     intent_row = fetch(c, "intent", actor.tenant_id, action["intent_id"])
                     if intent_row is None or intent_row["terms_hash"] != action["terms_hash"]:

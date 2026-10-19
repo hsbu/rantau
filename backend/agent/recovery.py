@@ -102,7 +102,8 @@ class RecoveryWorkflow(_Storage):
             )
             lines.append(
                 f"{index}. **Payment {index}** — tuition expected {amount}; provider "
-                f"{item.payment.transfer_status.value}; university {item.obligation.state.value}; "
+                f"{item.payment.transfer_status.value.replace('_', ' ').lower()}; university "
+                f"{item.obligation.state.value.replace('_', ' ').lower()}; "
                 f"tuition due {display_time(item.obligation.due_at)}."
             )
         lines.append(

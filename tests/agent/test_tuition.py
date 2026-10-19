@@ -95,6 +95,76 @@ def key(conversation="conversation_1", **changes):
     ).model_copy(update=changes)
 
 
+async def test_balance_question_reads_only_obligations_without_funding_clarification():
+    port = PlanningPort(multiple_funding=True)
+    result = await graph_for(port, Turns(TuitionInput(information_only=True))).run(
+        "How much tuition do I still owe, and when is it due?", ACTOR
+    )
+    assert "Tuition remaining: CNY 20,000.00" in result.message
+    assert "University credited: CNY 0.00" in result.message
+    assert "Due date:" in result.message
+    assert "Which funding account" not in result.message
+    assert "Selected:" not in result.message
+    assert port.calls == ["obligations"]
+    assert not any(event.tool == "clarify_tuition" for event in result.tool_events)
+
+
+async def test_balance_question_preserves_an_existing_preview_and_route_selection():
+    port = PlanningPort(multiple_funding=True)
+    port.rates = (
+        QUOTE,
+        QUOTE_B.model_copy(update={"estimated_delivery_at": NOW + timedelta(hours=2)}),
+    )
+    store = InMemoryConversations()
+    graph = graph_for(
+        port,
+        Turns(
+            TuitionInput(funding_owner="SELF", route_preference="EARLIEST_DELIVERY"),
+            TuitionInput(information_only=True),
+            TuitionInput(),
+        ),
+        store,
+    )
+    await graph.run("Use my account and the fastest route", ACTOR, "conversation_1")
+    async with store.turn(key()) as session:
+        before = session.state.tuition.model_dump()
+    port.calls.clear()
+    result = await graph.run("What is my remaining tuition?", ACTOR, "conversation_1")
+    assert "Which funding account" not in result.message
+    assert port.calls == ["obligations"]
+    async with store.turn(key()) as session:
+        assert session.state.tuition.model_dump() == before
+    resumed = await graph.run("Show the payment route again", ACTOR, "conversation_1")
+    assert "Funding: your account" in resumed.message
+    assert "Selected: Route 2" in resumed.message
+
+
+@pytest.mark.parametrize(
+    "preference,total,fee,other_fee,comparison",
+    [
+        ("LOWEST_COST", "46,025,000", "25,000", "50,000", "less than"),
+        ("EARLIEST_DELIVERY", "46,050,000", "50,000", "25,000", "more than"),
+    ],
+)
+async def test_preview_explains_principal_alternative_fees_and_exact_cost_difference(
+    preference, total, fee, other_fee, comparison
+):
+    port = PlanningPort()
+    port.rates = (
+        QUOTE,
+        QUOTE_B.model_copy(update={"estimated_delivery_at": NOW + timedelta(hours=2)}),
+    )
+    result = await graph_for(port, Turns(TuitionInput(route_preference=preference))).run(
+        "Compare payment routes", ACTOR
+    )
+    assert "Transfer amount: IDR 46,000,000" in result.message
+    assert f"IDR {total}" in result.message
+    assert f"includes IDR {fee} fee" in result.message
+    assert f"fee: IDR {other_fee}" in result.message
+    assert f"IDR 25,000 {comparison}" in result.message
+    assert "same CNY 20,000.00" in result.message
+
+
 async def test_unambiguous_request_has_verified_read_only_intent_preview():
     port = PlanningPort()
     before = OBLIGATION.model_dump()
@@ -104,7 +174,7 @@ async def test_unambiguous_request_has_verified_read_only_intent_preview():
     assert "Recipient: University tuition account" in result.message
     assert "funding owner will need to approve these exact terms" in result.message
     assert "simulat" not in result.message.lower()
-    assert "No payment has been requested or executed" in result.message
+    assert "Reviewing this preview does not request or execute a payment" in result.message
     assert OBLIGATION.model_dump() == before
     assert set(port.calls) <= {"obligations", "policy", "permissions", "quotes", "beneficiary"}
     assert "acct_sponsor" not in result.model_dump_json()

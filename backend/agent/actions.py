@@ -23,7 +23,7 @@ from backend.contracts.models import (
     ServiceUnavailable,
 )
 from backend.finance.outcomes import Refused
-from backend.finance.records import intent_from_row, lock_intent
+from backend.finance.records import Row, intent_from_row, lock_intent
 from backend.finance.wiring import FinanceServices
 
 Command = Literal["REQUEST", "CONTINUE"]
@@ -66,6 +66,27 @@ def action_reply(
     )
 
 
+def payment_status_message(state: PaymentState) -> str:
+    if state == PaymentState.OUTCOME_UNKNOWN:
+        return (
+            "**Payment outcome is uncertain**\n\n"
+            "The provider has not confirmed the result; tuition is not confirmed paid. "
+            "Check the original payment in Payments before any retry. "
+            "Do not create another payment while this outcome is unknown."
+        )
+    if state == PaymentState.FAILED:
+        return (
+            "**Payment failed**\n\n"
+            "The provider reports this attempt failed; tuition is not confirmed paid. "
+            "Review the original request and current account balance in Payments "
+            "before planning another payment. Continuing here only rechecks this attempt."
+        )
+    return (
+        f"Payment status: {state.value}; tuition is not "
+        "confirmed paid by provider status. Verify university posting."
+    )
+
+
 class Correlation(Contract):
     action_key: str
     intent_id: str
@@ -105,6 +126,24 @@ class TuitionActions(_Storage):
             json.dumps([key.model_dump(), scenario, proposal.model_dump()], sort_keys=True).encode()
         ).hexdigest()
 
+    @staticmethod
+    def record_for_proposal(
+        connection: PolicyConnection, key: ConversationKey, scenario: int, proposal: IntentProposal
+    ) -> Row | None:
+        return connection.execute(
+            "SELECT action_key,intent_id,terms_hash,execution_key FROM agent_actions "
+            "WHERE tenant_id=%s AND actor_id=%s AND session_id=%s AND conversation_id=%s "
+            "AND scenario_run_no=%s AND proposal=%s ORDER BY created_at DESC LIMIT 1",
+            (
+                key.tenant_id,
+                key.actor_id,
+                key.session_id,
+                key.conversation_id,
+                scenario,
+                Jsonb(proposal.model_dump()),
+            ),
+        ).fetchone()
+
     def _prepare(
         self, key: ConversationKey, proposal: IntentProposal, actor: ActorContext, *, create: bool
     ) -> Correlation | Refused | None:
@@ -114,11 +153,7 @@ class TuitionActions(_Storage):
             connection.execute(
                 "SELECT pg_advisory_xact_lock(%s)", (_lock_id("agent-action", (action_key,)),)
             )
-            row = connection.execute(
-                "SELECT action_key,intent_id,terms_hash,execution_key FROM agent_actions "
-                "WHERE action_key = %s",
-                (action_key,),
-            ).fetchone()
+            row = self.record_for_proposal(connection, key, scenario, proposal)
             if row:
                 self._require(connection, actor)
                 return Correlation.model_validate(row)
@@ -205,8 +240,10 @@ class TuitionActions(_Storage):
                 )
             if record is None:
                 return action_reply(
-                    "No confirmed proposal exists in this conversation. "
-                    "Review the preview and say 'confirm tuition'.",
+                    "No confirmed request matches this preview. Cancel or revise any earlier "
+                    "request in Payments before using changed terms; existing approval does "
+                    "not cover them. If you have not saved a request yet, review this preview "
+                    "and say 'confirm tuition'.",
                     "get_approval_status",
                 )
             if command == "REQUEST":
@@ -216,11 +253,18 @@ class TuitionActions(_Storage):
                     "PENDING",
                 }:
                     await _database_call(lambda: self.approval.request(actor, record.intent_id))
-                    return action_reply(
-                        "**Waiting for funding-owner approval**\n\n"
+                    own_funding = intent.funding_owner_id == actor.actor_id
+                    waiting = (
+                        "**Waiting for your approval**\n\n"
+                        "Your request is saved using your own account. You need to approve "
+                        "these exact terms through your authenticated account. "
+                        if own_funding
+                        else "**Waiting for funding-owner approval**\n\n"
                         "Your request is saved. The funding owner needs to review "
-                        "these exact terms "
-                        "in their approval workspace. No payment was executed.\n\n"
+                        "these exact terms in their approval workspace. "
+                    )
+                    return action_reply(
+                        waiting + "No payment was executed.\n\n"
                         "After approval, say `continue tuition` to proceed with this payment.",
                         "request_approval",
                     )
@@ -278,8 +322,7 @@ class TuitionActions(_Storage):
                 lambda: self.finance.reads.payment_result(actor, existing.payment_id)
             )
             return action_reply(
-                f"Payment status: {result.transfer_status.value}; tuition is not "
-                "confirmed paid by provider status. Verify university posting.",
+                payment_status_message(result.transfer_status),
                 "get_payment_status",
                 "OK",
                 result.payment_id,
@@ -345,8 +388,7 @@ class TuitionActions(_Storage):
                 "DENIED",
             )
         return action_reply(
-            f"Payment status: {outcome.transfer_state.value}; tuition is not "
-            "confirmed paid by provider status. Verify university posting.",
+            payment_status_message(outcome.transfer_state),
             "execute_payment",
             "OK",
             outcome.payment_id,

@@ -71,7 +71,9 @@ def test_ux_04_provider_unavailable_rechecks_the_original_transfer_without_secon
     for command in ("check", "continue", "continue"):
         response = message(client, command)
         assert response.status_code == 200
-        assert "FAILED" in response.json()["message"]
+        assert "Payment failed" in response.json()["message"]
+        assert "current account balance in Payments" in response.json()["message"]
+        assert "Verify university posting" not in response.json()["message"]
     with services.database.connection() as c:
         assert c.execute("SELECT alias, provider_reference FROM transfers").fetchall() == [original]
         assert (

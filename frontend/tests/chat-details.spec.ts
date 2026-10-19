@@ -13,6 +13,10 @@ test("connected quote, approval and hold panels reflect trusted records without 
   const quote = page.getByRole("region", { name: "Quote breakdown" });
   await expect(quote).toContainText("IDR 46,025,000");
   await expect(quote).toContainText("IDR 25,000");
+  await expect(quote).toContainText("Payment route");
+  await expect(quote).toContainText("Rate (rounded, CNY per IDR)");
+  await expect(quote).toContainText("0.00043478");
+  await expect(quote).not.toContainText("mock_remit_a");
   await expect(page.getByRole("region", { name: "Tuition balance" })).toContainText("CNY 20,000.00");
   await send(page, "approved");
   await expect(page.getByRole("region", { name: "Approval status" })).toContainText("Approval recorded");
@@ -22,6 +26,29 @@ test("connected quote, approval and hold panels reflect trusted records without 
   await expect(page.getByRole("button", { name: /approve|execute|pay now|clear hold/i })).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText(/acct_|terms_hash|fingerprint|sponsor_balance/);
 });
+
+for (const [provider, rate, label, displayed] of [
+  ["mock_remit_a", "0.0004347826086956521739130435", "Standard route", "0.00043478"],
+  ["mock_remit_b", "0.000434795", "Faster route", "0.0004348"],
+  ["unrecognized-provider", "0.000000001", "Payment route", "0.000000001"],
+  ["mock_remit_a", "0.999999999", "Standard route", "1"],
+]) {
+  test(`quote display preserves ${provider} / ${rate} without exposing technical labels`, async ({ page }) => {
+    await page.route("**/student/chat/api/details?*", async route => {
+      const response = await route.fetch();
+      const snapshot = await response.json();
+      snapshot.summary.quote.provider = provider;
+      snapshot.summary.quote.rate = rate;
+      await route.fulfill({ response, json: snapshot });
+    });
+    await page.goto("/student/chat");
+    await send(page, "quote");
+    const quote = page.getByRole("region", { name: "Quote breakdown" });
+    await expect(quote).toContainText(label);
+    await expect(quote.locator("dd").nth(4)).toHaveText(displayed);
+    await expect(quote).not.toContainText(provider);
+  });
+}
 
 test("provider, ledger and recovery panels preserve linkage and exact state", async ({ page }) => {
   await page.goto("/student/chat");

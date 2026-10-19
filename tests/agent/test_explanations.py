@@ -94,7 +94,7 @@ async def test_graph_displays_scoped_quotes_without_execution_or_raw_account_det
     assert "University credited: CNY 0.00" in result.message
     assert "Tuition remaining: CNY 20,000.00" in result.message
     assert "Due date: 21 Nov 2026, 17:00 China time" in result.message
-    assert "No payment has been requested or executed" in result.message
+    assert "Reviewing this preview does not request or execute a payment" in result.message
     assert "quotes" in port.calls
     assert all(
         call in {"obligations", "obligation", "policy", "quotes", "permissions"}

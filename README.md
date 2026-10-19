@@ -682,3 +682,38 @@ student session can retrieve a run; logout, expiry, changed scopes/credentials o
 disabled actors deny access. These are past orchestration diagnostics, not current
 financial state or the authoritative B/C financial/security audit. New financial
 tools must update the diagnostic allowlist and domain audit integration together.
+
+### Scenario refinement and local execution evidence
+
+Students paying from their own account review the existing owner approval in
+Payments, then explicitly approve or reject its exact terms. Approval alone sends
+no funds. Sponsor-funded requests keep their separate sponsor decision. Both flows
+still use the protected executor when continued.
+
+Chat stages changed amounts, funding, routes and recipient requests as a draft.
+Say `confirm revision` to cancel the earlier unstarted request or save a valid
+replacement with fresh approval. Partial tuition and arbitrary recipients remain
+blocked by the existing policy. A security hold or submitted payment cannot be
+bypassed by revising it. Correct a blocked amount with `full balance`, or select
+`use the verified university recipient`, then review and confirm the revision.
+
+The admin Demo page identifies the observed scenario/run independently of the
+scenario selected for the next reset. Follow `docs/scenario-checklist.md` for the
+continuous hero rehearsal, attack branch and review requirements.
+
+For an isolated development/test database configured in your ignored environment,
+save a current-run SQL/tool snapshot before resetting it:
+
+```powershell
+uv run python -m scripts.capture_demo_evidence --output .generated/acceptance/hero/before-posting.json
+```
+
+Use a new filename for each checkpoint. This read-only export includes bounded,
+allowlisted synthetic financial records, current-run financial audit and saved
+agent diagnostics, plus a commit/application-source digest and model ID. It omits
+auth/session records, credentials, document bodies and raw chat/model prose. It
+does not export every B security/authority event or prove a browser interaction;
+keep the separate dialogue/screenshots and B's reviewed security evidence. Exports
+are local and unreviewed until redaction, financial assertions and team review;
+never commit them. The final video and deployed build must identify the selected
+reviewed release, not silently combine checkpoints from different runs.

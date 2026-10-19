@@ -326,7 +326,18 @@ class ApprovalService:
         if actor.role not in {Role.STUDENT, Role.SPONSOR} or scope not in actor.scopes:
             raise ScopeDenied()
         snapshot = self._load(connection, actor, intent_id)
-        AuthorityStore(connection).refresh(actor, terms_of(snapshot.intent))
+        store = AuthorityStore(connection)
+        rows = store.refresh(actor, terms_of(snapshot.intent))
+        if snapshot.intent.state == PaymentState.CANCELLED:
+            for row in rows:
+                if row["state"] in {"REQUESTED", "PENDING", "APPROVED"}:
+                    connection.execute(
+                        "UPDATE approvals SET state='INVALIDATED_BY_CHANGE' WHERE id=%s",
+                        (row["id"],),
+                    )
+                    store.event(
+                        actor, "APPROVAL_INVALIDATED", row["approval_id"], "INVALIDATED_BY_CHANGE"
+                    )
         self.auth.current_actor(connection, actor)
 
     def save_mandate(

@@ -74,7 +74,8 @@ def test_tool_response_must_be_success_or_error():
 
 
 def test_catalogue_preserves_mvp_paths():
-    assert len(HTTP_ENDPOINTS) == 44  # Includes the approved read-only Chat detail projection.
+    assert len(HTTP_ENDPOINTS) == 45  # Includes the approved admin-only current-run read.
+    assert ("GET", "/api/v1/demo/state") in HTTP_ENDPOINTS
     assert ("POST", "/api/v1/sponsor/approvals/{id}/decision") in HTTP_ENDPOINTS
     assert ("POST", "/api/v1/payment-intents/{id}/execute") in HTTP_ENDPOINTS
     assert ("GET", "/api/v1/security-cases") in HTTP_ENDPOINTS

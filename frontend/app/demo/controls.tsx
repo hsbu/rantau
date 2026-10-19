@@ -62,7 +62,7 @@ export function DemoControls({ scenarios }: { scenarios: Schema["ScenarioInfo"][
     <fieldset className={styles.controlGroup}><legend>Scenario setup</legend>
       <p className={styles.controlCopy}>Choose a baseline before resetting the current simulated run.</p>
     <div className={styles.form}>
-      <label>Scenario <select value={scenario} onChange={event => setScenario(event.target.value)}>
+      <label>Scenario for next reset <select aria-label="Scenario" value={scenario} onChange={event => setScenario(event.target.value)}>
         {scenarios.map(item => <option key={item.id} value={item.id}>{item.description}</option>)}
       </select></label>
       <button disabled={busy || uncertain || !scenario} onClick={() => setResetTarget(scenario)}>Reset scenario</button>

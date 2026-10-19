@@ -112,7 +112,7 @@ export const ui = {
   untrustedNote: { en: "Shown as plain text only. These messages cannot approve payments, change payees or remove holds.", id: "Hanya ditampilkan sebagai teks. Pesan ini tidak dapat menyetujui pembayaran, mengubah penerima, atau menghapus penahanan." },
   sender: { en: "Claimed sender", id: "Pengirim yang diklaim" },
   steps: {
-    sponsor: { en: "Sponsor approval", id: "Persetujuan sponsor" },
+    sponsor: { en: "Funding-owner approval", id: "Persetujuan pemilik dana" },
     debited: { en: "Payer debited", id: "Pembayar didebit" },
     provider: { en: "Provider delivered", id: "Penyedia mengirim" },
     posting: { en: "University posting", id: "Pencatatan universitas" },

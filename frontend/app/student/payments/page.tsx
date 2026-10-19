@@ -10,6 +10,7 @@ import {
 } from "./components";
 import { ExceptionActions } from "./exception-actions";
 import { IntentActions } from "./intent-actions";
+import { OwnerApproval } from "./owner-approval";
 import { RouteChoices } from "./route-choices";
 import { type Schema, financeGet } from "./finance-api";
 import styles from "./payments.module.css";
@@ -64,14 +65,18 @@ async function ObligationCard(
   const transferId = item.provider_status?.payment_id;
   const topup = item.state === "PARTIALLY_POSTED" && item.topup_permitted && item.shortfall_minor > 0;
   const revisable = pending?.state === "AWAITING_APPROVAL" || pending?.state === "AUTHORIZED";
+  const ownPending = pending?.state === "AWAITING_APPROVAL" && pending.funded_by_requester;
   const mode = pending ? (revisable ? "revise" : null) : item.state === "UNPAID" ? "create" : topup ? "topup" : null;
-  const [payment, quotes, options, transferTrail, intentTrail] = await Promise.all([
+  const [payment, quotes, options, transferTrail, intentTrail, approvals] = await Promise.all([
     transferId ? financeGet<Schema["PaymentResult"]>(`/api/v1/transfers/${transferId}`) : null,
     mode ? financeGet<Schema["FxQuote"][]>(`/api/v1/quotes?obligation_id=${item.id}`) : null,
     mode ? financeGet<Schema["PaymentOptions"]>(`/api/v1/tuition/obligations/${item.id}/payment-options`) : null,
     transferId ? financeGet<Schema["AuditEntry"][]>(`/api/v1/audit?resource_id=${transferId}`) : null,
     pending ? financeGet<Schema["AuditEntry"][]>(`/api/v1/audit?resource_id=${pending.id}`) : null,
+    ownPending ? financeGet<Schema["ApprovalView"][]>("/api/v1/student/approvals") : null,
   ]);
+  const ownerApproval = approvals?.ok && pending ? approvals.data.find(item =>
+    item.intent_id === pending.id && item.terms_hash === pending.terms_hash && item.state === "PENDING") : undefined;
   const activity = [...(intentTrail?.ok ? intentTrail.data : []), ...(transferTrail?.ok ? transferTrail.data : [])]
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
   const delivered = item.provider_status?.transfer_status === "DELIVERED";
@@ -90,21 +95,25 @@ async function ObligationCard(
       <strong>{ui.next[lang]}:</strong> {ui.nextActor[nextActor(item, pending)][lang]}
     </p>
     {pending && <section aria-label="pending payment">
-      <h3>{paymentStateLabels[pending.state][lang]}</h3>
+      <h3>{ownPending ? (lang === "id" ? "Menunggu persetujuan Anda" : "Waiting for your approval") : paymentStateLabels[pending.state][lang]}</h3>
       <IntentSummary intent={pending} lang={lang} />
-      {pending.state === "AWAITING_APPROVAL" && <p className={styles.notice}>{ui.waitingOwner[lang]}</p>}
+      {pending.state === "AWAITING_APPROVAL" && <p className={styles.notice}>{ownPending
+        ? (lang === "id" ? "Anda pemilik dana. Tinjau dan setujui rincian sebelum melanjutkan." : "You own these funds. Review and approve the exact terms before continuing.") : ui.waitingOwner[lang]}</p>}
+      {ownerApproval && <OwnerApproval approval={ownerApproval} lang={lang} />}
+      {ownPending && !ownerApproval && <p className={styles.notice}>{lang === "id" ? "Persetujuan saat ini tidak tersedia. Muat ulang atau minta rincian persetujuan terbaru." : "A current reviewable approval is unavailable. Refresh or request current approval terms."}</p>}
       {pending.state === "ON_HOLD" && <p className={styles.notice} role="alert">
         {safeNextStep[pending.hold_reason ?? "SECURITY_HOLD"][lang]}
       </p>}
       <IntentActions lang={lang} intentId={pending.id} canContinue={pending.state === "AUTHORIZED"}
         payee={pending.beneficiary_label} total={money(pending.source_currency, pending.source_total_minor)}
-        canRequestApproval={pending.state === "AWAITING_APPROVAL"} />
+        canRequestApproval={pending.state === "AWAITING_APPROVAL" && !ownerApproval} />
     </section>}
     {item.state !== "PAID" && item.state !== "UNPAID" && <p className={styles.notice}>{ui.noPay[lang]}</p>}
     {payment?.ok && <ReceiptCard payment={payment.data} lang={lang} />}
     {quotes?.ok && quotes.data.length > 0 && <QuoteBreakdown quotes={quotes.data} lang={lang} />}
-    {mode && quotes?.ok && options?.ok && <RouteChoices lang={lang} mode={mode} obligationId={item.id}
+    {mode && quotes?.ok && options?.ok && <RouteChoices key={pending?.id ?? item.id} lang={lang} mode={mode} obligationId={item.id}
       currentIntentId={pending?.id} currentQuoteId={pending?.quote_id}
+      currentFundingOwnerSelf={pending?.funded_by_requester}
       options={options.data} quotes={quotes.data} />}
     {item.state === "PARTIALLY_POSTED" && !item.topup_permitted && <p className={styles.notice}>
       {ui.shortfallTitle[lang]}: {money(item.currency, item.shortfall_minor)}. {safeNextStep.TOPUP_NOT_PERMITTED[lang]}
