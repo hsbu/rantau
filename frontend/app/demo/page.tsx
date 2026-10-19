@@ -29,10 +29,19 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
     </main>;
   }
   const trail = await financeGet<Schema["AuditEntry"][]>("/api/v1/demo/audit");
+  const current = await financeGet<Schema["DemoState"]>("/api/v1/demo/state");
   return <main id="main-content" tabIndex={-1} lang={lang} className={styles.page}>
     <WorkspaceHeader label="Demo workspace" links={[{ href: "/", label: "Home" }, { href: "/student/chat", label: "Student workspace" }]} />
     <SimulatedBanner lang={lang} />
     <h1>Demo</h1>
+    <section className={styles.card} aria-label="Active scenario">
+      <h2>Active scenario</h2>
+      {current.ok ? <p>{current.data.scenario_id
+        ? <><strong>{current.data.scenario_id}</strong> · Run {current.data.run_no}</>
+        : "No scenario has been initialized."}</p>
+        : <p role="alert">Current scenario state is unavailable. Refresh before operating controls.</p>}
+      <p>This is the observed sandbox run. The selector below chooses the next reset.</p>
+    </section>
     <DemoControls scenarios={scenarios.data} />
     <section className={styles.card}>
       <h2>{trailTitle[lang]}</h2>

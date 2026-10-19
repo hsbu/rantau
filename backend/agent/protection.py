@@ -65,7 +65,8 @@ class AgentProtection:
     ) -> tuple[str, bool] | None:
         with self.actions.database.connection() as c:
             scenario = self.actions._context(c, key, actor)
-            if self.actions._key(key, scenario, proposal) != record.action_key:
+            current = self.actions.record_for_proposal(c, key, scenario, proposal)
+            if current is None or Correlation.model_validate(current) != record:
                 raise ScopeDenied("Resource unavailable")
             locked = lock_intent(c, actor.tenant_id, record.intent_id)
             if self.actions._scenario(c, actor.tenant_id) != scenario:

@@ -9,6 +9,7 @@ from backend.contracts.enums import Role
 from backend.contracts.http import (
     AdvanceClockRequest,
     AuditEntry,
+    DemoState,
     DocumentInjectRequest,
     FaultRequest,
     ResetRequest,
@@ -54,6 +55,17 @@ Services = Annotated[FinanceServices, Depends(finance_services)]
 @router.get("/scenarios", response_model=list[ScenarioInfo])
 def list_scenarios() -> list[ScenarioInfo]:
     return [ScenarioInfo(id=spec.id, description=spec.description) for spec in SCENARIOS.values()]
+
+
+@router.get("/state", response_model=DemoState)
+def current_state(admin: Admin, services: Services) -> DemoState:
+    with services.database.connection() as connection:
+        row = connection.execute(
+            "SELECT scenario_id,run_no FROM demo_state WHERE tenant_id=%s", (admin.tenant_id,)
+        ).fetchone()
+    return DemoState(
+        scenario_id=row["scenario_id"] if row else None, run_no=int(row["run_no"]) if row else 0
+    )
 
 
 @router.post("/reset", response_model=ResetResult, dependencies=[TrustedOrigin])

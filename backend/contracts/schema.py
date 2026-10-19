@@ -11,6 +11,7 @@ from backend.contracts.authority import ApprovalView, MandateRequest, MandateVie
 from backend.contracts.security import SecurityCaseList, SecurityCaseView
 
 SCHEMA_MODELS = (
+    http.DemoState,
     AgentDetailSnapshot,
     models.ActorContext,
     models.Money,
@@ -113,6 +114,7 @@ def contract_schema() -> dict[str, Any]:
         "/transfers/{id}/recheck": "PaymentResult",
         "/audit": "AuditEntry",
         "/demo/scenarios": "ScenarioInfo",
+        "/demo/state": "DemoState",
         "/demo/reset": "ResetResult",
         "/demo/university/tick": "TickResult",
         "/demo/audit": "AuditEntry",

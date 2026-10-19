@@ -89,6 +89,12 @@ class ScenarioInfo(Contract):
     description: str
 
 
+class DemoState(Contract):
+    scenario_id: Identifier | None
+    run_no: Annotated[int, Field(strict=True, ge=0)]
+    simulated: Literal[True] = True
+
+
 class ResetRequest(Contract):
     scenario_id: Identifier
 
@@ -174,6 +180,7 @@ HTTP_ENDPOINTS = (
     ("GET", "/api/v1/kb/universities/{id}/payment-policy"),
     ("POST", "/api/v1/demo/reset"),
     ("GET", "/api/v1/demo/scenarios"),
+    ("GET", "/api/v1/demo/state"),
     ("POST", "/api/v1/demo/clock/advance"),
     ("POST", "/api/v1/demo/faults"),
     ("POST", "/api/v1/demo/university/tick"),

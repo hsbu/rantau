@@ -21,7 +21,9 @@ export function trustSteps(
     : detail.state === "RECONCILIATION_PENDING" ? "current"
     : detail.state === "EXCEPTION" || detail.state === "ESCALATED" ? "problem" : "todo";
   return [
-    { key: "sponsor", label: ui.steps.sponsor, status: sent ? "done" : sponsorStatus(pending) },
+    { key: "sponsor", label: pending?.funded_by_requester
+      ? { en: "Your approval", id: "Persetujuan Anda" } : ui.steps.sponsor,
+      status: sent ? "done" : sponsorStatus(pending) },
     { key: "provider", label: ui.steps.provider, status: provider },
     { key: "posting", label: ui.steps.posting, status: posting },
     { key: "reconciliation", label: ui.steps.reconciliation, status: reconciliation },

@@ -59,7 +59,7 @@ export function DemoControls({ scenarios }: { scenarios: Schema["ScenarioInfo"][
 
   return <section className={styles.card}>
     <div className={styles.form}>
-      <label>Scenario <select value={scenario} onChange={event => setScenario(event.target.value)}>
+      <label>Scenario for next reset <select aria-label="Scenario" value={scenario} onChange={event => setScenario(event.target.value)}>
         {scenarios.map(item => <option key={item.id} value={item.id}>{item.id}</option>)}
       </select></label>
       <button disabled={busy || uncertain || !scenario} onClick={() => setResetTarget(scenario)}>Reset scenario</button>

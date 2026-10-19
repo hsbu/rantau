@@ -167,8 +167,8 @@ def test_changed_funding_cannot_reuse_an_old_approval(runtime):
     decide("APPROVED")
     assert "Selected:" in message(client, "Use my own account").json()["message"]
     changed = message(client, "confirm tuition")
-    assert "Cancel or revise" in changed.json()["message"]
-    assert "Cancel or revise" in message(client, "continue").json()["message"]
+    assert "confirm revision" in changed.json()["message"]
+    assert "confirm revision" in message(client, "continue").json()["message"]
     with services.database.connection() as c:
         assert c.execute("SELECT count(*) AS n FROM payment_intents").fetchone()["n"] == 1
     no_debit(services.database)

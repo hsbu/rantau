@@ -21,6 +21,10 @@ const proposal = (b: Record<string, string>) =>
         beneficiary_id: b.beneficiary_id, quote_id: b.quote_id, purpose: "TUITION" }
     : null;
 const ACTIONS: Record<string, (body: Record<string, string>) => Target | null> = {
+  "owner-decision": b => ID.test(b.id ?? "") && /^[a-f0-9]{64}$/.test(b.terms_hash ?? "")
+    && ["APPROVED", "REJECTED"].includes(b.decision)
+    && Object.keys(b).every(key => ["id", "decision", "terms_hash"].includes(key))
+    ? { path: `/api/v1/student/approvals/${b.id}/decision`, payload: { decision: b.decision, terms_hash: b.terms_hash } } : null,
   "create-intent": b => { const payload = proposal(b);
     return payload ? { path: "/api/v1/payment-intents", payload, after: approvalRequest } : null; },
   "revise-intent": b => { const payload = proposal(b);

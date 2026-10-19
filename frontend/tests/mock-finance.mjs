@@ -71,6 +71,7 @@ createServer(async (request, response) => {
   if (url.startsWith("/api/v1/demo/")) {
     if (!admin) { response.statusCode = 404; return response.end(JSON.stringify({ detail: "Resource unavailable" })); }
     if (url === "/api/v1/demo/scenarios") return response.end(JSON.stringify([{ id: "tuition_happy_path", description: "Happy path" }]));
+    if (url === "/api/v1/demo/state") return response.end(JSON.stringify({ scenario_id: "tuition_missing_reference", run_no: 7, simulated: true }));
     if (url === "/api/v1/demo/audit") return response.end(JSON.stringify([{
       audit_event_id: "audit_9", run_no: 1, action: "PAYMENT_DEBITED", resource_id: "transfer_001",
       decision: "ALLOW", reason_code: null, created_at: "2026-10-17T09:00:00Z",
@@ -80,7 +81,8 @@ createServer(async (request, response) => {
   }
   if (!signedIn) { response.statusCode = 401; return response.end("{}"); }
   const cookie = request.headers.cookie ?? "";
-  const pending = cookie.includes("variant=pending") ? "AWAITING_APPROVAL"
+  const own = cookie.includes("variant=ownpending");
+  const pending = own || cookie.includes("variant=pending") ? "AWAITING_APPROVAL"
     : cookie.includes("variant=authorized") ? "AUTHORIZED"
     : cookie.includes("variant=held") ? "ON_HOLD" : null;
   const shown = pending || cookie.includes("variant=unpaid") ? unpaid
@@ -96,7 +98,17 @@ createServer(async (request, response) => {
   }
   if (url.startsWith("/api/v1/audit?resource_id=")) return response.end(JSON.stringify(trail(url.split("=")[1])));
   if (url.endsWith("/payment-options")) return response.end(JSON.stringify(options));
-  if (url === "/api/v1/payment-intents") return response.end(JSON.stringify(pending ? [intent(pending)] : []));
+  if (url === "/api/v1/payment-intents") return response.end(JSON.stringify(pending ? [{ ...intent(pending),
+    ...(own ? { funded_by_requester: true, terms_hash: "a".repeat(64) } : {}),
+  }] : []));
+  if (url === "/api/v1/student/approvals") return response.end(JSON.stringify(own ? [{
+    approval_id: "approval_own", intent_id: "intent_001", intent_revision: 1, terms_hash: "a".repeat(64),
+    state: "PENDING", expires_at: "2030-10-20T09:00:00Z", purpose: "TUITION",
+    source_label: "Your IDR account •••• 0001", beneficiary_label: "Fictional university •••• DEMO",
+    source_principal_minor: 46000000, fee_minor: 25000, source_total_minor: 46025000,
+    destination_amount_minor: 2000000, source_currency: "IDR", destination_currency: "CNY", simulated: true,
+  }] : []));
+  if (url === "/api/v1/student/approvals/approval_own/decision") return response.end("{}");
   if (url === "/api/v1/documents") return response.end(JSON.stringify([
     cookie.includes("variant=longdocument")
       ? { ...document, title: "T".repeat(200), claimed_sender: "S".repeat(200), body: "Unbroken".repeat(500) }

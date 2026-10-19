@@ -131,6 +131,21 @@ class TuitionPlanner:
             events.append(ToolEvent(tool="get_university_payment_policy", status="PENDING"))
             return reply(summary + UNKNOWN_POLICY, draft.model_copy(update={"quote_id": None}))
         events.append(ToolEvent(tool="get_university_payment_policy", status="OK"))
+        if inputs.recipient_choice:
+            draft = draft.model_copy(
+                update={
+                    "recipient_blocked": inputs.recipient_choice == "DIFFERENT_RECIPIENT",
+                    "quote_id": None,
+                }
+            )
+        if draft.recipient_blocked:
+            return reply(
+                summary + "**Revised draft — recipient needs verification**\n\n"
+                "Requested change: a different recipient. This bill can only be paid to its "
+                "verified university recipient. No new account details are saved or used.\n\n"
+                "Say `use the verified university recipient` to restore that selection.",
+                draft.model_copy(update={"awaiting": "RECIPIENT", "quote_id": None}),
+            )
         amount = draft.requested_amount_minor
         if inputs.full_balance:
             amount = None
@@ -146,7 +161,12 @@ class TuitionPlanner:
             )
         if amount is not None and amount != obligation.balance_minor:
             return reply(
-                summary + "This payment needs to cover the full outstanding balance. "
+                summary
+                + "**Revised draft — amount needs correction**\n\n"
+                + "Requested amount: "
+                + format_money(Money(currency=Currency.CNY, amount_minor=amount))
+                + ".\n\n"
+                "This payment needs to cover the full outstanding balance. "
                 "Say `full balance`, or review the existing shortfall case in Payments.",
                 draft.model_copy(update={"awaiting": "AMOUNT", "quote_id": None}),
             )

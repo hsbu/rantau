@@ -217,6 +217,7 @@ def add_admin(database, password_hash):
 
 def test_demo_controls_are_closed_to_students(api):
     student = client_for("student")
+    assert student.get("/api/v1/demo/state").status_code == 404
     assert student.get("/api/v1/demo/scenarios").status_code == 404
     assert (
         student.post(
@@ -233,6 +234,14 @@ def test_the_missing_reference_recovery_runs_end_to_end_over_http(api, password_
         "/api/v1/demo/reset", headers=ORIGIN, json={"scenario_id": "tuition_missing_reference"}
     )
     assert reset.status_code == 200
+    observed = admin.get("/api/v1/demo/state")
+    assert observed.status_code == 200
+    assert observed.headers["cache-control"] == "no-store"
+    assert observed.json() == {
+        "scenario_id": "tuition_missing_reference",
+        "run_no": reset.json()["run_no"],
+        "simulated": True,
+    }
     intent_id = create(student).json()["id"]
     approve(api, intent_id)
     paid = student.post(
@@ -309,6 +318,11 @@ def test_demo_errors_are_typed_not_server_errors(api, password_hash):
     assert unknown.status_code == 422 and unknown.json()["detail"]["code"] == "UNKNOWN_SCENARIO"
     with api.database.connection() as connection:
         connection.execute("DELETE FROM demo_state")
+    assert admin.get("/api/v1/demo/state").json() == {
+        "scenario_id": None,
+        "run_no": 0,
+        "simulated": True,
+    }
     no_run = admin.post("/api/v1/demo/clock/advance", headers=ORIGIN, json={"hours": 1})
     assert no_run.status_code == 409 and no_run.json()["detail"]["code"] == "NO_DEMO_RUN"
 

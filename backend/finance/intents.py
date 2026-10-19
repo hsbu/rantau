@@ -52,30 +52,49 @@ class IntentService:
     ) -> Created | Refused:
         """Replace an unstarted intent with a new immutable revision; the old one is cancelled."""
         with self.database.connection() as connection:
-            locked = lock_intent(connection, actor.tenant_id, intent_alias)
-            if locked.intent["requested_by"] != actor.actor_id:
-                raise ScopeDenied("Resource unavailable")
-            require_transition(
-                INTENT_TRANSITIONS, PaymentState(locked.intent["state"]), PaymentState.CANCELLED
-            )
-            facts = _ProposalFacts.load(connection, actor, proposal)
-            if facts.refusal is not None:
-                return self._refuse(connection, actor, facts.refusal, None)
-            cancelled = _set_state(connection, locked.intent, PaymentState.CANCELLED)
-            self._audit(connection, actor, "INTENT_SUPERSEDED", cancelled.id, cancelled.state)
-            revision = locked.intent["intent_revision"] + 1
-            return self._create(connection, actor, proposal, revision, intent_alias, facts)
+            return self.revise_in_transaction(connection, actor, intent_alias, proposal)
+
+    def revise_in_transaction(
+        self,
+        connection: PolicyConnection,
+        actor: ActorContext,
+        intent_alias: str,
+        proposal: IntentProposal,
+    ) -> Created | Refused:
+        """Compose the existing revision with caller correlation on the same transaction."""
+        locked = lock_intent(connection, actor.tenant_id, intent_alias)
+        if locked.intent["requested_by"] != actor.actor_id:
+            raise ScopeDenied("Resource unavailable")
+        require_transition(
+            INTENT_TRANSITIONS, PaymentState(locked.intent["state"]), PaymentState.CANCELLED
+        )
+        facts = _ProposalFacts.load(connection, actor, proposal)
+        if facts.refusal is not None:
+            return self._refuse(connection, actor, facts.refusal, None)
+        cancelled = _set_state(connection, locked.intent, PaymentState.CANCELLED)
+        self._audit(connection, actor, "INTENT_SUPERSEDED", cancelled.id, cancelled.state)
+        revision = locked.intent["intent_revision"] + 1
+        return self._create(connection, actor, proposal, revision, intent_alias, facts)
 
     def cancel(self, actor: ActorContext, intent_alias: str) -> PaymentIntent:
         with self.database.connection() as connection:
-            locked = lock_intent(connection, actor.tenant_id, intent_alias)
-            if not may_view(actor.actor_id, locked.intent):
-                raise ScopeDenied("Resource unavailable")
-            current = PaymentState(locked.intent["state"])
-            require_transition(INTENT_TRANSITIONS, current, PaymentState.CANCELLED)
-            updated = _set_state(connection, locked.intent, PaymentState.CANCELLED)
-            self._audit(connection, actor, "INTENT_CANCELLED", updated.id, updated.state)
-            return updated
+            return self.cancel_in_transaction(connection, actor, intent_alias)
+
+    def cancel_in_transaction(
+        self,
+        connection: PolicyConnection,
+        actor: ActorContext,
+        intent_alias: str,
+    ) -> PaymentIntent:
+        """Compose cancellation with authority invalidation on the same transaction."""
+        locked = lock_intent(connection, actor.tenant_id, intent_alias)
+        if not may_view(actor.actor_id, locked.intent):
+            raise ScopeDenied("Resource unavailable")
+        current = PaymentState(locked.intent["state"])
+        require_transition(INTENT_TRANSITIONS, current, PaymentState.CANCELLED)
+        updated = _set_state(connection, locked.intent, PaymentState.CANCELLED)
+        self._audit(connection, actor, "INTENT_CANCELLED", updated.id, updated.state)
+        return updated
 
     def _create(
         self,

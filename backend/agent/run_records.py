@@ -25,6 +25,7 @@ TOOLS = frozenset(
         "get_trusted_beneficiary",
         "build_tuition_preview",
         "create_payment_intent",
+        "revise_payment_intent",
         "request_approval",
         "get_approval_status",
         "execute_payment",

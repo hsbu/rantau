@@ -132,6 +132,21 @@ Use this sequence wherever a case says **run the sponsor-payment flow**:
 
 ## Dev A Phase 2 owner run — 2026-10-19 to 2026-10-20
 
+**Implementation follow-up, 2026-10-20:** requester explicitly approved the constrained
+UX-02 design while retaining the full-balance/verified-payee policy. Chat now stages
+edits, shows requested amount/recipient restrictions, and requires `confirm revision`
+to invalidate old terms and save a valid replacement or cancel a blocked request.
+Correct a blocked amount with `full balance`; the same conversation can request new
+approval. Holds and started payments remain protected. Student approval/rejection is
+now available in Payments with exact-term EN/ID confirmation; a real own-funded
+browser run produced one debit, and the final blocked-edit/correction run produced
+zero debits plus a fresh pending approval. Demo now displays observed scenario/run.
+Specific private-data refusal was verified with the actual model. These supersede
+the implementation gaps in the historical table below; final release/review remains
+LIMITED. Latest local evidence: `.generated/acceptance/phase2-completion/` and
+`.generated/a-phase2-*.log`. A separate production frontend launch was blocked by
+automatic approval review; production runtime and native-device checks are unverified.
+
 Status: **LIMITED — owner verification/evidence draft; independent review and final release pending.** Source: main `5d9962a`, local A-08 `d3e5309` and subsequent local changes on `fix/tuition-planning-journey`. This run contributes to A-09/A-10/A-11, not a claim that all 24 cases or B/C tickets are complete. The final release run record above remains unfilled deliberately.
 
 Used visible connected Chat at `http://127.0.0.1:3003/student/chat`, actual student authentication, PostgreSQL 17 and OpenRouter `deepseek/deepseek-v4.1-flash-1017`. Sponsor/admin used a separate `localhost:3004` cookie Origin against the same isolated synthetic database. Natural requests used the model; exact action commands use the fixed graph. Payments, FX, provider outcomes and university posting are intentionally simulated. Student-owner decisions used existing protected authenticated HTTP because the browser lacks a student approval control; this is not a complete browser-only TC-04 pass.
@@ -630,13 +645,19 @@ without executing it. Use separate runs when testing pre- and post-approval edit
    use the previously approved draft when asked to continue.
 3. Request an unknown recipient. Verify no recipient rewrite or reused approval;
    apply the existing protected verification/hold boundary.
-4. Record the exact supported Payments handoff. Arbitrary amount/recipient editing
-   as a complete Chat revision flow remains a gap: leave full UX-02 sign-off
-   unchecked and record `LIMITED` unless that gap is implemented or the team
-   explicitly accepts the narrower behavior.
+4. Requester accepted the constrained policy on 2026-10-20. Review the revised
+   draft and send `confirm revision`: a valid route/funding replacement needs fresh
+   owner approval; a blocked amount/recipient cancels the earlier unstarted request
+   without payment. Verify old approval is `INVALIDATED_BY_CHANGE`, old intent is
+   `CANCELLED`, and repeating confirmation does not duplicate requests/effects.
+   Correct the amount with `full balance` or restore the verified university
+   recipient, then confirm the new revision. Never use this to bypass a hold or
+   a payment that has already started. Partial/arbitrary-recipient execution remains
+   forbidden. Leave final acceptance unchecked pending independent replay.
 
 **Evidence:** supported revision results, safe rejection/handoff and no stale debit.
-A passing safety test does not complete the missing free-form editing feature.
+The explicitly accepted scope includes editable blocked drafts and valid replacements;
+it does not authorize broader financial policy.
 
 ```powershell
 uv run pytest tests/finance/test_agent_ux.py::test_ux_02_amount_revision_cannot_execute_the_previously_approved_draft tests/finance/test_agent_approval.py::test_changed_funding_cannot_reuse_an_old_approval -q
@@ -771,6 +792,31 @@ npm --prefix frontend run test:e2e -- tests/chat-replies.spec.ts tests/chat-deta
 **Lead:** B, with A/C tool and financial evidence.
 
 ### 06 — Sandbox execution evidence and demo video
+
+Recording script for one continuous hero run (A-11; B/C review):
+
+| Step | Visible action | Proof / narration |
+|---|---|---|
+| 1 | Operator resets the isolated `tuition_missing_reference` fixture; student starts New chat. | Record release/build/model, observed scenario/run and initial balances. Keep the sandbox disclosure visible. |
+| 2 | Student: “Help me pay my full tuition”; answer missing funding with “my sponsor account” and select lowest cost. | Show actual-model interpretation, CNY 20,000 expected, exact principal/fee/total, recipient and expiry. |
+| 3 | Student: `confirm tuition`; separate sponsor switches summary to Indonesian and explicitly approves. | Same terms and a separate authenticated owner; approval itself moves no funds. |
+| 4 | Student: `continue tuition`; repeat once. | One debit/transfer. Provider delivery leaves university credit at zero; no PAID claim. |
+| 5 | Student asks why delivered tuition is uncredited, then `select payment 1` and `submit recovery` twice. | One SUBMITTED case, one original payment, zero university postings. |
+| 6 | Separate authenticated university/demo operator clicks University tick. | Independent simulator authority reviews/posts; this is not an agent tool or sponsor decision. |
+| 7 | Student: `check recovery`, then repeat once. | One linked CNY 20,000 posting, zero tuition remaining, one debit, one resolved case. |
+| 8 | Save final evidence and have a non-author replay without coaching. | Capture current-run SQL/tool snapshots before reset using the command below; review dialogue/screenshots and B authority/security proof alongside them. |
+
+```powershell
+uv run python -m scripts.capture_demo_evidence --output .generated/acceptance/hero/01-start.json
+# Repeat at the pre-posting and final checkpoints with new filenames.
+```
+
+The export is read-only and bounded, carries commit/model/application-source digest,
+and omits credentials, sessions, raw chat and document bodies. It is not a complete
+B authority/security export or a video. Record the attack branch from its own reset;
+do not splice separate runs into a claimed continuous hero. The final reviewed
+recording and deployment must match the selected release. Current local screenshots
+are rehearsal evidence; final video/release sign-off remains pending.
 
 - [ ] Save redacted operation logs and before/after linked database assertions with
   release commit, timestamps, scenario/run number and safe correlation references.

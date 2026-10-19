@@ -15,6 +15,7 @@ from backend.agent.classifier import (
 from backend.agent.conversation import conversational_reply
 from backend.agent.protection import AgentProtection
 from backend.agent.recovery import RecoveryWorkflow, payment_selection_command, recovery_command
+from backend.agent.revisions import TuitionRevisions
 from backend.agent.state import (
     ConversationKey,
     ConversationState,
@@ -49,6 +50,7 @@ class AgentGraph:
     ) -> None:
         self.conversations = conversations if conversations is not None else InMemoryConversations()
         self.actions = actions
+        self.revisions = TuitionRevisions(actions) if actions else None
         self.recovery = recovery
         self.protection = AgentProtection(actions) if actions else None
         self.tools = tools
@@ -146,7 +148,10 @@ class AgentGraph:
                 return self.recovery.reply(
                     "Select a payment in a current conversation before recovery submission/recheck."
                 ).model_copy(update={"run_id": f"run_{uuid4().hex}"})
-            if self.actions and action_command(message):
+            if self.actions and (
+                action_command(message)
+                or message.strip().casefold().rstrip(".!?") == "confirm revision"
+            ):
                 return action_reply(
                     "A current conversation and reviewed tuition preview are "
                     "required before confirmation.",
@@ -161,6 +166,7 @@ class AgentGraph:
             conversation_id=conversation_id,
         )
         async with self.conversations.turn(key) as session:
+            revision = message.strip().casefold().rstrip(".!?") == "confirm revision"
             command = action_command(message) if self.actions else None
             recovery = recovery_command(message) if self.recovery else None
             selection = payment_selection_command(message) if self.recovery else None
@@ -193,10 +199,23 @@ class AgentGraph:
                     update={"recovery": selected, "active_intent": Intent.RECOVER}
                 )
                 response = response.model_copy(update={"run_id": f"run_{uuid4().hex}"})
+            elif revision and self.revisions:
+                response, tuition = await self.revisions.confirm(key, actor, session.state.tuition)
+                updated = session.state.model_copy(
+                    update={"tuition": tuition, "active_intent": Intent.TUITION}
+                )
+                response = response.model_copy(update={"run_id": f"run_{uuid4().hex}"})
             elif command:
                 updated = session.state
                 proposal = proposal_of(updated.tuition)
-                if updated.active_intent not in {Intent.TUITION, Intent.VERIFY_MESSAGE} or (
+                if updated.tuition.revision_pending:
+                    response = action_reply(
+                        "Review the revised draft first. Say 'confirm revision' to replace or "
+                        "cancel the earlier unstarted request. Existing approval does not "
+                        "cover changed terms; no payment was executed.",
+                        "clarify_tuition",
+                    )
+                elif updated.active_intent not in {Intent.TUITION, Intent.VERIFY_MESSAGE} or (
                     proposal is None
                 ):
                     response = action_reply(
@@ -229,9 +248,33 @@ class AgentGraph:
                 response = response.model_copy(update={"run_id": f"run_{uuid4().hex}"})
             else:
                 response, updated = await self._turn(message, actor, session.state)
-                if self.actions and any(
-                    e.tool == "build_tuition_preview" and e.status == "OK"
-                    for e in response.tool_events
+                if self.revisions and response.requested_action == Intent.TUITION:
+                    pending = await self.revisions.stage(key, actor, updated.tuition)
+                    updated = updated.model_copy(
+                        update={
+                            "tuition": updated.tuition.model_copy(
+                                update={"revision_pending": pending}
+                            )
+                        }
+                    )
+                    if pending:
+                        response = response.model_copy(
+                            update={
+                                "message": response.message
+                                + "\n\n**Review this change**\n\nThe earlier saved request remains "
+                                "unchanged until you confirm the revision. Say `confirm revision` "
+                            "to cancel its old terms and request fresh owner approval "
+                            "for a valid replacement. "
+                                "This does not execute a payment."
+                            }
+                        )
+                if (
+                    self.actions
+                    and any(
+                        e.tool == "build_tuition_preview" and e.status == "OK"
+                        for e in response.tool_events
+                    )
+                    and not updated.tuition.revision_pending
                 ):
                     response = response.model_copy(
                         update={

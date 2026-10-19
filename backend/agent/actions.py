@@ -23,7 +23,7 @@ from backend.contracts.models import (
     ServiceUnavailable,
 )
 from backend.finance.outcomes import Refused
-from backend.finance.records import intent_from_row, lock_intent
+from backend.finance.records import Row, intent_from_row, lock_intent
 from backend.finance.wiring import FinanceServices
 
 Command = Literal["REQUEST", "CONTINUE"]
@@ -126,6 +126,24 @@ class TuitionActions(_Storage):
             json.dumps([key.model_dump(), scenario, proposal.model_dump()], sort_keys=True).encode()
         ).hexdigest()
 
+    @staticmethod
+    def record_for_proposal(
+        connection: PolicyConnection, key: ConversationKey, scenario: int, proposal: IntentProposal
+    ) -> Row | None:
+        return connection.execute(
+            "SELECT action_key,intent_id,terms_hash,execution_key FROM agent_actions "
+            "WHERE tenant_id=%s AND actor_id=%s AND session_id=%s AND conversation_id=%s "
+            "AND scenario_run_no=%s AND proposal=%s ORDER BY created_at DESC LIMIT 1",
+            (
+                key.tenant_id,
+                key.actor_id,
+                key.session_id,
+                key.conversation_id,
+                scenario,
+                Jsonb(proposal.model_dump()),
+            ),
+        ).fetchone()
+
     def _prepare(
         self, key: ConversationKey, proposal: IntentProposal, actor: ActorContext, *, create: bool
     ) -> Correlation | Refused | None:
@@ -135,11 +153,7 @@ class TuitionActions(_Storage):
             connection.execute(
                 "SELECT pg_advisory_xact_lock(%s)", (_lock_id("agent-action", (action_key,)),)
             )
-            row = connection.execute(
-                "SELECT action_key,intent_id,terms_hash,execution_key FROM agent_actions "
-                "WHERE action_key = %s",
-                (action_key,),
-            ).fetchone()
+            row = self.record_for_proposal(connection, key, scenario, proposal)
             if row:
                 self._require(connection, actor)
                 return Correlation.model_validate(row)

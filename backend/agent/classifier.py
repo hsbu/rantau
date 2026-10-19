@@ -22,6 +22,7 @@ class IntentClassification(Contract):
             "UNSUPPORTED_TRAVEL",
             "UNSUPPORTED_ACADEMIC",
             "UNSUPPORTED_FINANCIAL_ACTION",
+            "PRIVATE_DATA",
             "UNSUPPORTED_GENERAL",
             "CLARIFY",
         ]

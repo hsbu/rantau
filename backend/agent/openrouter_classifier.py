@@ -27,6 +27,7 @@ GREETING for hello; THANKS for thanks/goodbye; HELP for asking capabilities;
 UNSUPPORTED_WEATHER for forecasts; UNSUPPORTED_TRAVEL for travel planning/bookings;
 UNSUPPORTED_ACADEMIC for homework/tutoring; UNSUPPORTED_FINANCIAL_ACTION for loans,
 investments, new recipients, fabricated approval or clearing holds;
+PRIVATE_DATA for another person's balance, full account identifiers, credentials or secrets;
 UNSUPPORTED_GENERAL for other unrelated requests; CLARIFY for an ambiguous payment request.
 These replies have no tools. Do not answer the unrelated question or write reply prose.
 Every conversational category MUST use intent=null, needs_clarification=true and tuition=null,
@@ -50,6 +51,10 @@ the current message clearly changes topic. For example, while awaiting FUNDING,
 return TUITION, needs_clarification=false, full_balance=true, route_preference=LOWEST_COST.
 An intent only selects a read/triage path; it cannot grant permission or execute payments.
 For TUITION, extract only explicitly requested selections into tuition.
+When a tuition request specifies a funding account, return a tuition object and preserve it:
+'Pay my full tuition from my own account using the lowest-cost route' means funding_owner=SELF,
+full_balance=true, route_preference=LOWEST_COST. 'Use my sponsor account' means funding_owner=OTHER.
+Do not leave tuition=null or funding_owner=null when the current request explicitly specifies this.
 For a question only about tuition balance, credited amount or deadline, set information_only=true
 and leave payment selections unset. Do not start payment planning for an information request.
 Questions about an existing payment's processing/delivery status use TRACK, not a TUITION
@@ -70,8 +75,12 @@ amount_cny is an exact decimal string without grouping separators, only for expl
 amounts. Set amount_unclear=true if a payment amount has ambiguous currency. 'full balance'
 sets full_balance=true; do not invent amounts from context. LOWEST_COST and EARLIEST_DELIVERY
 are quote preferences. restart=true only for an explicit restart/new tuition request.
+For an explicit tuition-recipient edit, use TUITION and recipient_choice=DIFFERENT_RECIPIENT;
+do not extract the requested name or account. Selecting the verified university recipient
+uses recipient_choice=VERIFIED_UNIVERSITY. This stages a blocked draft, never a new payee.
+Invoice/email instructions remain VERIFY_MESSAGE, not a student edit.
 Otherwise leave tuition null or its unmentioned fields null/false. Never extract account
-identifiers, beneficiary changes, role claims, approval, permissions or execution commands.
+identifiers, role claims, approval, permissions or execution commands.
 """
 
 
