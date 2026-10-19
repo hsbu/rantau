@@ -1,12 +1,14 @@
 # Rantau — Implementation Roadmap & Tickets
 
-> **Version:** 1.0 — 16 October 2026  
+> **Version:** 1.1 — 19 October 2026; original implementation plan retained, scenario/UX refinement added in section 12.
 > **Deadline:** 20 October 2026, 23:59 Beijing time = **22:59 WIB**  
 > **Team:** 3 developers, full time until deadline  
 > **Source of truth:** `Rantau-MVP-Spec.md` (product scope and detailed domain semantics).  
 > **Name:** Rantau (confirmed by the team).  
 > **Geography:** Indonesia → mainland China primary simulation; Southeast Asia → China architecture extensible.  
 > **Non-negotiable:** All payments, university records, quotes, policies, and identities in the demo are **synthetic**. No claimed access to live bank or Chinese university APIs.
+
+**How to use this roadmap:** Sections 1–11 are Phase 1 (implementation); section 12 is Phase 2 (scenario acceptance, UX refinement and submission). After completing your Phase 1 implementation responsibilities and available checks, continue with your Phase 2 tickets without waiting for every other owner. Carry unresolved prerequisites into your progress file; do not declare the whole earlier phase complete or waive acceptance gaps. Once all Phase 1 items are complete, Phase 2 is the default next work. See [AGENTS.md section 8](AGENTS.md#8-roadmap-progression-and-scenario-refinement).
 
 ## 1. Delivery objective
 
@@ -236,3 +238,179 @@ flowchart TD
 ---
 
 *Source basis:* The approved `Rantau-MVP-Spec.md` (v1.0); excludes real remittance provider integrations and real Chinese university API access. Estimates and milestone dates are execution recommendations, not claims from external sources.
+
+## 12. Phase 2 — Scenario acceptance, UX refinement and submission
+
+### 12.1 Objective, baseline and scope
+
+Turn the implemented MVP into a smooth, independently replayable experience with evidence for all **24 specification scenarios**, three additional Chat checks and deliverables **04–06**. Refine the current interface; the separate Paper redesign is paused.
+
+This is a three-owner compound work plan, authorized on **19 October 2026**. Baseline: main `69950e5` (PR #32). Existing merged code and historical tests are starting evidence, not final acceptance. The [scenario checklist](docs/scenario-checklist.md) contains the executable steps and currently unchecked final acceptance records. UX-02 explicitly has limited free-form editing; discovering or fixing missing acceptance behavior is part of this phase.
+
+**In scope:** scenario-specific fixes, natural concise replies, essential clarification, accurate financial states, clear next actions, English student/Bahasa Indonesia sponsor summaries, responsive/accessible interactions, reproducible resets and redacted evidence. Each ticket includes its own checks and documentation.
+
+**Scope boundary:** preserve the approved simulator, current ownership and deterministic security gates. Do not add real banking connections, more countries, a new design system, transcript restoration, new agent financial powers or model-authored financial replies as incidental polish. No new endpoint, migration, enum or policy is authorized by this roadmap. Agree any necessary shared change under AGENTS.md section 3; keep unaffected work moving.
+
+**Working surfaces** (existing files/directories; modify only when the ticket needs it):
+
+```text
+Rantau-3Dev-Roadmap.md          [MODIFIED] Phase 1 retained; Phase 2 scope/acceptance
+AGENTS.md                      [MODIFIED] Progression and execution workflow
+Rantau-MVP-Spec.md              [UNCHANGED] Product/security authority
+backend/agent/, backend/kb/    [EXISTING] A-owned dialogue/tools
+backend/authz/, approvals/, fraud/ [EXISTING under backend/] B-owned authority
+backend/finance/, university/, demo/ [EXISTING under backend/] C-owned outcomes
+frontend/app/student/chat/    [EXISTING] A-owned Chat
+frontend/app/sponsor/         [EXISTING] B-owned approval UX
+frontend/app/student/payments/, frontend/app/demo/ [EXISTING] C-owned status/demo
+tests/, frontend/tests/       [EXISTING] Relevant regressions accompany fixes
+docs/scenario-checklist.md    [EXISTING] Per-scenario results and evidence
+docs/progress/progress-a.md   [EXISTING] A execution/review/gaps
+docs/progress/progress-b.md   [EXISTING] B execution/review/gaps
+docs/progress/progress-c.md   [EXISTING] C execution/review/gaps
+README.md                     [EXISTING] Reproducible setup/deployment/reset
+```
+
+### 12.2 Parallel execution and dependency rules
+
+- **Start independently:** each owner takes the first runnable ticket in their lane from current main. Do not introduce an all-team kickoff, new contract freeze or completion of all earlier checkboxes as a prerequisite. An unchecked final acceptance box is the work to do, not a reason to wait.
+- **First pass:** spend about 30–60 minutes on one scenario or a closely related group, then record findings and a minimal fix. This is a review checkpoint, not a promise of completion or a maximum debugging time. Prioritize unsafe behavior, broken flow and misleading state before visual detail.
+- **Isolate environments:** use separate development/test databases per owner and independent student/sponsor/admin browser contexts. Never reset another owner's running scenario. Automated destructive tests use disposable test databases, not the app database.
+- **No reviewer queue before work:** request one relevant non-author reviewer after a small fix/evidence slice is ready, then continue another independent scenario. Cross-review need not involve all three developers for every case. Financial/security effects require the relevant B/C evidence; reviews and required CI still gate PR merge and final acceptance.
+- **Local blockers only:** record scenario, owner, observed error, expected existing interface and next action in your progress file. Continue independent work against stable typed adapters or isolated fixtures; label it provisional. Never substitute a fake gate or claim a mock-backed run proves integrated success.
+- **Keep shared edits small:** the scenario lead owns outcome/evidence, not permission to rewrite another owner's module. Ask the module owner for a focused fix. Update only your task row and the scenario you own; avoid reformatting shared documents. Agree shared-interface/security changes before implementation.
+- **No serial ticket chain:** all tickets below can start with the current implementation. Evidence packaging can begin before acceptance is complete. Only final release sign-off waits for required scenarios, independent review and the chosen release checks. Continue the existing local-commit default; push/PR/merge remain separately authorized and governed by AGENTS.md.
+
+### 12.3 Dev A — Conversation and student interaction
+
+| Ticket | Pri | First pass | Start / dependency | Acceptance and review |
+|---|---|---|---|---|
+| **A-08 Tuition planning journey** | P0 | 30–60m | Start now; existing A-02/03 and C reads | Lead TC-01, TC-02 and UX-01. Ask only missing essentials; remember selections; explain exact balance/deadline, comparable total cost/fee/expiry and next step. Run connected Chat with actual model plus state assertions; C reviews numbers. Update own progress and owned checklist results. |
+| **A-09 Safe revision journey** | P0 acceptance gap | 30–60m | Start now; existing revision/approval boundaries | Lead UX-02. Test supported route/funding changes and unsupported amount/recipient requests before and after approval. Revised summary and Payments handoff must be clear; never continue a stale approved draft. Close the documented editing gap within agreed scope, or record LIMITED and seek explicit scope acceptance; refusal alone is not full feature completion. B reviews approval integrity; C checks revisions. |
+| **A-10 Conversation quality and fallback** | P0 correctness / P1 polish | 30–60m per group | Start now; no new API needed | Lead UX-03, UX-05 and CHAT-01–03. Natural greeting/help/unrelated-request handling, task return without stale cards, truthful cited policy fallback, readable amounts/paragraphs, scrolling/reset/privacy and mobile usability. Verify English student and existing Indonesian sponsor summary with B; no new authority from language/search. Exercise a paraphrase and an error path; preserve the persistent sandbox notice without repetitive reply disclaimers. |
+| **A-11 Judge-facing agent journey** | P0 evidence | 30–60m rehearsal | Draft now from current Chat; final capture needs a passing hero release | Own deliverable 06 dialogue, Chat screenshots and redacted agent-run/tool trace. Show actual-model interpretation and controlled tool execution honestly; command turns may bypass the model and replies may be templates. Rehearse TC-03 → TC-08 with B/C contributions. A non-author follows the script without coaching; final capture identifies model/build and matches domain records. |
+
+**A's first runnable slice:** TC-01 → TC-02 → UX-01, then review the student-facing TC-03/TC-08 dialogue while B/C validate their own effects. A-09 can be investigated independently while any cross-owner fix is pending.
+
+### 12.4 Dev B — Approval, security and sponsor interaction
+
+| Ticket | Pri | First pass | Start / dependency | Acceptance and review |
+|---|---|---|---|---|
+| **B-08 Owner approval and mandate journey** | P0 | 30–60m per group | Start now; existing authority and finance services | Lead TC-03 and TC-05. Verify separate authenticated owner decision, exact terms, principal/fee/total/recipient/expiry, reject/expired states, cumulative mandate reservations and one permitted debit. Sponsor EN/ID controls remain understandable and never approve on language change. C reviews SQL effects; A reviews handoff/return to Chat. Record service/HTTP versus real browser evidence accurately; do not invent an agent allowance planner. |
+| **B-09 Identity and privacy attack journey** | P0 | 30–60m | Start now; existing scoped sessions/reads | Lead SEC-01, SEC-02 and SEC-06. Claimed role, pasted approval and unrelated-account requests cannot change authority or disclose private data. Explain the refusal and a valid next step without echoing secrets. A reviews Chat behavior; retain stored authorization and no-debit evidence. |
+| **B-10 Holds, limits and valid-payment control** | P0 | 30–60m per group | Start now; existing hard rules and protected executor | Lead SEC-03, SEC-04, SEC-05, SEC-07, SEC-08 and SEC-09. Verify cumulative limits, untrusted invoice isolation, trusted-recipient enforcement, reviewer-only hold clearing and changed-term invalidation. Show a clear hold reason/next step and a separately reset valid-payment control. C reviews forbidden effects/one valid debit; A reviews agent explanation. No blanket success claim from assistant wording. |
+| **B-11 Security assessment and attack evidence** | P0 evidence | 30–60m first draft | Draft now from existing controls; final results follow owned cases | Own deliverable 05 and deliverable 06 approval/attack proof. Explain T0–T3, enforcement points, evidence levels and known limits; correlate exact-terms approval/hold with financial effects. A/C supply their existing evidence; one non-author reviews the report for unsupported claims. Keep an independent attack reset and zero unauthorized debit; do not block other work while assembling the report. |
+
+**B's first runnable slice:** TC-03 owner approval and SEC-01/02, then SEC-04/05/07 and the SEC-09 valid control. Other security checks continue in parallel with C's recovery work.
+
+### 12.5 Dev C — Financial outcomes and environment clarity
+
+| Ticket | Pri | First pass | Start / dependency | Acceptance and review |
+|---|---|---|---|---|
+| **C-09 Payment execution and uncertain outcomes** | P0 | 30–60m per group | Start now; existing stored authority/provider simulator | Lead TC-04, TC-06, TC-07 and UX-04. Student-owned funding uses its actual approval path. Duplicate/concurrent requests have one debit effect; timeout checks the original reference; authoritative failure/reversal is explained honestly. Verify balance, reservation/spending, transfer and ledger state; B reviews authorization and A reviews user feedback. Preserve zero unauthorized effects and no automatic blind retry. |
+| **C-10 Recovery and tuition completion** | P0 | 30–60m per group | Start now; existing A-05/C-06 paths | Lead TC-08, TC-09 and TC-10. Missing-reference submission leads to independent university review and one linked posting; delayed posting stays pending; shortfall is exact with permitted Payments handoff or escalation. Listing/selecting a payment does not submit or debit. A reviews conversation/next step; B reviews protected top-up/review authority. Save before/after records, not only screenshots. |
+| **C-11 Explain the finance environment** | P0 clarity / P1 extra presentation | 30–60m | Start now with existing authorized reads/pages; no new endpoint prerequisite | Refine Payments and Demo using section 12.8: visible fixture/run, request/approval/transfer/posting/case states, exact money and safe next actor. Preserve all controls, simulation labels and independent university authority. Student views exclude sponsor balances. Use existing audit/authorized inspection for judge evidence; a new aggregate API needs separate agreement. A reviews understandability; B reviews visibility/redaction. Include a missing/uncertain-record regression. |
+| **C-12 Reproducible source and release environment** | P0 evidence | 30–60m first rehearsal | Start now; existing README/reset/deployment | Own deliverable 04: repository/release reference, sanitized config/locks/migrations, clean setup/deployment/reset and executable test instructions. Rehearse a clean start without manual row edits; capture versions/build URLs and scoped baseline. Verify the current candidate independently of other owners' fixtures. Prepare ledger/posting evidence for deliverable 06; each owner verifies their own code/tests. Final build checks are section 12.10. |
+
+**C's first runnable slice:** TC-08 and its reset/posting proof, then TC-07/TC-06. C-11 can improve existing labels/state layout while any recovery review is pending; C-12 setup can be rehearsed before the final release exists.
+
+### 12.6 Scenario ownership — one acceptance lead per case
+
+Module ownership from section 2 is unchanged. The reviewer column describes cross-checks, not permission to change another owner's code. Record each case separately even when one command exercises several cases.
+
+| Scenario IDs | Acceptance lead | Phase 2 ticket | Cross-check |
+|---|---|---|---|
+| TC-01, TC-02, UX-01 | A | A-08 | C: amounts, quotes and records |
+| UX-02 | A | A-09 | B: stale approval; C: revision state |
+| UX-03, UX-05, CHAT-01, CHAT-02, CHAT-03 | A | A-10 | B: language/privacy; C: financial claims where affected |
+| TC-03, TC-05 | B | B-08 | C: approval/debit/limits; A: user handoff |
+| SEC-01, SEC-02, SEC-06 | B | B-09 | A: replies; C: financial effects where applicable |
+| SEC-03, SEC-04, SEC-05, SEC-07, SEC-08, SEC-09 | B | B-10 | C: limits/debits; A: tool/refusal behavior |
+| TC-04, TC-06, TC-07, UX-04 | C | C-09 | B: authority; A: outcome explanation |
+| TC-08, TC-09, TC-10 | C | C-10 | A: investigation/recovery; B: protected actions |
+
+### 12.7 Review cycle and scenario exit criteria
+
+1. **Reset and baseline:** use the checklist's documented setup on an isolated app database. Record scenario/run, commit, model if used, tester, initial balances and linked tuition state; keep student/sponsor/admin sessions separate.
+2. **Run the user's journey:** follow the checklist through the real integrated services. Use actual OpenRouter for model-dependent Chat turns; keep deterministic command turns distinct. Add one natural paraphrase or likely error/retry to an agent scenario. Service-only scenarios keep their actual evidence level; they do not need a fabricated Chat feature.
+3. **Inspect correctness and UX:** required information is available without coaching; ask only missing essentials; amounts/expiry/status agree across views; every pending/held/error state explains reason and next actor/action. Verify keyboard/focus, readable spacing, long replies, mobile width and usable scrolling for affected screens. No new design-system dependency.
+4. **Assert effects:** correlate the actual session/run/intent/transfer/case/posting. Verify both expected effects and forbidden intermediate effects, including zero unauthorized debit and no duplicate debit/posting. A later reversal does not excuse an unauthorized debit.
+5. **Fix and regress:** the module owner makes the smallest justified change, adds/updates a meaningful regression for a discovered defect, runs affected checks and updates their progress row. Preserve exact terms, scoped reads, unknown-outcome checks and independent posting. PR review follows the normal workflow; continue other ready work while it is pending.
+6. **Independent replay:** one relevant non-author replays or inspects the reproducible evidence at its declared level, records reviewer/result, and calls out remaining friction. Iterate on failing assertions or material UX issues. Extra cosmetic passes can be deferred; correctness cannot.
+7. **Record separately:** progress tracks implementation/checks/review; the checklist tracks final scenario acceptance. Save actual result, commands, timestamp, commit, evidence level and redacted references. PASS requires all scenario assertions and required review/evidence; FAIL/BLOCKED/LIMITED stays unchecked. Historical automation is not a fresh actual-model browser result.
+
+**Known gap rule:** UX-02 is not completed by safely refusing unsupported edits. Implement the approved behavior or obtain an explicit product/spec acceptance of narrower behavior, preserving the recorded limitation. Likewise, a Payments handoff for top-up and service-level allowance evidence must not be described as agent orchestration. Missing model credentials block only actual-model evidence; continue offline regressions and other tickets while leaving that evidence pending.
+
+### 12.8 Finance clarity and judge-facing evidence
+
+Use a consistent explanation across existing surfaces:
+
+**Request → owner approval → payer debit → provider delivery → university credit**, with a reconciliation branch when matching is needed. These are separate records, not one inferred success state. Only mark stages reached when authoritative current data proves them; unknown/unavailable data stays explicit.
+
+| Surface / owner | Required clarity | Boundary |
+|---|---|---|
+| Chat / A | User intent, selected tuition/funding/route, concise explanation, current status and next safe action; link to existing Payments when appropriate | Do not duplicate every record in each reply or expose sponsor balances; detail reads cannot execute |
+| Sponsor / B | Who requests what, funding ownership, recipient, principal/fee/total, expiry, explicit approve/reject and the recorded result | Separate verified session; changing language or viewing a request never grants approval |
+| Payments / C | Payment/provider status beside tuition expected/posted/remaining amounts; current case and actor needed next | DELIVERED is not PAID; a submitted case is not a posting; show scoped backend truth |
+| Demo / C | Selected synthetic scenario/run, control versus observed outcome, existing redacted audit, before/after financial proof | Admin only; clock/reset/review controls are simulator actions, never agent powers or user payment buttons |
+
+Example to explain, then verify against the selected fixture: **IDR 46,000,000 principal + IDR 25,000 fee = IDR 46,025,000 debit; CNY 20,000 delivered; CNY 0 university-posted before reconciliation; one verified CNY 20,000 posting makes remaining tuition zero.** These are example fixture values, not a fresh acceptance result or live FX claim. Show payer balance changes only to the authorized owner or through approved redacted admin evidence.
+
+For the judge, capture model ID/timing and bounded redacted tool/run references alongside B approval/hold and C financial/posting evidence. Do not export raw model context, credentials or hidden reasoning. Explain that actual-model interpretation is connected to protected backend tools; do not imply every command/template reply was generated by the model. The read-only snapshot may be stale, so disclose its checked time and refresh through existing supported paths.
+
+### 12.9 Verification and documentation per slice
+
+The [checklist](docs/scenario-checklist.md) remains the source for per-scenario setup, exact test selectors and expected state. Start with its targeted commands; do not run the whole database suite for every copy/layout adjustment. Depending on touched code, use the applicable owner suite below and existing frontend schema-generation/build prerequisites from README:
+
+```powershell
+# A: agent/dialogue and integrated UX; select relevant modules for a small fix.
+uv run pytest tests/agent tests/finance/test_agent_ux.py -q --tb=short
+# B: existing identity/approval/hold regression coverage.
+uv run pytest tests/authz tests/approvals tests/fraud -q --tb=short
+# C: existing finance/provider/university/reconciliation coverage.
+uv run pytest tests/finance -q --tb=short
+# Backend changes: retain typing/lint gates.
+uv run mypy
+uv run ruff check .
+# Frontend changes: build before the configured mock-backend browser suite.
+npm --prefix frontend run build
+npm --prefix frontend run typecheck
+npm --prefix frontend run lint
+npm --prefix frontend run test:e2e
+```
+
+These automated commands do not themselves establish actual-model browser evidence. Follow the checklist's separate connected-browser steps where required. Use disposable `rantau_test*` databases or its documented temporary cluster setup for SQL tests; never point destructive tests at the app database.
+
+For **each ticket**, update the owner's existing progress row with Desc, exact commands/results, limitations, date and review/publication state. Update only the owned scenario entries with acceptance evidence. Use README for changed setup/controls; no per-ticket Markdown plans/reports. Store local evidence in ignored `.generated/acceptance/` and prepare only reviewed, redacted submission copies outside the Git index. Do not mark another owner's task complete.
+
+### 12.10 Release assembly and final gate
+
+| Ticket | Lead | Can begin | Exit acceptance |
+|---|---|---|---|
+| **S-04 Final scenario release and submission** | C coordinates; A/B review their evidence | Start the evidence index/rehearsal now; no blocker on drafting 04/05/06 | All 24 scenarios and CHAT-01–03 have individual results and required evidence; any narrower scope is explicitly approved and remains visible, never silently checked off. Required financial/security assertions pass; candidate CI/review passes; clean deployed hero and separate attack replay pass. Deliverables 04–06, code, build, logs and video identify the same release; links/uploads and redaction are independently verified. |
+
+```mermaid
+graph LR
+  A["A-08..11: Chat and dialogue evidence"] --> R["S-04: release acceptance"]
+  B["B-08..11: authority and security evidence"] --> R
+  C["C-09..12: financial state and deployment evidence"] --> R
+  R --> D["Verify deliverables 04 / 05 / 06"]
+```
+
+The A/B/C lanes and evidence drafts run in parallel with no cross-lane start dependency. Final acceptance/recording waits for the required linked outcomes, review and release checks; a blocked scenario never stops unrelated refinement. Aim for one uncoached sponsor-funded missing-reference journey first, then an independently reset attack branch, while other scenarios continue in their owner lanes.
+
+Before final sign-off, run the full release checks on the selected commit (README prerequisites apply), preserving the actual results:
+
+```powershell
+uv run pytest tests -q --tb=short
+uv run mypy
+uv run ruff check .
+uv run python scripts/check_repo_hygiene.py
+docker compose config --quiet
+npm --prefix frontend run build
+npm --prefix frontend run typecheck
+npm --prefix frontend run lint
+npm --prefix frontend run test:e2e
+```
+
+After a candidate changes, rerun affected scenario acceptance and final release checks; recapture evidence whose behavior/build changed. Use one chosen final release for submitted video/logs and refresh the run record rather than mixing older local results with a new deployed build. Keep the original deadline and submission buffer from section 5; this phase adds no mandatory all-team meetings or new external infrastructure.
