@@ -12,6 +12,7 @@ export function trustSteps(
   const transfer = detail.provider_status?.transfer_status;
   const paid = detail.state === "PAID";
   const sent = transfer !== undefined;
+  const debited: StepStatus = !sent ? "todo" : transfer === "FAILED" ? "problem" : "done";
   const provider: StepStatus = transfer === "DELIVERED" ? "done"
     : transfer === "FAILED" || transfer === "OUTCOME_UNKNOWN" ? "problem"
     : transfer === "PROCESSING" ? "current" : "todo";
@@ -22,6 +23,7 @@ export function trustSteps(
     : detail.state === "EXCEPTION" || detail.state === "ESCALATED" ? "problem" : "todo";
   return [
     { key: "sponsor", label: ui.steps.sponsor, status: sent ? "done" : sponsorStatus(pending) },
+    { key: "debited", label: ui.steps.debited, status: debited },
     { key: "provider", label: ui.steps.provider, status: provider },
     { key: "posting", label: ui.steps.posting, status: posting },
     { key: "reconciliation", label: ui.steps.reconciliation, status: reconciliation },
@@ -33,4 +35,25 @@ function sponsorStatus(pending?: Schema["PaymentIntentView"]): StepStatus {
   if (!pending) return "todo";
   if (pending.state === "AWAITING_APPROVAL") return "current";
   return pending.state === "ON_HOLD" ? "problem" : "done";
+}
+
+export type NextActor = keyof typeof ui.nextActor;
+
+// Names the one party who must act next, from backend states only.
+export function nextActor(
+  detail: Schema["TuitionObligationDetail"],
+  pending?: Schema["PaymentIntentView"],
+): NextActor {
+  if (pending?.state === "AWAITING_APPROVAL") return "approval";
+  if (pending?.state === "AUTHORIZED") return "continue";
+  if (pending?.state === "ON_HOLD") return "hold";
+  switch (detail.state) {
+    case "PAID": return "paid";
+    case "AWAITING_POSTING": return "posting";
+    case "EXCEPTION": return "exception";
+    case "RECONCILIATION_PENDING": return "review";
+    case "PARTIALLY_POSTED": return "shortfall";
+    case "ESCALATED": return "escalated";
+    default: return "start";
+  }
 }

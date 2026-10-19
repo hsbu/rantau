@@ -113,10 +113,24 @@ export const ui = {
   sender: { en: "Claimed sender", id: "Pengirim yang diklaim" },
   steps: {
     sponsor: { en: "Sponsor approval", id: "Persetujuan sponsor" },
+    debited: { en: "Payer debited", id: "Pembayar didebit" },
     provider: { en: "Provider delivered", id: "Penyedia mengirim" },
     posting: { en: "University posting", id: "Pencatatan universitas" },
     reconciliation: { en: "Reconciliation", id: "Rekonsiliasi" },
     paid: { en: "Tuition paid", id: "Uang kuliah lunas" },
+  },
+  next: { en: "Next", id: "Berikutnya" },
+  nextActor: {
+    start: { en: "You choose a route to start a payment.", id: "Anda memilih rute untuk memulai pembayaran." },
+    approval: { en: "The funding owner approves or rejects these exact terms.", id: "Pemilik dana menyetujui atau menolak rincian ini." },
+    continue: { en: "You continue the approved payment.", id: "Anda melanjutkan pembayaran yang disetujui." },
+    hold: { en: "A reviewer must clear the hold. Do not pay again.", id: "Peninjau harus mencabut penahanan. Jangan bayar lagi." },
+    posting: { en: "The university posts the payment. You can recheck; do not pay again.", id: "Universitas mencatat pembayaran. Anda dapat cek ulang; jangan bayar lagi." },
+    exception: { en: "You open a reconciliation case so the university can review it.", id: "Anda membuka kasus rekonsiliasi agar universitas dapat meninjaunya." },
+    review: { en: "The university reviews the case. You can recheck.", id: "Universitas meninjau kasus. Anda dapat cek ulang." },
+    shortfall: { en: "Ask the university about the remainder, or request a top-up if it is permitted.", id: "Tanyakan sisa tagihan ke universitas, atau minta tambahan dana jika diizinkan." },
+    escalated: { en: "The university office handles this case.", id: "Kantor universitas menangani kasus ini." },
+    paid: { en: "Nothing more to do: the university credited the full amount.", id: "Tidak ada lagi yang perlu dilakukan: universitas mencatat seluruh jumlah." },
   },
 } satisfies Record<string, Label | Record<string, Label>>;
 

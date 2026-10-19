@@ -52,4 +52,12 @@ export async function interpret<T>(response: Response): Promise<ApiResult<T>> {
   return { ok: true, data: (response.status === 204 ? undefined : await response.json()) as T };
 }
 
+// A Response with a null-body status (204) must not be constructed with a body, even an empty one.
+const NULL_BODY_STATUSES = new Set([204, 205, 304]);
+
+export async function relayResponse(response: Response, headers: Record<string, string>): Promise<Response> {
+  const body = NULL_BODY_STATUSES.has(response.status) ? null : await response.text();
+  return new Response(body, { status: response.status, headers: { ...headers, "Content-Type": "application/json" } });
+}
+
 export { upstream };
