@@ -1,6 +1,11 @@
 .git
 .env
 .env.*
+**/.env
+**/.env.*
+!**/.env.example
+.generated
+**/*.tsbuildinfo
 .venv
 **/node_modules
 **/.next

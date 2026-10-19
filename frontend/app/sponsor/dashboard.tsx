@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { components } from "../../lib/api-contracts/generated";
 import Link from "next/link";
+import { PageHeading } from "../components/workspace-page";
 import { WorkspaceHeader } from "../components/workspace-header";
 import { CredentialsFields, validateCredentials, type FieldErrors } from "../components/credentials-fields";
 import uiStyles from "../components/ui.module.css";
@@ -386,12 +387,12 @@ export function SponsorDashboard() {
 
   return <>{header}<main id="main-content" tabIndex={-1} className={styles.page}>
     <section className={styles.intro}>
-      <p className={styles.eyebrow}>Sponsor workspace</p>
-      <h1>Review payment requests</h1>
+      <PageHeading eyebrow="Sponsor workspace" title="Review payment requests"
+        description="Check the recipient and full cost before recording a decision.">
       <label className={styles.summaryLanguage}>Summary language <select aria-label="Summary language" value={language}
         onChange={event => setLanguage(event.target.value === "id" ? "id" : "en")}><option value="en">English</option><option value="id">Bahasa Indonesia</option></select></label>
+      </PageHeading>
       <p className={styles.muted}>Language applies to payment summaries and confirmation. Dates use China time (UTC+08:00).</p>
-      <p>Check the recipient and full cost before recording a decision.</p>
       <div className={styles.safety} role="note">
         <span aria-hidden="true">ⓘ</span>
         <p>An approval authorizes an attempt. It does not move money or confirm tuition has been posted.</p>
@@ -423,7 +424,7 @@ export function SponsorDashboard() {
         </div>
       </section>}
 
-      <section className={styles.section} aria-labelledby="cases-title">
+      <section className={`${styles.section} ${styles.securitySection}`} aria-labelledby="cases-title">
         <div className={styles.sectionHeading}>
           <div><p className={styles.eyebrow}>Security review</p><h2 id="cases-title">Security cases</h2></div>
           <button className={styles.textButton} onClick={() => void loadCases()}>Refresh</button>
