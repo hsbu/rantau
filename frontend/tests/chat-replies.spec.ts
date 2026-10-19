@@ -26,5 +26,5 @@ test("assistant replies render spaced paragraphs, numbered routes and safe citat
   await expect(log).toContainText("<img src=x onerror=alert(1)>");
   await expect(log).not.toContainText(/simulat/i);
   await page.setViewportSize({ width: 390, height: 844 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.body.clientWidth)).toBe(true);
 });

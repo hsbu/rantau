@@ -16,7 +16,7 @@ test("Chat views keep the same tab positions when switching routes at every brea
     await tabs.getByRole("link", { name: "Chat", exact: true }).click();
     await expect(page).toHaveURL("/student/chat");
     expect(await geometry(), `Chat changed the tab geometry at ${width}px`).toEqual(original);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.body.clientWidth)).toBe(true);
   }
 });
 
@@ -92,7 +92,7 @@ test("Chat and Scenarios tabs switch views without sharing fixture state", async
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(tabs.getByRole("link", { name: "Chat", exact: true })).toBeVisible();
   await expect(tabs.getByRole("link", { name: "Scenarios", exact: true })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.body.clientWidth)).toBe(true);
 });
 
 test("tuition clarification, exact quote and waiting do not execute or expose account IDs", async ({ page }) => {
@@ -148,7 +148,7 @@ test("mobile chat fits, keyboard send works and reset discards an in-flight resu
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/student/chat/preview");
   await expect(page.getByLabel("Message Rantau")).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.body.clientWidth)).toBe(true);
   await page.getByLabel("Message Rantau").fill("Pay my tuition");
   await page.getByLabel("Message Rantau").press("Enter");
   await page.getByRole("button", { name: "New chat" }).click();

@@ -50,7 +50,7 @@ test("quote expiry uses the security clock and connected panels fit mobile", asy
   await send(page, "expired");
   await expect(page.getByRole("region", { name: "Quote breakdown" })).toContainText("Expired");
   await expect(page.getByRole("region", { name: "Approval status" })).toContainText("Approval expired");
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.body.clientWidth)).toBe(true);
 });
 
 test("unavailable or invalid details clear previous cards without losing successful assistant replies", async ({ page }) => {

@@ -22,7 +22,7 @@ test("the brand and student navigation keep their geometry across page changes",
           expect(box!.x + box!.width).toBeLessThanOrEqual(width);
         }
       }
-      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.body.clientWidth)).toBe(true);
     }
   }
 });

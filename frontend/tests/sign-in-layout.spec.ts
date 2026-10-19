@@ -25,7 +25,7 @@ test("student and sponsor sign-in share a balanced composition on desktop and mo
       const shape = { x: box!.x, width: box!.width, styles };
       original ??= shape;
       expect(shape).toEqual(original);
-      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.body.clientWidth)).toBe(true);
     }
   }
 });
