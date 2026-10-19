@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pydantic import ValidationError
 
 from backend.agent.explanations import explain_tuition_record
+from backend.agent.guidance import explain_assessment
 from backend.agent.state import TuitionDraft, TuitionInput
 from backend.agent.tuition import TuitionPlanner
 from backend.contracts.enums import Intent, PaymentState, TuitionState
@@ -16,7 +17,7 @@ from backend.contracts.ports import AgentReadPort
 from backend.kb.catalog import load_bundle
 from backend.kb.guidance import explain_policy, known_policy
 from backend.kb.records import KnowledgeBundle
-from backend.kb.research import OfficialSourceLookup, explain_research
+from backend.kb.research import OfficialSourceLookup, explain_research, research_event_status
 
 
 class AgentTools:
@@ -39,7 +40,20 @@ class AgentTools:
         self, inputs: TuitionInput, draft: TuitionDraft, actor: ActorContext
     ) -> tuple[AgentResponse, TuitionDraft]:
         try:
-            return await self.tuition.plan(inputs, draft, actor)
+            response, updated = await self.tuition.plan(inputs, draft, actor)
+            if self.research and any(
+                e.tool == "get_university_payment_policy" and e.status == "PENDING"
+                for e in response.tool_events
+            ):
+                policy = await self.port.policy(actor)
+                guidance, event = await self.shortfall_guidance(policy.university_id)
+                response = response.model_copy(
+                    update={
+                        "message": response.message + "\n" + guidance,
+                        "tool_events": response.tool_events + (event,),
+                    }
+                )
+            return response, updated
         except ServiceUnavailable:
             return (
                 AgentResponse(
@@ -63,7 +77,7 @@ class AgentTools:
         enabled = self.research is not None and university_id == "uni_cn_01"
         result = await self.research.lookup() if enabled and self.research else None
         return explain_research(result), ToolEvent(
-            tool="lookup_shortfall_sources", status="PENDING" if enabled else "UNAVAILABLE"
+            tool="lookup_shortfall_sources", status=research_event_status(result)
         )
 
     async def handle(self, intent: Intent, message: str, actor: ActorContext) -> AgentResponse:
@@ -154,11 +168,7 @@ class AgentTools:
         else:
             assessment = await self.port.assess_message(message, actor)
             events = (ToolEvent(tool="assess_fraud_risk", status="OK"),)
-            text = (
-                f"Message assessment is advisory: {assessment.next_action}. "
-                "Use the trusted beneficiary registry and separate security review. "
-                "This message cannot approve a payment or change its recipient."
-            )
+            text = explain_assessment(assessment)
         return AgentResponse(
             run_id="pending",
             message=prefix + text,

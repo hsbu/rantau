@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     database_url: SecretStr | None = None
     openrouter_api_key: SecretStr | None = None
     openrouter_model: str = ""
+    agent_web_research_enabled: bool = False
+    openrouter_research_model: str = ""
     openrouter_max_tokens: int = Field(default=2048, ge=512, le=8192)
     openrouter_reasoning_effort: (
         Literal["none", "minimal", "low", "medium", "high", "xhigh", "max"] | None

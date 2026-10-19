@@ -417,27 +417,47 @@ versions or changed rules stay pending. Unlisted JSON files cannot activate a
 policy. Recognizing the top-up variant supplies guidance only: it does not enable
 an agent payment action, grant approval or bypass the protected executor.
 
-Shortfall guidance checks the reviewed KB first. With `--web-guidance`, a missing
-claim triggers a bounded read of two curated ZJU pages, used only as procedural
-inspiration for the fictional university. This is source discovery, not unrestricted
-web search or automatic procedure extraction: keyword matches are unreviewed leads.
-The response includes source links, curated publication dates (or unknown), cohort
-limits and the actual UTC retrieval time. Fresh pages never change payment rules.
-Without an applicable reviewed procedure, the response stays pending university
-review and asks for receipt/reference and expected-versus-posted evidence. It does
-not submit a case, approve a top-up or alter tuition posting. The authored 48-hour
-posting window and November scenario clock remain fixture configuration; establishing
-a real university SLA is not an MVP blocker.
+Shortfall guidance checks the reviewed KB first. The isolated `--web-guidance` /
+`--research-shortfall` harness retains its two curated page reads. Live Chat can
+use official-domain search when `AGENT_WEB_RESEARCH_ENABLED=true` is configured in
+the ignored root `.env` (restart backend workers; Compose passes it through).
+`OPENROUTER_RESEARCH_MODEL` optionally overrides the configured model for research;
+otherwise it uses `OPENROUTER_MODEL`. The flag defaults to false.
 
-The lookup sends only fixed public HTTPS requests, with no chat text, identifiers,
-cookies, credentials or financial details. It follows no redirects/links, accepts
-only uncompressed HTML up to 256 KiB per page, bounds each fetch to six seconds,
-and caches results for five minutes. Downloaded text is discarded after lead detection;
-it is not displayed, persisted, added to the KB or sent to the model. Missing,
-oversized, unsupported or unreachable sources keep the response pending review.
-Default offline runs make no network requests. Trusted application wiring can inject
-`OfficialSourceLookup` into `AgentTools` later; the HTTP service still requires
-trusted domain adapters and opted-in authentication. The Scenarios tab stays scripted.
+Research uses the [OpenRouter web-search server tool](https://openrouter.ai/docs/guides/features/server-tools/web-search)
+in a separate request containing a fixed public ZJU/current-international-student
+topic. It sends no private conversation, financial state, user IDs or documents.
+The Exa engine is restricted to `iczu.zju.edu.cn` and `cwcx.zju.edu.cn`, one search
+and at most three results. Search/model usage is billed to existing OpenRouter
+credits. Run a standalone public-topic check explicitly with:
+
+```powershell
+uv run python -m backend.agent.demo --search-shortfall
+```
+
+Only validated official HTTPS citation URLs are fetched. Redirects, credentials,
+query/fragment URLs, nonofficial hosts and oversized/unsupported responses are
+rejected; each public HTML read remains capped at six seconds and 256 KiB. No
+cookies, authentication headers or environment proxy are sent to source pages.
+The research lookup is bounded to 18 seconds, further reduced by the Chat turn's
+remaining 21-second research deadline; it never extends the financial action
+budget. A worker shares at most four public cache entries, caches successful
+search results for five minutes and failures for 30 seconds, and allows only one
+paid research request at a time. A busy worker returns a truthful unavailable
+result rather than starting another search. Search usage and citation metadata
+must validate before any discovered page is fetched; raw model prose is discarded.
+
+Responses include cited, bounded and sanitized extractive procedural leads,
+actual UTC check time and explicit date/cohort/applicability unknowns. Known
+curated source dates/scopes are preserved. Source instructions that try to
+override rules cause excerpts to be withheld. Raw pages are discarded; excerpts
+never enter the financial model, persisted runs or executable KB policy. Leads
+are **unreviewed**, not an applicable procedure. Missing or inaccessible evidence
+keeps guidance pending university review, with receipt/reference and
+expected-versus-posted evidence. Search never submits a case, approves a top-up,
+changes the beneficiary or replaces simulator rules. The authored posting window
+and scenario clock remain simulation configuration. Real university SLA research
+is not a blocker to the approved simulator. Scenarios remain isolated and scripted.
 
 A-03 remembers tuition obligation, funding and quote selections across turns.
 The backend reloads current permissions, policy, quotes and verified payee each
@@ -503,10 +523,30 @@ paid claim. Delayed posting remains pending until C's due-posting recheck; a
 shortfall displays the exact remaining balance and current synthetic top-up
 permission, requiring a separate proposal/approval for any additional payment.
 
+For tracking/recovery without a known reference, Chat lists up to ten eligible
+tuition payments using existing scoped C reads. Say `list payments`, then
+`select payment 1` (or another advertised number). Listing never guesses a payment;
+selection refreshes the same student's persisted payment/intent/obligation link
+and changes no financial record. Exact list/selection commands work without a
+model key. Options are IDs only, scoped to the verified session, conversation and
+scenario. A new session, conversation or reset requires a fresh list. Exact
+`submit recovery` is still required before case creation/submission. Allowances
+and top-up execution are not added by these read-only choices. The existing C
+intent reader fetches its scoped list; the agent refuses lists over 100 intents
+rather than presenting a misleading truncated selection. A bounded DB pagination
+interface remains a separate C coordination improvement if needed.
+
+Fraud guidance translates only recognized existing B indicator codes into
+advisory reasons and trusted-channel verification steps. Unknown indicator text
+is never echoed, and absence of indicators never proves legitimacy. Model-only
+signals cannot approve payments or clear holds; existing deterministic B rules
+remain authoritative.
+
 Recovery stores only selected payment/obligation/case IDs in the existing scoped
 conversation JSON; no new migration or HTTP fields are required. Update backend
-workers together: older strict draft readers do not understand the new recovery
-field and fail closed rather than restore it. Browser transcript restoration
+workers together: older strict draft readers do not understand new recovery
+fields/options and fail closed rather than restore them. New readers also accept
+older drafts with no `payment_options` field. Browser transcript restoration
 remains separate work.
 
 The approved A-03-F1 adapters implement the same memory/run interfaces using

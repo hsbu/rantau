@@ -36,6 +36,8 @@ TOOLS = frozenset(
         "create_reconciliation_case",
         "submit_reconciliation_case",
         "get_reconciliation_status",
+        "list_student_payments",
+        "select_student_payment",
         "lookup_shortfall_sources",
     }
 )

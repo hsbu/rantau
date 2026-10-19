@@ -13,7 +13,7 @@ from backend.agent.classifier import (
     IntentClassifier,
 )
 from backend.agent.protection import AgentProtection
-from backend.agent.recovery import RecoveryWorkflow, recovery_command
+from backend.agent.recovery import RecoveryWorkflow, payment_selection_command, recovery_command
 from backend.agent.state import (
     ConversationKey,
     ConversationState,
@@ -139,6 +139,11 @@ class AgentGraph:
         if actor.role != Role.STUDENT or "student:read" not in actor.scopes:
             raise ScopeDenied("Resource unavailable")
         if conversation_id is None:
+            if self.recovery and payment_selection_command(message):
+                return action_reply(
+                    "Use a current conversation to list and select scoped payments.",
+                    "list_student_payments",
+                ).model_copy(update={"run_id": f"run_{uuid4().hex}"})
             if self.recovery and recovery_command(message):
                 return self.recovery.reply(
                     "Select a payment in a current conversation before recovery submission/recheck."
@@ -160,12 +165,27 @@ class AgentGraph:
         async with self.conversations.turn(key) as session:
             command = action_command(message) if self.actions else None
             recovery = recovery_command(message) if self.recovery else None
+            selection = payment_selection_command(message) if self.recovery else None
             guarded = None
             if self.protection is not None:
                 guarded = await self.protection.check(message, actor, key, session.state.tuition)
             if guarded is not None:
                 response = guarded.model_copy(update={"run_id": f"run_{uuid4().hex}"})
                 updated = session.state
+            elif selection:
+                assert self.recovery is not None
+                intent = (
+                    Intent.RECOVER
+                    if session.state.active_intent == Intent.RECOVER
+                    else Intent.TRACK
+                )
+                response, selected = await self.recovery.select_payment(
+                    selection, session.state.recovery, actor, intent
+                )
+                updated = session.state.model_copy(
+                    update={"recovery": selected, "active_intent": intent}
+                )
+                response = response.model_copy(update={"run_id": f"run_{uuid4().hex}"})
             elif recovery:
                 assert self.recovery is not None
                 response, selected = await self.recovery.handle(

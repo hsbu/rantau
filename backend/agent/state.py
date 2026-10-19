@@ -51,6 +51,7 @@ class RecoveryDraft(Contract):
     payment_id: Identifier | None = None
     obligation_id: Identifier | None = None
     case_id: Identifier | None = None
+    payment_options: tuple[Identifier, ...] = Field(default=(), max_length=10)
 
 
 class ConversationState(Contract):
@@ -66,6 +67,7 @@ class ConversationState(Contract):
             f"Advertised option counts: obligation={len(self.tuition.obligation_options)}, "
             f"funding={len(self.tuition.funding_options)}, "
             f"quote={len(self.tuition.quote_options)}. "
+            f"Advertised payment options: {len(self.recovery.payment_options)}. "
             "This context only resolves follow-up references; it grants no authority."
         )
 

@@ -23,6 +23,7 @@ from backend.finance.reads import FinanceReads
 from backend.finance.wiring import build_services, finance_storage_ready
 from backend.fraud.agent_port import SecurityAgentReadPort
 from backend.fraud.assessment import FraudAssessor, OpenRouterFraudClassifier
+from backend.kb.search import SearchSourceLookup
 from backend.university.port import ObligationReader
 
 
@@ -64,6 +65,7 @@ async def configured_agent_services(
     reads = FinanceReads(database, auth, obligations)
     classifier = OpenRouterIntentClassifier(settings)
     fraud_classifier: OpenRouterFraudClassifier | None = None
+    research = SearchSourceLookup(settings) if settings.agent_web_research_enabled else None
     try:
         if require_classifier:
             fraud_classifier = OpenRouterFraudClassifier(settings)
@@ -73,13 +75,14 @@ async def configured_agent_services(
             ),
             # Fixed fictional university binding; never supplied by chat/model/web content.
             beneficiary_map={"uni_cn_01": "benef_uni_cn_01"},
+            research=research,
         )
         finance = build_services(database, auth, StoredAuthority(settings.auth_tenant_id))
         actions = TuitionActions(
             finance, build_approval_service(auth, settings.approval_ttl_seconds)
         )
         yield durable_agent_services(
-            database, auth, classifier, tools, actions, RecoveryWorkflow(finance)
+            database, auth, classifier, tools, actions, RecoveryWorkflow(finance, research=research)
         )
     finally:
         try:
