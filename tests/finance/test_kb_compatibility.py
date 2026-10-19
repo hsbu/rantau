@@ -79,7 +79,7 @@ async def test_all_seeded_scenarios_have_known_policy_and_read_only_quote_previe
         assert "Partial payments: not allowed; top-ups: allowed" in guidance.message
     result = await AgentGraph(SelfFundedTuition(), tools).run("Pay tuition", student)
     assert "Selected:" in result.message
-    assert "No payment has been requested or executed" in result.message
+    assert "Reviewing this preview does not request or execute a payment" in result.message
     assert any(
         event.tool == "get_fx_quotes" and event.status == "OK" for event in result.tool_events
     )

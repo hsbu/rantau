@@ -39,7 +39,15 @@ export function ChatWorkspace({ transport = connectedTransport, preview = false,
   useEffect(() => () => { request.current?.abort(); }, []);
   useEffect(() => {
     const log = transcript.current;
-    if (log && following.current) log.scrollTop = messages.length || error ? log.scrollHeight : 0;
+    if (!log || !following.current) return;
+    const answer = messages[messages.length - 1]?.role === "assistant"
+      ? log.querySelector<HTMLElement>("article:last-of-type") : null;
+    if (answer && answer.offsetHeight > log.clientHeight - 32) {
+      // Start a long answer at its beginning so the amount/reason is not skipped.
+      log.scrollTop += answer.getBoundingClientRect().top - log.getBoundingClientRect().top - 16;
+    } else {
+      log.scrollTop = messages.length || error ? log.scrollHeight : 0;
+    }
   }, [messages, busy, error]);
 
   function latest() {

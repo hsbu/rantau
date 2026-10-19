@@ -174,7 +174,7 @@ async def test_unambiguous_request_has_verified_read_only_intent_preview():
     assert "Recipient: University tuition account" in result.message
     assert "funding owner will need to approve these exact terms" in result.message
     assert "simulat" not in result.message.lower()
-    assert "No payment has been requested or executed" in result.message
+    assert "Reviewing this preview does not request or execute a payment" in result.message
     assert OBLIGATION.model_dump() == before
     assert set(port.calls) <= {"obligations", "policy", "permissions", "quotes", "beneficiary"}
     assert "acct_sponsor" not in result.model_dump_json()

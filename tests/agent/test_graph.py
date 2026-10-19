@@ -73,7 +73,7 @@ async def test_chat_cannot_grant_authority_even_with_adversarial_classification(
         "permissions",
         "beneficiary",
     }
-    assert "No payment has been requested or executed" in result.message
+    assert "Reviewing this preview does not request or execute a payment" in result.message
 
 
 async def test_provider_unknown_never_queries_posting_or_retries():

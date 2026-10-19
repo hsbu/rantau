@@ -83,6 +83,19 @@ def test_agent_submits_missing_reference_then_verifies_independent_posting(recov
         assert c.execute("SELECT count(*) AS n FROM spend_entries").fetchone()["n"] == 1
 
 
+def test_continue_while_tracking_does_not_suggest_another_tuition_payment(recovery_runtime):
+    services, _, _ = recovery_runtime
+    client, payment = delivered(recovery_runtime)
+    assert message(client, "Track " + payment).status_code == 200
+    response = message(client, "continue tuition")
+    assert response.status_code == 200
+    assert "check recovery" in response.json()["message"]
+    assert "confirm tuition" not in response.json()["message"]
+    with services.database.connection() as c:
+        assert c.execute("SELECT count(*) AS n FROM transfers").fetchone()["n"] == 1
+        assert c.execute("SELECT count(*) AS n FROM spend_entries").fetchone()["n"] == 1
+
+
 def test_current_confirmed_action_is_held_by_injection_not_retargeted(recovery_runtime):
     services, _, _ = recovery_runtime
     client = confirmed(recovery_runtime)

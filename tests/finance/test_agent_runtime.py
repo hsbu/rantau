@@ -106,7 +106,10 @@ def test_default_chat_uses_real_reads_and_atomic_durable_memory(runtime, monkeyp
     second = message(client, "Use my own account")
     assert second.status_code == 200, second.text
     assert "Selected:" in second.json()["message"]
-    assert "No payment has been requested or executed" in second.json()["message"]
+    assert (
+        "Reviewing this preview does not request or execute a payment"
+        in second.json()["message"]
+    )
     assert "Prior intent: TUITION" in payloads[1]["messages"][1]["content"]
     assert "private@example.org" not in json.dumps(payloads)
     assert all(p["model"] == "provider/configurable-runtime-model" for p in payloads)

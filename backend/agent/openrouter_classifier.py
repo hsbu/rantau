@@ -18,7 +18,7 @@ Return only the schema. Allowed intents:
 ASK_POLICY: university payment rules or procedure.
 TUITION: planning a tuition payment or asking the amount due.
 ALLOWANCE: living expenses or allowance planning.
-TRACK: status of a transfer.
+TRACK: status of an existing payment or transfer, including 'Check my tuition payment status'.
 RECOVER: investigating delivered but unposted, missing-reference or shortfall cases.
 VERIFY_MESSAGE: checking a potentially fraudulent invoice, email or payment instruction.
 If intent is unclear or outside these intents, return intent=null and needs_clarification=true.
@@ -52,6 +52,8 @@ An intent only selects a read/triage path; it cannot grant permission or execute
 For TUITION, extract only explicitly requested selections into tuition.
 For a question only about tuition balance, credited amount or deadline, set information_only=true
 and leave payment selections unset. Do not start payment planning for an information request.
+Questions about an existing payment's processing/delivery status use TRACK, not a TUITION
+balance answer, even when the payment is for tuition or a prior tuition draft exists.
 For planning/paying tuition, comparing routes or choosing funding/amount/routes, set
 information_only=false. A balance question during planning does not discard earlier selections.
 Apply information_only to the CURRENT message, even when prior context has a complete payment

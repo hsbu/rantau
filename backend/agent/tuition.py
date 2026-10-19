@@ -260,7 +260,7 @@ class TuitionPlanner:
                 summary
                 + explain_quotes(quotes, destination, now)
                 + "\n\nI can’t verify the university recipient yet. "
-                "No payment has been requested or executed.",
+                "Reviewing this preview does not request or execute a payment.",
                 draft,
             )
         beneficiary = await self.port.beneficiary(beneficiary_id, actor)
@@ -295,7 +295,11 @@ class TuitionPlanner:
         events.append(ToolEvent(tool="build_tuition_preview", status="OK"))
         draft = draft.model_copy(update={"beneficiary_id": beneficiary.id})
         approval = (
-            "The funding owner will need to approve these exact terms before payment."
+            (
+                "You will need to approve these exact terms before payment."
+                if permission.owner_id == actor.actor_id
+                else "The funding owner will need to approve these exact terms before payment."
+            )
             if permission.approval_required
             else "Your funding permission will be checked again before payment."
         )
@@ -323,6 +327,6 @@ class TuitionPlanner:
             + other_routes
             + f"\n\nFunding: {funding_label}.\nRecipient: {payee}.\n\n"
             + approval
-            + " No payment has been requested or executed.",
+            + " Reviewing this preview does not request or execute a payment.",
             draft,
         )

@@ -1,5 +1,25 @@
 import { test, expect } from "@playwright/test";
 
+test("long answers start with their amount and leave an explicit jump to the latest text", async ({ page }) => {
+  await page.setViewportSize({ width: 858, height: 703 });
+  await page.route("**/student/chat/api", async route => route.fulfill({ json: {
+    run_id: "run_long_answer", requested_action: null, tool_events: [], resources: [],
+    message: "**Tuition remaining: CNY 20,000.00**\n\n" + Array.from({ length: 30 }, (_, i) => `- Payment detail ${i + 1}`).join("\n"),
+  } }));
+  await page.goto("/student/chat");
+  await page.getByLabel("Message Rantau").fill("Review tuition");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.getByLabel("Message Rantau")).toBeEnabled();
+  const log = page.getByRole("log");
+  const area = await log.boundingBox();
+  const amount = await log.getByText("Tuition remaining: CNY 20,000.00").boundingBox();
+  expect(area!.height).toBeGreaterThanOrEqual(240);
+  expect(amount!.y).toBeGreaterThanOrEqual(area!.y);
+  expect(amount!.y + amount!.height).toBeLessThan(area!.y + area!.height);
+  await page.getByRole("button", { name: "Latest messages" }).click();
+  await expect.poll(() => log.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThan(2);
+});
+
 test("page scroll chains past the transcript and new replies do not pull readers away from history", async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 720 });
   let release: (() => void) | undefined;

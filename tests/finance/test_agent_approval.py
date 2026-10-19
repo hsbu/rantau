@@ -168,7 +168,7 @@ def test_changed_funding_cannot_reuse_an_old_approval(runtime):
     assert "Selected:" in message(client, "Use my own account").json()["message"]
     changed = message(client, "confirm tuition")
     assert "Cancel or revise" in changed.json()["message"]
-    assert "No confirmed proposal" in message(client, "continue").json()["message"]
+    assert "Cancel or revise" in message(client, "continue").json()["message"]
     with services.database.connection() as c:
         assert c.execute("SELECT count(*) AS n FROM payment_intents").fetchone()["n"] == 1
     no_debit(services.database)
@@ -225,7 +225,9 @@ def test_provider_unknown_is_polled_without_second_debit(runtime):
     decide("APPROVED")
     with services.database.connection() as c:
         set_fault(c, "demo_001", "mock_remit_a", FaultMode.TIMEOUT_AFTER_ACCEPT)
-    assert "OUTCOME_UNKNOWN" in message(client, "continue").json()["message"]
+    uncertain = message(client, "continue").json()["message"]
+    assert "Payment outcome is uncertain" in uncertain
+    assert "Check the original payment in Payments before any retry" in uncertain
     assert message(client, "check").status_code == 200
     with services.database.connection() as c:
         assert c.execute("SELECT count(*) AS n FROM transfers").fetchone()["n"] == 1
@@ -312,7 +314,9 @@ def test_student_owned_funding_uses_its_actual_owner_authority(runtime):
         ).fetchone()["balance_minor"]
     requested = message(client, "confirm tuition")
     assert requested.status_code == 200
-    if "Waiting for funding-owner approval" in requested.json()["message"]:
+    if any(e["tool"] == "request_approval" for e in requested.json()["tool_events"]):
+        assert "Waiting for your approval" in requested.json()["message"]
+        assert "sponsor" not in requested.json()["message"].lower()
         approval = client.get("/api/v1/student/approvals").json()[0]
         decision = client.post(
             f"/api/v1/student/approvals/{approval['approval_id']}/decision",

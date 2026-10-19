@@ -200,7 +200,14 @@ class AgentGraph:
                     proposal is None
                 ):
                     response = action_reply(
-                        "Review a complete tuition preview first, then say 'confirm tuition'.",
+                        (
+                            "You’re reviewing an existing payment. Say 'check recovery' "
+                            "to reload its status. Do not start another payment while "
+                            "this one is being checked."
+                            if updated.recovery.payment_id is not None
+                            else "Review a complete tuition preview first, "
+                            "then say 'confirm tuition'."
+                        ),
                         "clarify_tuition",
                     )
                 else:
