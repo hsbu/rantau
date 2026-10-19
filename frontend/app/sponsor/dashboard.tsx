@@ -356,10 +356,9 @@ export function SponsorDashboard() {
   const pending = approvals.filter(item => item.state === "PENDING");
   const history = approvals.filter(item => item.state !== "PENDING");
 
-  return <main id="main-content" tabIndex={-1} className={styles.page}>
-    <WorkspaceHeader label="Workspaces" links={[{ href: "/student/sign-in", label: "Student workspace" }]}>
+  return <><WorkspaceHeader label="Workspaces" links={[{ href: "/student/sign-in", label: "Student workspace" }]}>
       {mode === "ready" && <button className={`${uiStyles.button} ${uiStyles.secondary}`} onClick={() => void signOut()} disabled={busy}>Sign out</button>}
-    </WorkspaceHeader>
+    </WorkspaceHeader><main id="main-content" tabIndex={-1} className={styles.page}>
 
     <section className={styles.intro}>
       <p className={styles.eyebrow}>Sponsor workspace</p>
@@ -468,7 +467,7 @@ export function SponsorDashboard() {
     </dialog>}
 
     <footer className={styles.footer}>Rantau is a simulated financial service. No real payment is made here.</footer>
-  </main>;
+  </main></>;
 }
 
 function ApprovalCard({ item, busy, busyId, uncertain, language, onChoose }: {

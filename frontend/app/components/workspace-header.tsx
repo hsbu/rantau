@@ -6,19 +6,29 @@ export function Brand() {
 }
 
 type NavLink = { href: string; label: string; current?: boolean };
-export function WorkspaceHeader({ links, label, children }: { links: NavLink[]; label: string; children?: React.ReactNode }) {
-  return <header className={styles.header}>
+function Navigation({ links, label, className }: { links: NavLink[]; label: string; className?: string }) {
+  return <nav aria-label={label} className={className}>{links.map(link =>
+    <Link key={link.href} href={link.href} prefetch={false} aria-current={link.current ? "page" : undefined}>{link.label}</Link>
+  )}</nav>;
+}
+export function WorkspaceHeader({ links, label, children, primaryLinks }: {
+  links: NavLink[]; label: string; children?: React.ReactNode; primaryLinks?: NavLink[];
+}) {
+  return <header className={styles.header}><div className={styles.headerInner}>
     <Brand />
-    <div className={styles.headerActions}><nav aria-label={label}>
-      {links.map(link => <Link key={link.href} href={link.href} aria-current={link.current ? "page" : undefined}>{link.label}</Link>)}
-    </nav>{children}</div>
-  </header>;
+    {primaryLinks && <Navigation links={primaryLinks} label="Chat views" className={styles.viewTabs} />}
+    <div className={styles.headerActions}><Navigation links={links} label={label} />{children}</div>
+  </div></header>;
 }
 
-export function StudentHeader({ payments = false, lang = "en" }: { payments?: boolean; lang?: "en" | "id" }) {
-  return <WorkspaceHeader label="Student workspace" links={[
-    { href: "/student/chat", label: "Chat" },
-    { href: `/student/payments${lang === "id" ? "?lang=id" : ""}`, label: lang === "id" ? "Pembayaran" : "Payments", current: payments },
-    { href: "/student/sign-in", label: lang === "id" ? "Masuk / akun" : "Sign in / account" },
+export function StudentHeader({ current, payments = false, lang = "en" }: {
+  current?: "chat" | "scenarios" | "payments" | "account"; payments?: boolean; lang?: "en" | "id";
+}) {
+  return <WorkspaceHeader label="Student workspace" primaryLinks={[
+    { href: "/student/chat", label: "Chat", current: current === "chat" },
+    { href: "/student/chat/preview", label: "Scenarios", current: current === "scenarios" },
+  ]} links={[
+    { href: `/student/payments${lang === "id" ? "?lang=id" : ""}`, label: lang === "id" ? "Pembayaran" : "Payments", current: payments || current === "payments" },
+    { href: "/student/sign-in", label: lang === "id" ? "Masuk / akun" : "Sign in / account", current: current === "account" },
   ]} />;
 }

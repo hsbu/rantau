@@ -27,8 +27,7 @@ export default async function StudentPayments({ searchParams }: Props) {
     financeGet<Schema["UntrustedDocument"][]>("/api/v1/documents"),
   ]);
   const pending = intents.ok ? intents.data.filter(item => PENDING.includes(item.state)) : [];
-  return <main id="main-content" tabIndex={-1} lang={lang} className={styles.page}>
-    <StudentHeader payments lang={lang} />
+  return <><StudentHeader payments lang={lang} /><main id="main-content" tabIndex={-1} lang={lang} className={styles.page}>
     <SimulatedBanner lang={lang} />
     <h1>{ui.title[lang]}</h1>
     <p className={styles.lang}>
@@ -42,7 +41,7 @@ export default async function StudentPayments({ searchParams }: Props) {
     {list.ok && await Promise.all(list.data.map(item => <ObligationCard key={item.id} item={item} lang={lang}
       pending={pending.find(intent => intent.obligation_id === item.id)} />))}
     {documents.ok && documents.data.length > 0 && <UntrustedDocuments documents={documents.data} lang={lang} />}
-  </main>;
+  </main></>;
 }
 
 async function ObligationCard(
