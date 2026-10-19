@@ -7,7 +7,7 @@ const intents: components["schemas"]["Intent"][] = [
 ];
 
 export default function Home() {
-  return <main>
+  return <main className="home">
     <p className="eyebrow">Rantau / Development preview</p>
     <h1>A clearer path<br />from home to campus.</h1>
     <p className="description">A financial agent for students abroad and the people supporting them.</p>

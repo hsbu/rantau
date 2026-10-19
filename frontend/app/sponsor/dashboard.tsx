@@ -444,6 +444,7 @@ export function SponsorDashboard() {
     </div>}
 
     {confirmation && <dialog ref={confirmationDialog} className={styles.confirmDialog}
+      aria-labelledby="confirm-title" aria-describedby="confirm-copy"
       onCancel={event => { event.preventDefault(); setConfirmation(undefined); }}>
       <section className={styles.confirm} aria-labelledby="confirm-title" aria-describedby="confirm-copy">
         <p className={styles.eyebrow}>Confirm your decision</p>

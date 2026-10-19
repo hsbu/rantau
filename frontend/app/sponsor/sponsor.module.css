@@ -60,7 +60,7 @@
 .error, .notice { margin: 0 0 18px; padding: 12px 15px; border-radius: 7px; font-size: 12px; line-height: 1.7; }
 .error { border: 1px solid #d7aca4; background: #fbefec; color: #71372f; }
 .notice { border: 1px solid #bdcdbc; background: var(--soft); color: #31573d; }
-.confirmDialog { width: min(480px, calc(100% - 32px)); max-width: none; max-height: calc(100% - 32px); margin: auto; padding: 0; border: 0; background: transparent; color: var(--ink); overflow: visible; }
+.confirmDialog { width: min(480px, calc(100% - 32px)); max-width: none; max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 0; border-radius: 12px; background: var(--paper); color: var(--ink); overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: 16px; }
 .confirmDialog::backdrop { background: #13231fc2; }
 .confirm { width: min(480px, 100%); max-width: none; margin: 0; padding: 27px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink); line-height: normal; box-shadow: 0 18px 70px #0004; }
 .confirm h2 { margin: 0; font-size: 25px; font-weight: 500; letter-spacing: -.04em; }
@@ -74,6 +74,15 @@
   .cards { grid-template-columns: 1fr; }
   .card { padding: 18px; }
   .caseRow { padding: 14px; }
+  .header { gap: 16px; flex-wrap: wrap; padding-block: 14px; }
+  .headerActions { flex-wrap: wrap; }
+  .signIn input, .summaryLanguage select { font-size: 16px; }
+  .summaryLanguage select { max-width: 100%; min-height: 44px; }
+  .page button { min-height: 44px; }
+  .cardTop > div, .caseRow > div { min-width: 0; }
+  .caseRow { flex-wrap: wrap; }
+  .amounts > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+  .amounts dt { overflow-wrap: anywhere; }
 }
 
 @media (prefers-reduced-motion: no-preference) {

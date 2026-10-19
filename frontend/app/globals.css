@@ -5,6 +5,6 @@ main { width: min(900px, 100%); margin: auto; padding: 12vh 28px 60px; }
 .eyebrow { text-transform: uppercase; letter-spacing: .14em; font-size: .75rem; }
 h1 { font-size: clamp(2.6rem, 6vw, 4.7rem); line-height: 1.07; letter-spacing: -.05em; font-weight: 500; }
 .description { max-width: 480px; font-size: 1.15rem; line-height: 1.6; }
-section { border-top: 1px solid #bac8bf; margin-top: 60px; padding-top: 22px; max-width: 660px; line-height: 1.6; }
+.home section { border-top: 1px solid #bac8bf; margin-top: 60px; padding-top: 22px; max-width: 660px; line-height: 1.6; }
 h2 { font-size: 1.1rem; font-weight: 600; }
-ul { display: flex; flex-wrap: wrap; gap: 10px 22px; padding: 0; list-style: none; font-size: .85rem; }
+.home ul { display: flex; flex-wrap: wrap; gap: 10px 22px; padding: 0; list-style: none; font-size: .85rem; }

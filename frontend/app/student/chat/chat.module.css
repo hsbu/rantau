@@ -35,7 +35,7 @@
 .newChat { padding: 10px 13px; border: 1px solid var(--line); border-radius: 7px; background: transparent; font-size: 12px !important; white-space: nowrap; color: var(--ink); }
 .newChat:hover { background: var(--soft); }
 .newChat span { margin-left: 10px; }
-.messages { height: min(510px, 56dvh); min-height: 330px; overflow-y: auto; overscroll-behavior-y: auto; padding: 30px 2px; scrollbar-width: thin; scrollbar-color: var(--scrollbar) transparent; scrollbar-gutter: stable; }
+.messages { height: clamp(140px, calc(100dvh - 520px), 510px); overflow-y: auto; overscroll-behavior-y: auto; padding: 30px 2px; scrollbar-width: thin; scrollbar-color: var(--scrollbar) transparent; scrollbar-gutter: stable; }
 .welcome { max-width: 510px; padding: 17px 0; margin: auto; }
 .agentMark { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 28px; font-weight: 600; background: var(--mark-bg); color: var(--accent-ink); }
 .welcome h2 { font-size: 27px; letter-spacing: -.04em; font-weight: 500; margin: 22px 0 12px; }
@@ -117,14 +117,17 @@
   .main { display: block; } .conversation { padding: 0 20px; border-right: 0; } .chatHeader { padding: 28px 0 23px; }
   .chatHeader h1 { font-size: 27px; } .chatHeader p:last-child { font-size: 11px; } .kicker { font-size: 9px; margin-bottom: 12px; }
   .newChat { padding: 10px; font-size: 10px !important; } .newChat span { margin-left: 4px; }
-  .messages { height: 390px; min-height: 300px; padding-top: 22px; } .welcome { padding-top: 8px; }
+  .messages { height: clamp(120px, calc(100dvh - 570px), 390px); padding-top: 22px; } .welcome { padding-top: 8px; }
+  .composer textarea, .previewControls select { font-size: 16px; }
+  .workspace button { min-height: 44px; }
+  .workspaceLinks a { display: inline-flex; align-items: center; min-height: 44px; }
   .welcome h2 { font-size: 25px; } .welcome p { font-size: 13px; } .starters button { font-size: 12px; }
   .summary { border-top: 1px solid var(--line); padding: 28px 20px; } .summaryHeading h2 br { display: none; }
   .summaryHeading h2 { font-size: 25px; } .emptySummary { margin: 22px 0; padding: 18px 0 0; }
   .summaryGlyph { display: none; } .summary .balance { margin-top: 22px; }
   .footer { padding: 22px 20px; font-size: 9px; } .footer > span:last-child { text-align: right; }
   .previewControls { padding: 12px 20px; gap: 9px; flex-wrap: wrap; } .previewControls label { width: 100%; }
-  .scenarioSelect { flex: 1; width: auto; } .previewControls select { font-size: 12px; } .previewControls button { padding: 8px 0; font-size: 10px; }
+  .scenarioSelect { flex: 1; width: auto; } .previewControls select { font-size: 16px; } .previewControls button { padding: 8px 0; font-size: 10px; }
 }
 @media (prefers-reduced-motion: no-preference) { .starters button, .newChat, .composerBottom button { transition: background-color 120ms ease; } }
 

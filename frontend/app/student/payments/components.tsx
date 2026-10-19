@@ -21,8 +21,12 @@ export function Stat({ label, value }: { label: string; value: string }) {
   return <div className={styles.stat}><span>{label}</span><strong>{value}</strong></div>;
 }
 
+export function TableScroll({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div className={styles.tableScroll} role="region" aria-label={label} tabIndex={0}>{children}</div>;
+}
+
 export function QuoteBreakdown({ quotes, lang }: { quotes: Schema["FxQuote"][]; lang: Lang }) {
-  return <table className={styles.table}>
+  return <TableScroll label={ui.quotes[lang]}><table className={styles.table}>
     <caption>{ui.quotes[lang]}</caption>
     <thead><tr>
       <th>Route</th><th>{ui.principal[lang]}</th><th>{ui.fee[lang]}</th>
@@ -37,7 +41,7 @@ export function QuoteBreakdown({ quotes, lang }: { quotes: Schema["FxQuote"][]; 
       <td>{money(quote.destination_currency, quote.destination_amount_minor)}</td>
       <td>{dateTime(quote.estimated_delivery_at)}</td>
     </tr>)}</tbody>
-  </table>;
+  </table></TableScroll>;
 }
 
 export function ReceiptCard({ payment, lang }: { payment: Schema["PaymentResult"]; lang: Lang }) {

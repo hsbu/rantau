@@ -97,7 +97,11 @@ createServer(async (request, response) => {
   if (url.startsWith("/api/v1/audit?resource_id=")) return response.end(JSON.stringify(trail(url.split("=")[1])));
   if (url.endsWith("/payment-options")) return response.end(JSON.stringify(options));
   if (url === "/api/v1/payment-intents") return response.end(JSON.stringify(pending ? [intent(pending)] : []));
-  if (url === "/api/v1/documents") return response.end(JSON.stringify([document]));
+  if (url === "/api/v1/documents") return response.end(JSON.stringify([
+    cookie.includes("variant=longdocument")
+      ? { ...document, title: "T".repeat(200), claimed_sender: "S".repeat(200), body: "Unbroken".repeat(500) }
+      : document,
+  ]));
   if (url.startsWith("/api/v1/quotes")) return response.end(JSON.stringify(quotes));
   if (url === "/api/v1/transfers/transfer_001") return response.end(JSON.stringify(payment));
   if (url.endsWith("/recheck")) return response.end(JSON.stringify(detail));

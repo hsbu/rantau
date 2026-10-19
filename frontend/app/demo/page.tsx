@@ -1,5 +1,5 @@
 import { dateTime } from "../student/chat/chat-types";
-import { SimulatedBanner } from "../student/payments/components";
+import { SimulatedBanner, TableScroll } from "../student/payments/components";
 import { type Schema, financeGet } from "../student/payments/finance-api";
 import styles from "../student/payments/payments.module.css";
 import { pickLang, ui } from "../student/payments/status-labels";
@@ -29,13 +29,13 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
     <DemoControls scenarios={scenarios.data} />
     <section className={styles.card}>
       <h2>{trailTitle[lang]}</h2>
-      <table className={styles.table}>
+      <TableScroll label={trailTitle[lang]}><table className={styles.table}>
         <thead><tr><th>Time</th><th>Action</th><th>Resource</th><th>Decision</th><th>Reason</th></tr></thead>
         <tbody>{trail.ok && trail.data.map(entry => <tr key={entry.audit_event_id}>
           <td>{dateTime(entry.created_at)}</td><td>{entry.action}</td>
           <td>{entry.resource_id ?? "-"}</td><td>{entry.decision ?? "-"}</td><td>{entry.reason_code ?? "-"}</td>
         </tr>)}</tbody>
-      </table>
+      </table></TableScroll>
     </section>
   </main>;
 }
