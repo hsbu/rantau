@@ -20,7 +20,7 @@ async def test_live_runner_preserves_conversation_and_closes_client(monkeypatch,
     monkeypatch.setattr(demo, "Settings", Configured)
     monkeypatch.setattr(demo, "OpenRouterIntentClassifier", lambda settings: classifier)
     await demo.live_demo(["Pay tuition", "Continue"])
-    assert "Draft intent preview" in capsys.readouterr().out
+    assert "Selected:" in capsys.readouterr().out
     assert "Prior intent: TUITION" in classifier.prompts[1]
     classifier.close.assert_awaited_once()
 

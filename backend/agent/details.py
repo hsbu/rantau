@@ -50,7 +50,8 @@ class AgentDetails(_Storage):
         self._require(c, actor)
         scenario = self._scenario(c, actor.tenant_id)
         row = c.execute(
-            "SELECT d.state,d.revision,d.schema_version,d.scenario_run_no "
+            "SELECT d.state,d.revision,d.schema_version,d.scenario_run_no, "
+            "r.metadata->>'requested_action' AS requested_action "
             "FROM agent_conversations d JOIN agent_runs r ON "
             "r.tenant_id=d.tenant_id AND r.actor_id=d.actor_id AND r.session_id=d.session_id "
             "AND r.conversation_id=d.conversation_id AND r.scenario_run_no=d.scenario_run_no "
@@ -93,7 +94,11 @@ class AgentDetails(_Storage):
             row = self._context(c, actor, conversation_id, run_id)
             state = ConversationState.model_validate(row["state"])
             now = db_now(c)
-            summary = self._summary(c, actor, conversation_id, row["scenario_run_no"], state)
+            summary = (
+                self._summary(c, actor, conversation_id, row["scenario_run_no"], state)
+                if row["requested_action"] is not None
+                else None
+            )
             return AgentDetailSnapshot(
                 run_id=run_id,
                 revision=row["revision"],

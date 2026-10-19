@@ -16,6 +16,44 @@ from tests.finance.test_agent_runtime import message, student_client
 from tests.finance.test_agent_runtime import runtime as runtime
 
 
+def test_unrelated_turn_hides_old_cards_retains_draft_and_changes_no_financial_records(
+    runtime, monkeypatch
+):
+    from tests.finance.test_agent_details import domain, read
+
+    services, _, _ = runtime
+    client = student_client(services)
+    planned = message(client, "Plan tuition from my own account")
+    assert read(client, planned.json()["run_id"]).json()["summary"]["quote"] is not None
+    before = domain(services.database)
+    original_classify = OpenRouterIntentClassifier.classify
+
+    async def unrelated(self, text):
+        return IntentClassification(
+            intent=None, needs_clarification=True, reply_kind="UNSUPPORTED_ACADEMIC"
+        )
+
+    monkeypatch.setattr(OpenRouterIntentClassifier, "classify", unrelated)
+    response = message(client, "Write my essay private-marker")
+    assert response.status_code == 200
+    assert "academic tutoring" in response.json()["message"]
+    assert response.json()["requested_action"] is None
+    assert response.json()["tool_events"] == []
+    assert read(client, response.json()["run_id"]).json()["summary"] is None
+    after = domain(services.database)
+    for table in before.keys() - {"agent_conversations", "agent_runs"}:
+        assert after[table] == before[table], table
+    with services.database.connection() as c:
+        state = c.execute("SELECT state FROM agent_conversations").fetchone()["state"]
+        assert state["tuition"]["source_account_id"] == "acct_idr_stu_01"
+        assert "private-marker" not in str(c.execute("SELECT metadata FROM agent_runs").fetchall())
+    monkeypatch.setattr(OpenRouterIntentClassifier, "classify", original_classify)
+    resumed = message(client, "Review my tuition")
+    assert "Selected:" in resumed.json()["message"]
+    assert read(client, resumed.json()["run_id"]).json()["summary"]["quote"] is not None
+    no_debit(services.database)
+
+
 def test_ux_04_provider_unavailable_rechecks_the_original_transfer_without_second_debit(runtime):
     services, _, _ = runtime
     client = confirmed(runtime)
@@ -62,7 +100,7 @@ def test_ux_02_amount_revision_cannot_execute_the_previously_approved_draft(runt
     changed = message(client, "Change the amount to CNY 15000")
     assert changed.status_code == 200
     assert "full outstanding balance" in changed.json()["message"]
-    assert "Draft intent preview" not in changed.json()["message"]
+    assert "Selected:" not in changed.json()["message"]
     assert not any(
         e["tool"] == "execute_payment" for e in message(client, "continue").json()["tool_events"]
     )

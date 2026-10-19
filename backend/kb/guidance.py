@@ -6,8 +6,8 @@ from backend.contracts.models import UniversityPolicy
 from backend.kb.records import KnowledgeBundle
 
 UNKNOWN_POLICY = (
-    "University policy is unknown or expired, or its reviewed simulation record is unavailable. "
-    "Verify it before planning a payment."
+    "The university policy is unknown or expired, or its reviewed record is unavailable. "
+    "I can’t prepare a payment until the requirements are verified."
 )
 
 
@@ -36,9 +36,7 @@ def known_policy(policy: UniversityPolicy, bundle: KnowledgeBundle | None, now: 
     return False
 
 
-def explain_policy(
-    policy: UniversityPolicy, bundle: KnowledgeBundle | None, now: datetime
-) -> str:
+def explain_policy(policy: UniversityPolicy, bundle: KnowledgeBundle | None, now: datetime) -> str:
     if not known_policy(policy, bundle, now):
         return UNKNOWN_POLICY
     assert bundle is not None
@@ -47,18 +45,14 @@ def explain_policy(
     topups = "allowed" if policy.topup_allowed else "not allowed"
     reference = bundle.reference
     return (
-        f"Fictional university policy {policy.version} (simulation only). "
-        f"Required reference fields: {references}. "
-        f"Synthetic posting window: {policy.posting_window_hours} elapsed hours. "
-        f"Partial payments: {partial}; top-ups: {topups}. "
-        f"Validity: {policy.effective_from.isoformat()} to {policy.effective_to.isoformat()} "
-        "(end excluded). These are authored demo rules, not official university terms.\n"
-        f"Procedural context: [ZJU tuition notice]({reference.source_url}), "
-        f"published {reference.published_on}, reviewed {reference.reviewed_on}, "
-        f"Rantau record revision {reference.revision} (reviewed draft). "
-        f"Scope: {reference.scope.audience} "
-        f"The notice's payment period is {reference.payment_period.start} to "
-        f"{reference.payment_period.end}; current applicability requires rechecking. "
-        "This citation does not establish the fictional posting window or payment permissions. "
-        "It does not establish a live IDR-to-CNY route or university API."
+        "**Payment requirements for this tuition bill**\n\n"
+        f"- Required payment references: {references}.\n"
+        f"- Posting review window: {policy.posting_window_hours} elapsed hours.\n"
+        f"- Partial payments: {partial}; top-ups: {topups}.\n\n"
+        "**Reference material**\n\n"
+        f"[ZJU tuition notice]({reference.source_url}), published {reference.published_on}. "
+        f"Scope: {reference.scope.audience}\n\n"
+        f"The notice covers {reference.payment_period.start} to {reference.payment_period.end}; "
+        "current applicability requires rechecking. This reference does not verify the "
+        "configured posting window, payment permissions, a live exchange route or a university API."
     )

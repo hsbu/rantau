@@ -171,7 +171,7 @@ def test_shortfall_recovery_uses_same_research_without_policy_or_case_mutations(
     before = financial_snapshot(services.database)
     response = message(client, "Recover " + payment)
     assert response.status_code == 200, response.text
-    assert "remaining CNY 1,500.00" in response.json()["message"]
-    assert "forbids a top-up" in response.json()["message"]
+    assert "Tuition remaining: CNY 1,500.00" in response.json()["message"]
+    assert "A top-up is not permitted" in response.json()["message"]
     assert "Unreviewed source excerpt" in response.json()["message"]
     assert financial_snapshot(services.database) == before

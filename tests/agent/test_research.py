@@ -153,7 +153,7 @@ async def test_recovery_shows_exact_balance_and_review_without_claiming_case_sub
     response = await AgentTools(port, clock=lambda: NOW).handle(
         Intent.RECOVER, "Recover transfer_001", ACTOR
     )
-    assert "remaining CNY 0.01" in response.message
+    assert "Tuition remaining: CNY 0.01" in response.message
     assert "pending university review" in response.message
     assert "not a submitted reconciliation case" in response.message
     assert "no web check was made" in response.message

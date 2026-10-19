@@ -81,7 +81,6 @@ class AgentTools:
         )
 
     async def handle(self, intent: Intent, message: str, actor: ActorContext) -> AgentResponse:
-        prefix = "Simulated Rantau guidance. "
         events: tuple[ToolEvent, ...] = ()
         resources: tuple[ResourceReference, ...] = ()
         if intent == Intent.ASK_POLICY:
@@ -100,7 +99,7 @@ class AgentTools:
                 for claim in bundle.reference.claims
             ):
                 guidance, event = await self.shortfall_guidance(policy.university_id)
-                text += "\n" + guidance
+                text += "\n\n" + guidance
                 events += (event,)
             resources = (ResourceReference(kind="policy", id=policy.id),)
         elif intent == Intent.TUITION:
@@ -113,9 +112,8 @@ class AgentTools:
                 "ALLOWANCE" in permission.permitted_purposes for permission in permissions
             )
             text = (
-                "Allowance planning is available. Specify the amount "
-                "and verified student recipient. A trusted service must check "
-                "the owner's approval or active mandate before execution."
+                "This account has allowance funding permission, but I can’t submit "
+                "an allowance payment from Chat yet. Review living-expense transfers in Payments."
                 if eligible
                 else "No eligible allowance funding permission is available."
             )
@@ -171,7 +169,7 @@ class AgentTools:
             text = explain_assessment(assessment)
         return AgentResponse(
             run_id="pending",
-            message=prefix + text,
+            message=text,
             requested_action=intent,
             tool_events=events,
             resources=resources,

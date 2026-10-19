@@ -60,7 +60,7 @@ def action_reply(
     return AgentResponse(
         run_id="pending",
         requested_action=Intent.TUITION,
-        message="Simulated Rantau payment workflow. " + text,
+        message=text,
         tool_events=(event,),
         resources=(ResourceReference(kind="payment", id=payment_id),) if payment_id else (),
     )
@@ -217,22 +217,26 @@ class TuitionActions(_Storage):
                 }:
                     await _database_call(lambda: self.approval.request(actor, record.intent_id))
                     return action_reply(
-                        "AWAITING_APPROVAL. The funding owner must review the "
-                        "exact request in their approval workspace. Say 'check' or "
-                        "'continue' afterward. No payment was executed.",
+                        "**Waiting for funding-owner approval**\n\n"
+                        "Your request is saved. The funding owner needs to review "
+                        "these exact terms "
+                        "in their approval workspace. No payment was executed.\n\n"
+                        "After approval, say `continue tuition` to proceed with this payment.",
                         "request_approval",
                     )
                 if intent.state == PaymentState.DRAFT and approval == "NONE":
                     return action_reply(
-                        "Proposal saved. Say 'continue' to request protected "
-                        "execution of these exact terms. No debit occurred.",
+                        "**Payment request saved**\n\n"
+                        "Say `continue tuition` when you’re ready to proceed "
+                        "with these exact terms. "
+                        "Current permissions and payment checks still apply. No debit occurred.",
                         "create_payment_intent",
                         "OK",
                     )
                 return action_reply(
-                    "Proposal already saved. Say 'check' or 'continue' to "
-                    "reload current authority and payment status. No new execution "
-                    "was requested.",
+                    "This payment request is already saved. No new execution was requested.\n\n"
+                    "Review its status in Payments. Say `continue tuition` only when "
+                    "you want to proceed with the saved payment.",
                     "create_payment_intent",
                     "OK",
                 )
@@ -254,9 +258,9 @@ class TuitionActions(_Storage):
             )
         except ServiceUnavailable:
             return action_reply(
-                "The outcome could not be confirmed. Say 'check' to reload this "
-                "same proposal/payment before any retry; do not create another "
-                "payment request.",
+                "I couldn’t confirm the outcome.\n\n"
+                "Check the original request in Payments before any retry. "
+                "Do not create another payment request while its outcome is uncertain.",
                 "get_approval_status",
                 "UNAVAILABLE",
             )
@@ -322,8 +326,10 @@ class TuitionActions(_Storage):
             approval != ApprovalState.APPROVED.value
         ):
             return action_reply(
-                "AWAITING_APPROVAL. No current exact owner approval is available; "
-                "chat text cannot grant approval. No payment was executed.",
+                "**Waiting for funding-owner approval**\n\n"
+                "There is no current approval for these exact terms. The funding owner "
+                "must approve in their own workspace; a message in Chat cannot do that. "
+                "No payment was executed.",
                 "get_approval_status",
             )
         outcome = await _database_call(

@@ -40,7 +40,7 @@ class AgentProtection:
         return AgentResponse(
             run_id="pending",
             requested_action=Intent.VERIFY_MESSAGE,
-            message="Simulated security assessment. HELD: the current confirmed request is blocked "
+            message="**Payment on hold**\n\nThe current confirmed request is blocked "
             "pending separate trusted security review. Its recipient is unchanged. "
             "Chat cannot clear this hold or authorize a replacement payment.",
             resources=(ResourceReference(kind="case", id=case_id),),

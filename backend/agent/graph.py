@@ -12,6 +12,7 @@ from backend.agent.classifier import (
     IntentClassification,
     IntentClassifier,
 )
+from backend.agent.conversation import conversational_reply
 from backend.agent.protection import AgentProtection
 from backend.agent.recovery import RecoveryWorkflow, payment_selection_command, recovery_command
 from backend.agent.state import (
@@ -98,10 +99,7 @@ class AgentGraph:
                 "response": AgentResponse(
                     run_id="pending",
                     requested_action=None,
-                    message=(
-                        "Do you need tuition, allowance, payment tracking, recovery, "
-                        "policy, or message verification?"
-                    ),
+                    message=conversational_reply(state["classification"], state["conversation"]),
                 )
             }
 
@@ -111,8 +109,8 @@ class AgentGraph:
                     run_id="pending",
                     requested_action=None,
                     message=(
-                        "Intent classification is unavailable. "
-                        "No financial action was taken. Try again later."
+                        "I couldn’t understand your request because the service is unavailable. "
+                        "No payment was requested. Please try again later."
                     ),
                     tool_events=(ToolEvent(tool="classify_intent", status="UNAVAILABLE"),),
                 )
@@ -231,8 +229,9 @@ class AgentGraph:
                     response = response.model_copy(
                         update={
                             "message": response.message
-                            + " To save these terms and request any required owner approval, "
-                            "say 'confirm tuition'."
+                            + "\n\n**Next step:** say `confirm tuition` to save this request "
+                            "and request the funding owner’s approval. "
+                            "This does not send funds yet."
                         }
                     )
             session.state = updated

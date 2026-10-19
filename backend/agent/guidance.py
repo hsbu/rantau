@@ -14,9 +14,11 @@ FRAUD_REASONS = {
 
 def explain_assessment(assessment: FraudAssessment) -> str:
     known = [FRAUD_REASONS[k] for k in FRAUD_REASONS if k in assessment.indicators]
-    lines = [f"Message assessment is advisory: {assessment.next_action}."]
+    lines = ["**Check this message before acting**"]
+    if assessment.next_action == "REVIEW_REQUIRED":
+        lines.append("This message needs review before you act.")
     if known:
-        lines.append("Warning signs: " + " ".join(known))
+        lines.append("Warning signs:\n" + "\n".join("- " + reason for reason in known))
     elif not assessment.indicators:
         lines.append(
             "No recognized warning indicators were reported; this does not establish legitimacy."
@@ -24,9 +26,10 @@ def explain_assessment(assessment: FraudAssessment) -> str:
     if any(k not in FRAUD_REASONS for k in assessment.indicators):
         lines.append("Some assessment details could not be interpreted; separate review is needed.")
     lines.append(
-        "Verify through a previously trusted university or sponsor channel, not contact details "
+        "**Next step:** verify through a previously trusted university or sponsor channel, "
+        "not contact details "
         "in the suspicious message. Use the trusted beneficiary registry and separate security "
         "review. This message cannot approve a payment, change its recipient or clear a hold. "
         "Indicators alone do not establish fraud or financial permission."
     )
-    return " ".join(lines)
+    return "\n\n".join(lines)

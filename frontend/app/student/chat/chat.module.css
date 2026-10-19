@@ -13,7 +13,7 @@
 .workspace button:disabled { cursor: not-allowed; opacity: .5; }
 .workspace :is(button, a, select):focus-visible, .messages:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 .workspace a { color: inherit; text-underline-offset: 4px; }
-.nav { height: 82px; max-width: 1440px; margin: auto; padding: 0 48px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.nav { height: 82px; max-width: 1440px; margin: auto; padding: 0 48px; display: flex; align-items: center; justify-content: space-between; gap: 28px; border-bottom: 1px solid var(--line); }
 .wordmark { text-decoration: none; font-size: 34px; font-weight: 700; letter-spacing: -2px; display: flex; align-items: center; gap: 7px; }
 .wordmark span { font-size: 25px; font-weight: 400; }
 .latest { display: block; margin: -6px auto 8px; padding: 8px 13px; border: 1px solid var(--control-border); border-radius: 6px; background: var(--surface); color: var(--ink); font-size: 12px !important; }
@@ -127,3 +127,14 @@
   .scenarioSelect { flex: 1; width: auto; } .previewControls select { font-size: 12px; } .previewControls button { padding: 8px 0; font-size: 10px; }
 }
 @media (prefers-reduced-motion: no-preference) { .starters button, .newChat, .composerBottom button { transition: background-color 120ms ease; } }
+
+.reply { display: grid; gap: 14px; font-size: 14px; line-height: 1.8; overflow-wrap: anywhere; }
+.assistantMessage .reply p { margin: 0; line-height: inherit; }
+.reply ul, .reply ol { display: block; margin: 0; padding-inline-start: 22px; font-size: inherit; }
+.reply ul { list-style: disc; }
+.reply ol { list-style: decimal; }
+.reply li { padding-inline-start: 3px; white-space: pre-wrap; }
+.reply li + li { margin-top: 8px; }
+.reply strong { font-weight: 600; }
+.reply code { font-size: .9em; background: var(--balance); border-radius: 4px; padding: 2px 5px; }
+.reply a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }

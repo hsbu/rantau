@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { ActionPanel } from "./action-panel";
 import { ChatError, visibleText } from "./chat-types";
 import { connectedTransport } from "./connected-transport";
+import { MessageContent } from "./message-content";
 import type { ActionSummary, ChatTransport } from "./chat-types";
 import styles from "./chat.module.css";
 
@@ -103,7 +104,7 @@ export function ChatWorkspace({ transport = connectedTransport, preview = false,
     </header>
     <div className={styles.safetyBanner}>{preview
       ? <>Scenario preview · Scripted responses, no model calls, authentication or payment actions.</>
-      : <>Chat connects to the agent through your server session. All payments, quotes and university records are simulated.</>}
+      : <>Sandbox · No real funds move in this workspace.</>}
     </div>
     {children}
     <main className={styles.main}>
@@ -130,7 +131,7 @@ export function ChatWorkspace({ transport = connectedTransport, preview = false,
           </div>}
           {messages.map(message => <article key={`${message.id}-${message.role}`} className={message.role === "user" ? styles.userMessage : styles.assistantMessage}>
             <span className={styles.messageLabel}>{message.role === "user" ? "You" : "Rantau"}</span>
-            <p>{visibleText(message.text)}</p>
+            {message.role === "assistant" ? <MessageContent text={visibleText(message.text)} /> : <p>{visibleText(message.text)}</p>}
           </article>)}
           {busy && <p role="status" className={styles.loading}>Reviewing your request<span aria-hidden="true"> · · ·</span></p>}
           {error && <div role="alert" aria-label="Chat error" className={styles.error}><strong>{error === "session" ? "Session required" : "Let’s pause here"}</strong><p>{errorText[error]}</p>

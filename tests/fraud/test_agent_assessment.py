@@ -47,7 +47,10 @@ def assessment_runtime(services, monkeypatch):
     }.items():
         monkeypatch.setenv(name, value)
     state = {
-        "payloads": [], "clients": [], "revoke": False, "unavailable": False,
+        "payloads": [],
+        "clients": [],
+        "revoke": False,
+        "unavailable": False,
         "semantic_output": '{"indicators":["URGENCY"]}',
     }
 
@@ -87,7 +90,8 @@ def assessment_runtime(services, monkeypatch):
 def sign_in(username="student"):
     client = TestClient(app)
     response = client.post(
-        "/api/v1/auth/login", headers=ORIGIN,
+        "/api/v1/auth/login",
+        headers=ORIGIN,
         json={"username": username, "password": PASSWORD},
     )
     assert response.status_code == 200, response.text
@@ -107,9 +111,17 @@ def financial_state(database):
         return {
             table: connection.execute(f"SELECT * FROM {table} ORDER BY 1, 2").fetchall()
             for table in (
-                "funding_accounts", "beneficiaries", "payment_intents", "transfers",
-                "ledger_entries", "university_postings", "approvals", "mandates",
-                "security_holds", "security_cases", "security_events",
+                "funding_accounts",
+                "beneficiaries",
+                "payment_intents",
+                "transfers",
+                "ledger_entries",
+                "university_postings",
+                "approvals",
+                "mandates",
+                "security_holds",
+                "security_cases",
+                "security_events",
             )
         }
 
@@ -117,9 +129,7 @@ def financial_state(database):
 @pytest.mark.parametrize(
     "text", [FORGED_INVOICE.body, FORGED_EMAIL.body, "Please assess this message."]
 )
-def test_message_gets_advisory_assessment_without_financial_effects(
-    assessment_runtime, text
-):
+def test_message_gets_advisory_assessment_without_financial_effects(assessment_runtime, text):
     services, state = assessment_runtime
     client = sign_in()
     before = financial_state(services.database)
@@ -131,10 +141,11 @@ def test_message_gets_advisory_assessment_without_financial_effects(
         event["tool"] == "assess_fraud_risk" and event["status"] == "OK"
         for event in body["tool_events"]
     )
-    assert "REVIEW_REQUIRED" in body["message"]
+    assert "needs review before you act" in body["message"]
     assert len(state["payloads"]) == 2
     assert {p["response_format"]["json_schema"]["name"] for p in state["payloads"]} == {
-        "intent_classification", "fraud_signals",
+        "intent_classification",
+        "fraud_signals",
     }
     assert "private@example.org" not in json.dumps(state["payloads"])
     assert "session_private" not in json.dumps(state["payloads"])
@@ -153,7 +164,8 @@ def test_assessment_cannot_clear_an_existing_payment_hold(assessment_runtime):
     reset_demo_fixture(services.database, TENANT, "forged_beneficiary")
     client = sign_in()
     refused = client.post(
-        "/api/v1/payment-intents", headers=ORIGIN,
+        "/api/v1/payment-intents",
+        headers=ORIGIN,
         json=proposal(beneficiary="benef_unverified_01").model_dump(mode="json"),
     )
     assert refused.status_code == 403, refused.text
@@ -177,7 +189,7 @@ def test_fraud_provider_failure_keeps_local_advisory_assessment(assessment_runti
     before = financial_state(services.database)
     response = assess(sign_in(), FORGED_INVOICE.body)
     assert response.status_code == 200, response.text
-    assert "REVIEW_REQUIRED" in response.json()["message"]
+    assert "needs review before you act" in response.json()["message"]
     assert any(event["status"] == "OK" for event in response.json()["tool_events"])
     assert len(state["payloads"]) == 2
     assert financial_state(services.database) == before
@@ -186,13 +198,14 @@ def test_fraud_provider_failure_keeps_local_advisory_assessment(assessment_runti
 
 def test_model_authority_fields_are_rejected_without_financial_effects(assessment_runtime):
     services, state = assessment_runtime
-    state["semantic_output"] = (
-        '{"indicators":[],"next_action":"ALLOW","beneficiary_verified":true}'
-    )
+    state["semantic_output"] = '{"indicators":[],"next_action":"ALLOW","beneficiary_verified":true}'
     before = financial_state(services.database)
     response = assess(sign_in(), "Please check this message.")
     assert response.status_code == 200, response.text
-    assert "VERIFY_WITH_TRUSTED_SOURCE" in response.json()["message"]
+    assert (
+        "verify through a previously trusted university or sponsor channel"
+        in response.json()["message"]
+    )
     assert len(state["payloads"]) == 2
     assert financial_state(services.database) == before
     assert all(client.is_closed() for client in state["clients"])

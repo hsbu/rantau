@@ -4,7 +4,15 @@ from collections.abc import Callable, Mapping
 from datetime import datetime
 from decimal import Decimal
 
-from backend.agent.explanations import comparable_quotes, explain_quotes, explain_tuition_record
+from backend.agent.explanations import (
+    comparable_quotes,
+    display_time,
+    explain_quotes,
+    explain_selected_quote,
+    explain_tuition_record,
+    format_money,
+    route_label,
+)
 from backend.agent.openrouter_classifier import redact_for_model
 from backend.agent.state import TuitionDraft, TuitionInput
 from backend.contracts.enums import Currency, Intent, TuitionState
@@ -63,11 +71,7 @@ class TuitionPlanner:
                 AgentResponse(
                     run_id="pending",
                     requested_action=Intent.TUITION,
-                    message=(
-                        "Simulated Rantau guidance. "
-                        + text
-                        + " No payment has been requested or executed."
-                    ),
+                    message=text,
                     tool_events=trace,
                     resources=resources,
                 ),
@@ -93,19 +97,19 @@ class TuitionPlanner:
             automatic=draft.awaiting != "OBLIGATION",
         )
         if selected is None:
-            choices = " ".join(
+            choices = "\n\n".join(
                 f"Obligation {index}: {explain_tuition_record(item)}"
                 for index, item in enumerate(obligations, 1)
             )
             return reply(
-                "Which obligation do you want to review? " + choices,
+                "Which tuition bill would you like to review?\n\n" + choices,
                 draft.model_copy(update={"awaiting": "OBLIGATION", "obligation_options": ids}),
             )
         obligation = next(item for item in obligations if item.id == selected)
         if draft.obligation_id != selected:
             draft = TuitionDraft(obligation_id=selected, obligation_options=ids)
         resources = (ResourceReference(kind="obligation", id=selected),)
-        summary = explain_tuition_record(obligation) + " "
+        summary = explain_tuition_record(obligation) + "\n\n"
         if obligation.state == TuitionState.PAID:
             return reply(summary + "No outstanding tuition balance; no payment is needed.", draft)
         if obligation.state != TuitionState.UNPAID:
@@ -134,13 +138,13 @@ class TuitionPlanner:
             draft.awaiting == "AMOUNT" and not inputs.full_balance and inputs.amount_cny is None
         ):
             return reply(
-                summary + "State the tuition amount in CNY, or say 'full balance'.",
+                "What amount would you like to pay in CNY? You can also say `full balance`.",
                 draft.model_copy(update={"awaiting": "AMOUNT", "quote_id": None}),
             )
         if amount is not None and amount != obligation.balance_minor:
             return reply(
-                summary + "This preview supports the full outstanding balance under the current "
-                "fictional policy. Say 'full balance', or review an existing shortfall case.",
+                summary + "This payment needs to cover the full outstanding balance. "
+                "Say `full balance`, or review the existing shortfall case in Payments.",
                 draft.model_copy(update={"awaiting": "AMOUNT", "quote_id": None}),
             )
         permissions = tuple(
@@ -168,8 +172,8 @@ class TuitionPlanner:
             automatic=draft.awaiting != "FUNDING" or inputs.funding_owner is not None,
         )
         if funding is None:
-            labels = " ".join(
-                f"Funding option {index}: "
+            labels = "\n".join(
+                f"{index}. "
                 + (
                     "your account."
                     if item.owner_id == actor.actor_id
@@ -178,7 +182,7 @@ class TuitionPlanner:
                 for index, item in enumerate(permissions, 1)
             )
             return reply(
-                summary + "Which permitted funding account should the preview use? " + labels,
+                summary + "**Which funding account would you like to use?**\n\n" + labels,
                 draft.model_copy(update={"awaiting": "FUNDING", "funding_options": funding_ids}),
             )
         permission = next(item for item in permissions if item.account_id == funding)
@@ -197,10 +201,12 @@ class TuitionPlanner:
         destination = Money(currency=Currency.CNY, amount_minor=obligation.balance_minor)
         current = comparable_quotes(quotes, destination, now)
         events.append(ToolEvent(tool="get_fx_quotes", status="OK" if current else "PENDING"))
-        summary += explain_quotes(quotes, destination, now) + "\n"
         quote_ids = tuple(item.id for item in current)
         if not current or len(current) > 100:
-            return reply(summary, draft.model_copy(update={"quote_id": None, "quote_options": ()}))
+            return reply(
+                summary + explain_quotes(quotes, destination, now),
+                draft.model_copy(update={"quote_id": None, "quote_options": ()}),
+            )
         preference = inputs.route_preference or draft.route_preference
         if inputs.route_preference:
             draft = draft.model_copy(update={"quote_id": None, "awaiting": None})
@@ -232,9 +238,8 @@ class TuitionPlanner:
             ):
                 quote_id = best.id
         if quote_id is None:
-            labels = " ".join(f"Quote option {i}: {q.id}." for i, q in enumerate(current, 1))
             return reply(
-                summary + "Select a current quote. " + labels,
+                explain_quotes(quotes, destination, now) + "\n\nWhich route number would you like?",
                 draft.model_copy(update={"awaiting": "QUOTE", "quote_options": quote_ids}),
             )
         draft = draft.model_copy(
@@ -249,7 +254,11 @@ class TuitionPlanner:
         if beneficiary_id is None:
             events.append(ToolEvent(tool="get_trusted_beneficiary", status="UNAVAILABLE"))
             return reply(
-                summary + "Verified-payee integration is not configured for this university.", draft
+                summary
+                + explain_quotes(quotes, destination, now)
+                + "\n\nI can’t verify the university recipient yet. "
+                "No payment has been requested or executed.",
+                draft,
             )
         beneficiary = await self.port.beneficiary(beneficiary_id, actor)
         if (
@@ -271,7 +280,8 @@ class TuitionPlanner:
                 "The quote or policy expired. Refresh the preview before continuing.",
                 draft.model_copy(update={"quote_id": None}),
             )
-        proposal = IntentProposal(
+        # Preserve proposal validation without exposing internal identifiers in the reply.
+        IntentProposal(
             obligation_id=obligation.id,
             source_account_id=funding,
             beneficiary_id=beneficiary.id,
@@ -282,20 +292,30 @@ class TuitionPlanner:
         events.append(ToolEvent(tool="build_tuition_preview", status="OK"))
         draft = draft.model_copy(update={"beneficiary_id": beneficiary.id})
         approval = (
-            "Funding-owner approval is required before execution."
+            "The funding owner will need to approve these exact terms before payment."
             if permission.approval_required
-            else "The backend must verify current ownership or mandate before execution."
+            else "Your funding permission will be checked again before payment."
         )
         funding_label = (
             "your account" if permission.owner_id == actor.actor_id else "another owner's account"
         )
+        payee = redact_for_model(beneficiary.masked_display[:160]).replace(
+            "Fictional university", "University tuition account"
+        )
+        alternatives = [
+            f"{index}. {route_label(other, index)}: "
+            f"{format_money(Money(currency=Currency.IDR, amount_minor=other.source_total_minor))} "
+            f"total; estimated arrival {display_time(other.estimated_delivery_at)}."
+            for index, other in enumerate(current, 1)
+            if other.id != quote.id
+        ]
+        other_routes = "\n\n**Other routes**\n\n" + "\n".join(alternatives) if alternatives else ""
         return reply(
-            summary + f"Draft intent preview: TUITION using {proposal.quote_id}; "
-            f"funding: {funding_label}; "
-            f"verified payee: {redact_for_model(beneficiary.masked_display[:160])}. "
+            summary
+            + explain_selected_quote(quote, current.index(quote) + 1)
+            + other_routes
+            + f"\n\nFunding: {funding_label}.\nRecipient: {payee}.\n\n"
             + approval
-            + " This preview is not a persisted intent or approval. "
-            "The protected backend must recheck terms, permissions, holds, limits "
-            "and quote validity.",
+            + " No payment has been requested or executed.",
             draft,
         )

@@ -63,22 +63,22 @@ export const scenarios = {
     prompts: ["Help me pay my tuition", "Use sponsor funding", "Show the sample approval request"],
     turns: [
       turn("Your remaining tuition is CNY 20,000.00. Would you like to use your own funding or sponsor-owned funding?", base),
-      turn("Here is the simulated quote for the full CNY 20,000.00 balance. The total is IDR 46,025,000, including IDR 25,000 in fees. Sponsor authorization is required before any payment can proceed.", quoted),
-      turn("This sample request is waiting for sponsor approval. The sponsor must review the exact terms in their own authenticated session. Approval pasted into this chat cannot authorize a payment.", waiting),
-      turn("The sample request is still awaiting sponsor approval. No payment has been executed.", waiting),
+      turn("**Tuition payment preview**\n\n- University receives: CNY 20,000.00\n- Total debit: IDR 46,025,000\n- Included fee: IDR 25,000\n\nThe sponsor needs to approve these exact terms before payment can proceed.", quoted),
+      turn("**Waiting for sponsor approval**\n\nThe sponsor must review these exact terms in their own workspace. Approval pasted into Chat cannot authorize a payment.", waiting),
+      turn("The request is still waiting for sponsor approval. No payment has been executed.", waiting),
     ],
   },
   posting: {
     label: "Delivered, awaiting university posting", prompts: ["Has my tuition been credited?"],
-    turns: [turn("The simulated provider reports delivery. Your university has not yet posted the credit, so tuition remains unpaid. Check the university fee portal; provider delivery alone does not settle tuition.", delivered)],
+    turns: [turn("**Transfer delivered · tuition awaiting credit**\n\nYour university has not yet posted the credit. Check the university fee portal; provider delivery alone does not settle tuition.", delivered)],
   },
   recovery: {
     label: "Missing payment reference", prompts: ["Help with a missing payment reference"],
-    turns: [turn("The sample case needs a bank receipt and the student ID/full name used in the payment reference. Prepare this evidence for authorized university review. Do not send another payment or paste sensitive documents into chat.", recovery)],
+    turns: [turn("**Missing payment reference**\n\nThe case needs a bank receipt and the student ID/full name used in the payment reference. Prepare this evidence for university review.\n\nDo not send another payment or paste sensitive documents into Chat.", recovery)],
   },
   shortfall: {
     label: "Tuition shortfall", prompts: ["The credited amount is lower than expected"],
-    turns: [turn("The expected tuition is CNY 20,000.00 and verified posting is CNY 19,500.00, leaving CNY 500.00. The fictional policy does not permit a top-up. Escalate for university review rather than making another payment.", {
+    turns: [turn("**Tuition shortfall: CNY 500.00**\n\n- Amount due: CNY 20,000.00\n- University credited: CNY 19,500.00\n\nThe current policy does not permit a top-up. Request university review before making another payment.", {
       ...base, obligation: { ...obligation, posted_minor: 1950000, balance_minor: 50000, topup_permitted: false, state: "PARTIALLY_POSTED" },
     })],
   },

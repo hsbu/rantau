@@ -38,7 +38,7 @@ test("provider, ledger and recovery panels preserve linkage and exact state", as
   await expect(page.getByRole("region", { name: "Payment status" })).toContainText("Do not start a second payment");
   await send(page, "topup");
   await expect(page.getByRole("region", { name: "Tuition balance" })).toContainText("CNY 500.00");
-  await expect(page.locator("body")).toContainText("simulated policy permits separate top-up planning");
+  await expect(page.locator("body")).toContainText("current policy permits separate top-up planning");
   await expect(page.locator("body")).not.toContainText("policy does not permit a top-up");
 });
 

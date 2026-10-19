@@ -42,7 +42,7 @@ export function ActionPanel({ summary, preview, unavailable = false }: { summary
         </dl>
       </section>
       {quote && <section className={styles.detailBlock} aria-label="Quote breakdown">
-        <div className={styles.inlineHeading}><h3>Quote breakdown</h3><span className={expired ? styles.warningTag : styles.tag}>{expired ? "Expired" : "Simulated"}</span></div>
+        <div className={styles.inlineHeading}><h3>Quote breakdown</h3><span className={expired ? styles.warningTag : styles.tag}>{expired ? "Expired" : preview ? "Sample" : "Quote"}</span></div>
         <p className={styles.small}>{visibleText(quote.provider)} · IDR → CNY</p>
         <dl className={styles.rows}>
           <div><dt>Transfer amount</dt><dd>{money(quote.source_currency, quote.source_principal_minor)}</dd></div>
@@ -80,13 +80,13 @@ export function ActionPanel({ summary, preview, unavailable = false }: { summary
       </section>}
       {summary.obligation.state === "PARTIALLY_POSTED" && <section className={styles.notice}>
         <div><h3>University review needed</h3><p>{summary.obligation.topup_permitted
-          ? "The simulated policy permits separate top-up planning. Any additional payment requires its own current authorization in Payments."
+          ? "The current policy permits separate top-up planning. Any additional payment requires its own current authorization in Payments."
           : summary.obligation.topup_permitted === false
-            ? "The fictional policy does not permit a top-up. Escalate the shortfall for review."
+            ? "The current policy does not permit a top-up. Escalate the shortfall for review."
             : "Top-up permission is unverified. Seek university review before any additional payment."}</p></div>
       </section>}
       {preview && <p className={styles.fixtureClock}>Fictional scenario time: {dateTime(summary.asOf)}. These are sample records, not a live quote or account.</p>}
-      {!preview && <p className={styles.fixtureClock}>Simulated records as of {dateTime(summary.asOf)}.{summary.checkedAt && <> Checked {dateTime(summary.checkedAt)}.</>} This snapshot grants no authorization; current backend checks still apply.</p>}
+      {!preview && <p className={styles.fixtureClock}>Records as of {dateTime(summary.asOf)}.{summary.checkedAt && <> Checked {dateTime(summary.checkedAt)}.</>} Current checks still apply before any payment.</p>}
     </>}
     <div className={styles.trustNote}><span aria-hidden="true">↳</span><p>You stay in control. Financial actions require server authorization; chat text cannot grant approval.</p></div>
   </aside>;
