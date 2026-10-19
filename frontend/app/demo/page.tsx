@@ -11,6 +11,11 @@ export const metadata = { title: "Demo controls | Rantau" };
 export const dynamic = "force-dynamic";
 
 const adminOnly = { en: "Demo administrator sign-in is required.", id: "Perlu masuk sebagai administrator demo." };
+const controlsNote = {
+  en: "These controls change the simulator only. They are not available to students, sponsors or the agent, and they never approve or pay anything.",
+  id: "Kontrol ini hanya mengubah simulator. Tidak tersedia bagi mahasiswa, sponsor, atau agen, dan tidak pernah menyetujui atau membayar apa pun.",
+};
+const runLabel = { en: "Current simulator run", id: "Sesi simulator saat ini" };
 const trailTitle = { en: "Redacted audit trail (current run)", id: "Jejak audit tersamar (sesi saat ini)" };
 
 export default async function DemoPage({ searchParams }: { searchParams: Promise<{ lang?: string }> }) {
@@ -33,6 +38,10 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
     <WorkspaceHeader label="Demo workspace" links={[{ href: "/", label: "Home" }, { href: "/student/chat", label: "Student workspace" }]} />
     <SimulatedBanner lang={lang} />
     <h1>Demo</h1>
+    <p className={styles.notice}>{controlsNote[lang]}</p>
+    {trail.ok && trail.data.length > 0 && <p data-run={currentRun(trail.data)}>
+      <strong>{runLabel[lang]}:</strong> {currentRun(trail.data)}
+    </p>}
     <DemoControls scenarios={scenarios.data} />
     <section className={styles.card}>
       <h2>{trailTitle[lang]}</h2>
@@ -45,4 +54,8 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
       </table></TableScroll>
     </section>
   </main>;
+}
+
+function currentRun(entries: Schema["AuditEntry"][]): number {
+  return Math.max(...entries.map(entry => entry.run_no));
 }

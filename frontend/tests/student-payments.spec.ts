@@ -227,3 +227,29 @@ test("demo clock and tick actions are reported as recorded when the backend answ
   await page.getByRole("button", { name: "University tick" }).click();
   await expect(page.getByText("We could not confirm the result.", { exact: false })).toHaveCount(0);
 });
+
+const NEXT_ACTOR: [variant: string | null, key: string][] = [
+  [null, "exception"], ["pending", "approval"], ["authorized", "continue"],
+  ["held", "hold"], ["recovered", "paid"], ["partial", "shortfall"], ["unpaid", "start"],
+];
+for (const [variant, key] of NEXT_ACTOR) {
+  test(`the page names who acts next (${variant ?? "default"} -> ${key})`, async ({ context, page }) => {
+    if (variant) await context.addCookies([{ name: "variant", value: variant, url: origin }]);
+    await page.goto("/student/payments");
+    await expect(page.locator("[data-next]")).toHaveAttribute("data-next", key);
+  });
+}
+
+test("the timeline separates the payer debit from provider delivery", async ({ page }) => {
+  await page.goto("/student/payments");
+  const timeline = page.getByRole("list", { name: "trust states" });
+  await expect(timeline.getByText("Payer debited")).toHaveAttribute("data-status", "done");
+  await expect(timeline.getByText("Provider delivered")).toHaveAttribute("data-status", "done");
+});
+
+test("the demo page states the current run and that its controls are simulator-only", async ({ context, page }) => {
+  await context.addCookies([{ name: "admin", value: "ok", url: origin }]);
+  await page.goto("/demo");
+  await expect(page.getByText("These controls change the simulator only.", { exact: false })).toBeVisible();
+  await expect(page.locator("[data-run]")).toHaveAttribute("data-run", "1");
+});

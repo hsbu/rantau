@@ -17,6 +17,7 @@
 .done { background: #e3f1e6; border-color: #8ab79a; }
 .current { background: #fff4d6; border-color: #d4b25a; }
 .problem { background: #fde4e1; border-color: #d98a80; }
+.nextActor { margin: 12px 0; font-size: .95rem; }
 .notice { border-left: 4px solid #b8860b; background: #fff8e6; padding: 10px 12px; font-size: .9rem; }
 .tableScroll { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; border-radius: 4px; }
 .table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: .9rem; overflow-wrap: normal; font-variant-numeric: tabular-nums; }

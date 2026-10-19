@@ -11,7 +11,7 @@ import { RouteChoices } from "./route-choices";
 import { type Schema, financeGet } from "./finance-api";
 import styles from "./payments.module.css";
 import { caseStateLabels, paymentStateLabels, pickLang, safeNextStep, tuitionStateLabels, ui } from "./status-labels";
-import { trustSteps } from "./trust";
+import { nextActor, trustSteps } from "./trust";
 
 export const metadata = { title: "Payments | Rantau" };
 export const dynamic = "force-dynamic";
@@ -73,6 +73,9 @@ async function ObligationCard(
       {item.posting_deadline_at && <Stat label={ui.deadline[lang]} value={dateTime(item.posting_deadline_at)} />}
     </div>
     <TrustTimeline steps={trustSteps(item, pending)} lang={lang} />
+    <p className={styles.nextActor} data-next={nextActor(item, pending)}>
+      <strong>{ui.next[lang]}:</strong> {ui.nextActor[nextActor(item, pending)][lang]}
+    </p>
     {pending && <section aria-label="pending payment">
       <h3>{paymentStateLabels[pending.state][lang]}</h3>
       <IntentSummary intent={pending} lang={lang} />
