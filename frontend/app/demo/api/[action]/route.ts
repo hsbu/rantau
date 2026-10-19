@@ -1,4 +1,4 @@
-import { upstream } from "../../../student/payments/finance-api";
+import { relayResponse, upstream } from "../../../student/payments/finance-api";
 
 const headers = { "Cache-Control": "no-store" };
 const failure = (status: number) => Response.json({ error: "Demo service unavailable" }, { status, headers });
@@ -39,8 +39,6 @@ export async function POST(request: Request, context: { params: Promise<{ action
       },
       body: action === "tick" ? undefined : body,
     });
-    return new Response(await response.text(), {
-      status: response.status, headers: { ...headers, "Content-Type": "application/json" },
-    });
+    return await relayResponse(response, headers);
   } catch { return failure(502); }
 }
