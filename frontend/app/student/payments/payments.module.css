@@ -22,15 +22,16 @@
 .table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: .9rem; overflow-wrap: normal; font-variant-numeric: tabular-nums; }
 .table th, .table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #e7ede9; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.actions button, .form button { min-height: 44px; max-width: 100%; border: 1px solid #2f5d54; background: #2f5d54; color: #fff; padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+.actions button, .form button { min-height: 44px; max-width: 100%; border: 1px solid var(--color-accent); background: var(--color-accent); color: #fff; padding: 8px 14px; border-radius: 8px; cursor: pointer; }
 .actions button:disabled, .form button:disabled { opacity: .6; cursor: progress; }
+.actions button:not(:disabled):hover, .form button:not(:disabled):hover, .routes button:not(:disabled):hover { background: var(--color-accent-hover); }
 .form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
 .form label { display: grid; gap: 6px; min-width: 0; max-width: 100%; flex: 1 1 180px; }
-.form select, .form input, .form textarea { min-width: 0; max-width: 100%; min-height: 44px; padding: 7px 8px; border: 1px solid #bac8bf; border-radius: 8px; background: white; color: #183c37; }
+.form select, .form input, .form textarea { min-width: 0; max-width: 100%; min-height: 44px; padding: 7px 8px; border: 1px solid #bac8bf; border-radius: 8px; background: white; color: var(--color-ink); }
 .form label :is(input, select, textarea) { width: 100%; }
 .form textarea { min-height: 100px; resize: vertical; }
 .lang { font-size: .85rem; }
 .routes { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
 .routes li { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-.routes button { min-height: 44px; max-width: 100%; border: 1px solid #2f5d54; background: #2f5d54; color: #fff; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.routes button { min-height: 44px; max-width: 100%; border: 1px solid var(--color-accent); background: var(--color-accent); color: #fff; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
 .routes button:disabled { opacity: .6; cursor: progress; }

@@ -4,6 +4,8 @@ import { type Schema, financeGet } from "../student/payments/finance-api";
 import styles from "../student/payments/payments.module.css";
 import { pickLang, ui } from "../student/payments/status-labels";
 import { DemoControls } from "./controls";
+import Link from "next/link";
+import { WorkspaceHeader } from "../components/workspace-header";
 
 export const metadata = { title: "Demo controls | Rantau" };
 export const dynamic = "force-dynamic";
@@ -15,15 +17,20 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
   const lang = pickLang((await searchParams).lang);
   const scenarios = await financeGet<Schema["ScenarioInfo"][]>("/api/v1/demo/scenarios");
   if (!scenarios.ok) {
-    return <main className={styles.page}>
+    return <main id="main-content" tabIndex={-1} lang={lang} className={styles.page}>
+      <WorkspaceHeader label="Demo workspace" links={[{ href: "/", label: "Home" }]} />
       <SimulatedBanner lang={lang} />
+      <h1>Demo</h1>
       <p className={styles.notice} role="alert">
         {scenarios.reason === "unavailable" ? ui.unavailable[lang] : adminOnly[lang]}
       </p>
+      <p>{lang === "id" ? "Akses demo disediakan oleh administrator Anda." : "Demo access is provided by your administrator."}</p>
+      <Link href="/">{lang === "id" ? "Kembali ke beranda" : "Return home"}</Link>
     </main>;
   }
   const trail = await financeGet<Schema["AuditEntry"][]>("/api/v1/demo/audit");
-  return <main className={styles.page}>
+  return <main id="main-content" tabIndex={-1} lang={lang} className={styles.page}>
+    <WorkspaceHeader label="Demo workspace" links={[{ href: "/", label: "Home" }, { href: "/student/chat", label: "Student workspace" }]} />
     <SimulatedBanner lang={lang} />
     <h1>Demo</h1>
     <DemoControls scenarios={scenarios.data} />

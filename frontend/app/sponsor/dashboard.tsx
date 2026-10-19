@@ -6,6 +6,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { components } from "../../lib/api-contracts/generated";
 import Link from "next/link";
+import { WorkspaceHeader } from "../components/workspace-header";
+import { CredentialsFields, validateCredentials, type FieldErrors } from "../components/credentials-fields";
+import uiStyles from "../components/ui.module.css";
 import styles from "./sponsor.module.css";
 
 type Approval = components["schemas"]["ApprovalView"];
@@ -98,10 +101,10 @@ async function errorCode(response: Response): Promise<string> {
   } catch { return ""; }
 }
 
-function formatExpiry(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium", timeStyle: "short",
-  }).format(new Date(value));
+function formatExpiry(value: string, language: SummaryLanguage = "en"): string {
+  return new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-GB", {
+    dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Shanghai",
+  }).format(new Date(value)) + " (UTC+08:00)";
 }
 
 function humanise(value: string): string {
@@ -121,6 +124,7 @@ export function SponsorDashboard() {
   const [confirmation, setConfirmation] = useState<{ item: Approval; decision: Decision }>();
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [uncertain, setUncertain] = useState(false);
   const confirmationDialog = useRef<HTMLDialogElement>(null);
 
@@ -224,7 +228,10 @@ export function SponsorDashboard() {
 
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || !username.trim() || !password) return;
+    if (busy) return;
+    const validation = validateCredentials(event.currentTarget, username, password);
+    setFieldErrors(validation);
+    if (validation.username || validation.password) return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -349,18 +356,17 @@ export function SponsorDashboard() {
   const pending = approvals.filter(item => item.state === "PENDING");
   const history = approvals.filter(item => item.state !== "PENDING");
 
-  return <main className={styles.page}>
-    <header className={styles.header}>
-      <Link className={styles.wordmark} href="/">rantau<span>✳</span></Link>
-      <div className={styles.headerActions}><Link href="/student/sign-in">Student workspace</Link>
-        {mode === "ready" && <button className={styles.textButton} onClick={() => void signOut()} disabled={busy}>Sign out</button>}</div>
-    </header>
+  return <main id="main-content" tabIndex={-1} className={styles.page}>
+    <WorkspaceHeader label="Workspaces" links={[{ href: "/student/sign-in", label: "Student workspace" }]}>
+      {mode === "ready" && <button className={`${uiStyles.button} ${uiStyles.secondary}`} onClick={() => void signOut()} disabled={busy}>Sign out</button>}
+    </WorkspaceHeader>
 
     <section className={styles.intro}>
       <p className={styles.eyebrow}>Sponsor workspace</p>
       <h1>Review payment requests</h1>
       <label className={styles.summaryLanguage}>Summary language <select aria-label="Summary language" value={language}
         onChange={event => setLanguage(event.target.value === "id" ? "id" : "en")}><option value="en">English</option><option value="id">Bahasa Indonesia</option></select></label>
+      <p className={styles.muted}>Language applies to payment summaries and confirmation. Dates use China time (UTC+08:00).</p>
       <p>Check the recipient and full cost before recording a decision.</p>
       <div className={styles.safety} role="note">
         <span aria-hidden="true">ⓘ</span>
@@ -368,25 +374,19 @@ export function SponsorDashboard() {
       </div>
     </section>
 
-    {error && <p className={styles.error} role="alert">{error}</p>}
+    {error && <p id="signin-error" className={styles.error} role="alert">{error}</p>}
     {notice && <p className={styles.notice} role="status">{notice}</p>}
 
     {mode === "checking" && <div className={styles.loading} role="status">Checking your sponsor session…</div>}
-    {mode === "signed-out" && <form className={styles.signIn} onSubmit={signIn}>
+    {mode === "signed-out" && <form className={styles.signIn} onSubmit={signIn} noValidate>
       <div>
         <p className={styles.eyebrow}>Sponsor sign-in</p>
         <h2>Welcome back</h2>
         <p className={styles.muted}>Use the sponsor credentials provided for this simulated environment.</p>
       </div>
-      <label>Username
-        <input autoComplete="username" name="username" required maxLength={64} value={username}
-          onChange={event => setUsername(event.target.value)} disabled={busy} />
-      </label>
-      <label>Password
-        <input autoComplete="current-password" name="password" type="password" required maxLength={128}
-          value={password} onChange={event => setPassword(event.target.value)} disabled={busy} />
-      </label>
-      <button className={styles.primary} type="submit" disabled={busy || !username.trim() || !password}>
+      <CredentialsFields username={username} password={password} setUsername={setUsername} setPassword={setPassword}
+        busy={busy} errors={fieldErrors} errorId={error ? "signin-error" : undefined} />
+      <button className={uiStyles.button} type="submit" disabled={busy}>
         {busy ? "Signing in…" : "Sign in"}
       </button>
     </form>}
@@ -443,21 +443,23 @@ export function SponsorDashboard() {
       </section>
     </div>}
 
-    {confirmation && <dialog ref={confirmationDialog} className={styles.confirmDialog}
+    {confirmation && <dialog ref={confirmationDialog} className={uiStyles.dialog} lang={language}
       aria-labelledby="confirm-title" aria-describedby="confirm-copy"
       onCancel={event => { event.preventDefault(); setConfirmation(undefined); }}>
       <section className={styles.confirm} aria-labelledby="confirm-title" aria-describedby="confirm-copy">
-        <p className={styles.eyebrow}>Confirm your decision</p>
+        <p className={styles.eyebrow}>{language === "id" ? "Konfirmasi keputusan Anda" : "Confirm your decision"}</p>
         <h2 id="confirm-title">{language === "id"
           ? confirmation.decision === "APPROVED" ? "Setujui permintaan ini?" : "Tolak permintaan ini?"
           : confirmation.decision === "APPROVED" ? "Approve this request?" : "Reject this request?"}</h2>
-        <p id="confirm-copy">{confirmation.decision === "APPROVED" ? "You are authorizing an attempt to pay" : "You are rejecting the request for"} <strong>{confirmation.item.beneficiary_label}</strong> ({confirmation.item.purpose.toLowerCase()}).</p>
+        <p id="confirm-copy">{language === "id"
+          ? confirmation.decision === "APPROVED" ? "Anda mengizinkan upaya pembayaran kepada" : "Anda menolak permintaan untuk"
+          : confirmation.decision === "APPROVED" ? "You are authorizing an attempt to pay" : "You are rejecting the request for"} <strong>{confirmation.item.beneficiary_label}</strong>.</p>
         <ApprovalSummary item={confirmation.item} language={language} />
         <div className={styles.confirmActions}>
-          <button className={styles.secondary} onClick={() => setConfirmation(undefined)} disabled={busy}>Go back</button>
+          <button className={styles.secondary} onClick={() => setConfirmation(undefined)} disabled={busy}>{language === "id" ? "Kembali" : "Go back"}</button>
           <button className={confirmation.decision === "APPROVED" ? styles.primary : styles.reject}
             onClick={() => void decide(confirmation.item, confirmation.decision)} disabled={busy}>
-            {busy ? "Recording…" : language === "id"
+            {busy ? language === "id" ? "Mencatat…" : "Recording…" : language === "id"
               ? confirmation.decision === "APPROVED" ? "Konfirmasi persetujuan" : "Konfirmasi penolakan"
               : confirmation.decision === "APPROVED" ? "Confirm approval" : "Confirm rejection"}
           </button>
@@ -487,7 +489,7 @@ function ApprovalCard({ item, busy, busyId, uncertain, language, onChoose }: {
       </span>
     </div>
     <ApprovalSummary item={item} language={language} />
-    <p className={styles.expiry}>Request expires {formatExpiry(item.expires_at)}</p>
+    <p className={styles.expiry} lang={language}>{language === "id" ? "Permintaan berakhir" : "Request expires"} {formatExpiry(item.expires_at, language)}</p>
     {item.state === "PENDING" && <div className={styles.cardActions}>
       <button className={styles.secondary} onClick={() => onChoose("REJECTED")} disabled={!actionable}
         aria-label={`Reject request for ${item.beneficiary_label}`}>

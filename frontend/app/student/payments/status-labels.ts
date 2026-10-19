@@ -64,6 +64,10 @@ export const safeNextStep: Record<Schema["ReasonCode"], Label> = {
 };
 
 export const ui = {
+  route: { en: "Route", id: "Rute" },
+  processing: { en: "Processing request…", id: "Memproses permintaan…" },
+  checkStatus: { en: "Check current status", id: "Periksa status saat ini" },
+  unconfirmed: { en: "We could not confirm this request. Check the current status before repeating a payment or creating a replacement request. This request was not retried automatically.", id: "Kami belum dapat memastikan hasil permintaan ini. Periksa status saat ini sebelum mengulangi pembayaran atau membuat permintaan pengganti. Permintaan tidak diulang secara otomatis." },
   title: { en: "Payments and tuition status", id: "Pembayaran dan status uang kuliah" },
   simulated: { en: "Simulated: no real money, bank or university is involved.", id: "Simulasi: tidak ada uang, bank, atau universitas sungguhan." },
   provider: { en: "Payment provider", id: "Penyedia pembayaran" },
@@ -79,7 +83,7 @@ export const ui = {
   submitCase: { en: "Submit the case", id: "Ajukan kasus" },
   noPay: { en: "Provider delivery is not the same as tuition paid. Do not pay again.", id: "Pengiriman penyedia tidak sama dengan uang kuliah lunas. Jangan bayar lagi." },
   signIn: { en: "Sign in to see your payments.", id: "Masuk untuk melihat pembayaran Anda." },
-  unavailable: { en: "The payment service is not available right now. No payment was sent.", id: "Layanan pembayaran belum tersedia. Tidak ada pembayaran yang dikirim." },
+  unavailable: { en: "Payment details are unavailable right now. Refresh status before starting or repeating a payment request.", id: "Rincian pembayaran belum tersedia. Perbarui status sebelum memulai atau mengulangi permintaan pembayaran." },
   none: { en: "No tuition obligation found.", id: "Tidak ada tagihan uang kuliah." },
   total: { en: "Total", id: "Total" },
   fee: { en: "Fee", id: "Biaya" },
@@ -115,6 +119,19 @@ export const ui = {
     paid: { en: "Tuition paid", id: "Uang kuliah lunas" },
   },
 } satisfies Record<string, Label | Record<string, Label>>;
+
+export function providerLabel(provider: string, lang: Lang): string {
+  const routes: Record<string, Label> = {
+    mock_remit_a: { en: "Simulated route A", id: "Rute simulasi A" },
+    mock_remit_b: { en: "Simulated route B", id: "Rute simulasi B" },
+  };
+  return Object.hasOwn(routes, provider) ? routes[provider][lang] : readableCode(provider);
+}
+
+export function readableCode(code: string): string {
+  const text = code.replaceAll("_", " ").toLowerCase();
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 // Audit actions are open-ended strings from the backend; unknown ones fall back to the raw code.
 export const actionLabels: Record<string, Label> = {

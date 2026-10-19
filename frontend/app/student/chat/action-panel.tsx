@@ -5,7 +5,7 @@ import styles from "./chat.module.css";
 export function ActionPanel({ summary, preview, unavailable = false }: { summary?: ActionSummary; preview: boolean; unavailable?: boolean }) {
   const quote = summary?.quote;
   const expired = !!quote && new Date(quote.expires_at) <= new Date(summary.checkedAt ?? summary.asOf);
-  return <aside className={styles.summary} aria-labelledby="summary-title">
+  return <aside id="payment-details" tabIndex={-1} className={styles.summary} aria-labelledby="summary-title">
     <div className={styles.summaryHeading}><span className={styles.kicker}>THE DETAILS</span>
       <h2 id="summary-title">Your next step,{" "}<br />made clear.</h2>
     </div>
@@ -89,6 +89,7 @@ export function ActionPanel({ summary, preview, unavailable = false }: { summary
       {!preview && <p className={styles.fixtureClock}>Records as of {dateTime(summary.asOf)}.{summary.checkedAt && <> Checked {dateTime(summary.checkedAt)}.</>} Current checks still apply before any payment.</p>}
     </>}
     <div className={styles.trustNote}><span aria-hidden="true">↳</span><p>You stay in control. Financial actions require server authorization; chat text cannot grant approval.</p></div>
+    <a className={styles.detailsLink} href="#chat-message">Back to message</a>
   </aside>;
 }
 

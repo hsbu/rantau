@@ -1,7 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { ConfirmationDialog } from "../components/confirmation-dialog";
+import uiStyles from "../components/ui.module.css";
 import type { Schema } from "../student/payments/finance-api";
 import styles from "../student/payments/payments.module.css";
 
@@ -22,6 +24,9 @@ export function DemoControls({ scenarios }: { scenarios: Schema["ScenarioInfo"][
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const [uncertain, setUncertain] = useState(false);
+  const [resetTarget, setResetTarget] = useState<string | null>(null);
+  const inFlight = useRef(false);
   const [scenario, setScenario] = useState(scenarios[0]?.id ?? "");
   const [hours, setHours] = useState(25);
   const [provider, setProvider] = useState(PROVIDERS[0]);
@@ -32,15 +37,22 @@ export function DemoControls({ scenarios }: { scenarios: Schema["ScenarioInfo"][
   const [sender, setSender] = useState("");
 
   async function run(action: string, body: object = {}) {
-    setBusy(true);
+    if (inFlight.current || uncertain) return;
+    inFlight.current = true;
+    setBusy(true); setStatus("");
     try {
       const response = await fetch(`/demo/api/${action}`, {
-        method: "POST", credentials: "same-origin", cache: "no-store",
+        method: "POST", credentials: "same-origin", cache: "no-store", signal: AbortSignal.timeout(30000),
         headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       });
-      setStatus(response.ok ? `${action}: ok` : `${action}: not available (${response.status})`);
+      if (!response.ok) throw new Error("Unconfirmed demo action");
+      setStatus("The scenario action was recorded. Review the current state before continuing.");
       router.refresh();
+    } catch {
+      setUncertain(true);
+      setStatus("We could not confirm the result. Refresh scenario state before repeating this action. It was not retried automatically.");
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }
@@ -50,13 +62,13 @@ export function DemoControls({ scenarios }: { scenarios: Schema["ScenarioInfo"][
       <label>Scenario <select value={scenario} onChange={event => setScenario(event.target.value)}>
         {scenarios.map(item => <option key={item.id} value={item.id}>{item.id}</option>)}
       </select></label>
-      <button disabled={busy} onClick={() => run("reset", { scenario_id: scenario })}>Reset scenario</button>
+      <button disabled={busy || uncertain || !scenario} onClick={() => setResetTarget(scenario)}>Reset scenario</button>
     </div>
     <div className={styles.form}>
       <label>Hours <input type="number" min={1} max={720} value={hours}
         onChange={event => setHours(Number(event.target.value))} /></label>
-      <button disabled={busy} onClick={() => run("advance-clock", { hours })}>Advance simulated clock</button>
-      <button disabled={busy} onClick={() => run("tick")}>University tick</button>
+      <button disabled={busy || uncertain} onClick={() => run("advance-clock", { hours })}>Advance simulated clock</button>
+      <button disabled={busy || uncertain} onClick={() => run("tick")}>University tick</button>
     </div>
     <div className={styles.form}>
       <label>Provider <select value={provider} onChange={event => setProvider(event.target.value as typeof provider)}>
@@ -65,7 +77,7 @@ export function DemoControls({ scenarios }: { scenarios: Schema["ScenarioInfo"][
       <label>Fault <select value={mode} onChange={event => setMode(event.target.value as typeof mode)}>
         {MODES.map(item => <option key={item}>{item}</option>)}
       </select></label>
-      <button disabled={busy} onClick={() => run("fault", { provider, mode, remaining: 1 })}>Inject fault</button>
+      <button disabled={busy || uncertain} onClick={() => run("fault", { provider, mode, remaining: 1 })}>Inject fault</button>
     </div>
     <div className={styles.form}>
       <label>Kind <select value={kind} onChange={event => setKind(event.target.value as typeof kind)}>
@@ -74,14 +86,25 @@ export function DemoControls({ scenarios }: { scenarios: Schema["ScenarioInfo"][
       <label>Title <input value={title} maxLength={200} onChange={event => setTitle(event.target.value)} /></label>
       <label>Sender <input value={sender} maxLength={200} onChange={event => setSender(event.target.value)} /></label>
       <label>Body <textarea value={body} maxLength={4000} onChange={event => setBody(event.target.value)} /></label>
-      <button disabled={busy} onClick={() => { setKind(SAMPLE.kind); setTitle(SAMPLE.title); setBody(SAMPLE.body); setSender(SAMPLE.claimed_sender); }}>
+      <button disabled={busy || uncertain} onClick={() => { setKind(SAMPLE.kind); setTitle(SAMPLE.title); setBody(SAMPLE.body); setSender(SAMPLE.claimed_sender); }}>
         Use the forged-invoice sample
       </button>
-      <button disabled={busy || !title || !body || !sender}
+      <button disabled={busy || uncertain || !title || !body || !sender}
         onClick={() => run("document", { kind, title, body, claimed_sender: sender })}>
         Plant untrusted document
       </button>
     </div>
-    <p role="status">{status}</p>
+    {busy && <p role="status">Updating scenario…</p>}
+    {status && <div role={uncertain ? "alert" : "status"} className={uiStyles.notice}><p>{status}</p>
+      {uncertain && <button type="button" className={`${uiStyles.button} ${uiStyles.secondary}`} onClick={() => window.location.reload()}>Check current status</button>}
+    </div>}
+    <ConfirmationDialog open={resetTarget !== null} title="Reset this scenario?" cancelLabel="Go back" confirmLabel="Confirm reset"
+      onCancel={() => setResetTarget(null)} onConfirm={() => {
+        const target = resetTarget; setResetTarget(null);
+        if (target) void run("reset", { scenario_id: target });
+      }}>
+      <p>Reset to <strong>{scenarios.find(item => item.id === resetTarget)?.description ?? resetTarget}</strong>?</p>
+      <p>This replaces the current simulated scenario state. Review pending work before resetting.</p>
+    </ConfirmationDialog>
   </section>;
 }

@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { CredentialsFields, validateCredentials, type FieldErrors } from "../../components/credentials-fields";
+import { WorkspaceHeader } from "../../components/workspace-header";
+import uiStyles from "../../components/ui.module.css";
 import styles from "./student-sign-in.module.css";
 
 type Mode = "checking" | "signed-out" | "student" | "other" | "unavailable";
@@ -23,6 +26,7 @@ export function StudentSignIn({ destination }: { destination: "/student/chat" | 
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   useEffect(() => {
     const controller = new AbortController();
@@ -37,7 +41,10 @@ export function StudentSignIn({ destination }: { destination: "/student/chat" | 
 
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || !username.trim() || !password) return;
+    if (busy) return;
+    const validation = validateCredentials(event.currentTarget, username, password);
+    setFieldErrors(validation);
+    if (validation.username || validation.password) return;
     setBusy(true); setError("");
     try {
       const response = await fetch("/sponsor/api/login", {
@@ -70,9 +77,8 @@ export function StudentSignIn({ destination }: { destination: "/student/chat" | 
     finally { setBusy(false); }
   }
 
-  return <main className={styles.page}>
-    <header className={styles.header}><Link href="/" className={styles.brand}>rantau<span aria-hidden="true">↗</span></Link>
-      <Link href="/sponsor">Sponsor workspace</Link></header>
+  return <main id="main-content" tabIndex={-1} className={styles.page}>
+    <WorkspaceHeader label="Workspaces" links={[{ href: "/sponsor", label: "Sponsor workspace" }]} />
     <div className={styles.layout}>
       <div className={styles.intro}><p className="eyebrow">Student workspace</p>
         <h1>A little closer<br />to home.</h1>
@@ -82,14 +88,12 @@ export function StudentSignIn({ destination }: { destination: "/student/chat" | 
       <div className={styles.panel}>
         <h2>Student sign-in</h2>
         <p>Use the student credentials provided for this simulated environment.</p>
-        {error && <p role="alert" className={styles.error}>{error}</p>}
+        {error && <p id="signin-error" role="alert" className={styles.error}>{error}</p>}
         {mode === "checking" && <p role="status">Checking your session…</p>}
-        {mode === "signed-out" && <form onSubmit={signIn}>
-          <label>Username<input name="username" autoComplete="username" required maxLength={64}
-            value={username} onChange={event => setUsername(event.target.value)} disabled={busy} /></label>
-          <label>Password<input name="password" type="password" autoComplete="current-password" required maxLength={128}
-            value={password} onChange={event => setPassword(event.target.value)} disabled={busy} /></label>
-          <button type="submit" disabled={busy || !username.trim() || !password}>{busy ? "Signing in…" : "Sign in"}</button>
+        {mode === "signed-out" && <form onSubmit={signIn} noValidate>
+          <CredentialsFields username={username} password={password} setUsername={setUsername} setPassword={setPassword}
+            busy={busy} errors={fieldErrors} errorId={error ? "signin-error" : undefined} />
+          <button type="submit" className={uiStyles.button} disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
         </form>}
         {mode === "student" && <><p>You’re signed in as a student.</p>
           <Link className={styles.primary} href={destination}>Continue to {destination.endsWith("payments") ? "Payments" : "Chat"} →</Link>

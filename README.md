@@ -305,6 +305,17 @@ Finance tests need PostgreSQL binaries on PATH (for example
 through the server-only `FINANCE_API_ORIGIN` (falls back to `AGENT_API_ORIGIN`) and relay
 mutations through fixed-path same-origin handlers.
 
+
+Payment-request cancellation and scenario reset require explicit confirmation; backing
+out sends no mutation. If a payment/demo request times out after 30 seconds or its
+outcome cannot be confirmed, the UI stops that control group and offers **Check current
+status**, which reloads the page. Check the original state before repeating an action;
+requests are never automatically retried. A timeout does not prove that nothing happened.
+The shared navigation and keyboard skip link work across all page routes; mobile Chat
+also links directly to payment details and back to the message input. Sponsor summaries
+and confirmation can use Bahasa Indonesia; sponsor dates explicitly use China time
+(UTC+08:00). Quotes, transfers and university records remain simulated.
+
 ## Demo runbook (simulated)
 
 1. Prepare the isolated database once (see the backend authentication section for
@@ -326,7 +337,9 @@ mutations through fixed-path same-origin handlers.
    terms, quotes, receipts and untrusted messages (English or `?lang=id`). `/demo` offers
    scenario reset, clock, fault injection, the university tick and the redacted audit trail
    for a demo administrator. `/sponsor` provides sponsor browser sign-in and
-   approval decisions. Dedicated student and administrator sign-in pages are not built yet.
+   approval decisions. Students sign in at `/student/sign-in`; administrator access is
+   provided separately by the environment administrator. No dedicated administrator
+   sign-in page is available.
 4. With Docker running, the same setup commands can be run through
    `docker compose run --rm backend uv run --no-sync python -m backend.demo.reset --migrate`
    (not verified on this machine).

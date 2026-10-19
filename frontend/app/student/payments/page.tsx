@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StudentHeader } from "../../components/workspace-header";
 import { dateTime, money } from "../chat/chat-types";
 import {
   ActivityLog, HeldNotice, IntentSummary, QuoteBreakdown, ReceiptCard, SimulatedBanner, Stat, TrustTimeline,
@@ -26,7 +27,8 @@ export default async function StudentPayments({ searchParams }: Props) {
     financeGet<Schema["UntrustedDocument"][]>("/api/v1/documents"),
   ]);
   const pending = intents.ok ? intents.data.filter(item => PENDING.includes(item.state)) : [];
-  return <main className={styles.page}>
+  return <main id="main-content" tabIndex={-1} lang={lang} className={styles.page}>
+    <StudentHeader payments lang={lang} />
     <SimulatedBanner lang={lang} />
     <h1>{ui.title[lang]}</h1>
     <p className={styles.lang}>
@@ -79,6 +81,7 @@ async function ObligationCard(
         {safeNextStep[pending.hold_reason ?? "SECURITY_HOLD"][lang]}
       </p>}
       <IntentActions lang={lang} intentId={pending.id} canContinue={pending.state === "AUTHORIZED"}
+        payee={pending.beneficiary_label} total={money(pending.source_currency, pending.source_total_minor)}
         canRequestApproval={pending.state === "AWAITING_APPROVAL"} />
     </section>}
     {item.state !== "PAID" && item.state !== "UNPAID" && <p className={styles.notice}>{ui.noPay[lang]}</p>}

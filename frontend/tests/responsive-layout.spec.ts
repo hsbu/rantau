@@ -83,7 +83,7 @@ for (const language of ["en", "id"]) {
     expect(box!.y).toBeGreaterThanOrEqual(0);
     expect(box!.y + box!.height).toBeLessThanOrEqual(400);
     if (language === "id") await page.screenshot({ path: "../.generated/responsive-sponsor-dialog.png" });
-    await dialog.getByRole("button", { name: "Go back" }).click();
+    await dialog.getByRole("button", { name: language === "id" ? "Kembali" : "Go back" }).click();
     await expect(dialog).not.toBeVisible();
     expect(decisions).toEqual([]);
     await fitsPage(page);

@@ -2,7 +2,7 @@ import { dateTime, money } from "../chat/chat-types";
 import type { Schema } from "./finance-api";
 import { readableRate } from "./format";
 import styles from "./payments.module.css";
-import { type Lang, actionLabels, safeNextStep, ui } from "./status-labels";
+import { type Lang, actionLabels, paymentStateLabels, providerLabel, readableCode, safeNextStep, ui } from "./status-labels";
 import type { TrustStep } from "./trust";
 
 export function SimulatedBanner({ lang }: { lang: Lang }) {
@@ -29,11 +29,11 @@ export function QuoteBreakdown({ quotes, lang }: { quotes: Schema["FxQuote"][]; 
   return <TableScroll label={ui.quotes[lang]}><table className={styles.table}>
     <caption>{ui.quotes[lang]}</caption>
     <thead><tr>
-      <th>Route</th><th>{ui.principal[lang]}</th><th>{ui.fee[lang]}</th>
+      <th>{ui.route[lang]}</th><th>{ui.principal[lang]}</th><th>{ui.fee[lang]}</th>
       <th>{ui.rate[lang]}</th><th>{ui.total[lang]}</th><th>{ui.recipient[lang]}</th><th>{ui.eta[lang]}</th>
     </tr></thead>
     <tbody>{quotes.map(quote => <tr key={quote.id}>
-      <td>{quote.provider}</td>
+      <td>{providerLabel(quote.provider, lang)}</td>
       <td>{money(quote.source_currency, quote.source_principal_minor)}</td>
       <td>{money(quote.source_currency, quote.fee_minor)}</td>
       <td>1 {quote.source_currency} = {readableRate(quote.rate)} {quote.destination_currency}</td>
@@ -47,7 +47,7 @@ export function QuoteBreakdown({ quotes, lang }: { quotes: Schema["FxQuote"][]; 
 export function ReceiptCard({ payment, lang }: { payment: Schema["PaymentResult"]; lang: Lang }) {
   return <div className={styles.grid}>
     <Stat label={ui.receipt[lang]} value={payment.receipt_reference ?? "-"} />
-    <Stat label={ui.provider[lang]} value={payment.transfer_status} />
+    <Stat label={ui.provider[lang]} value={paymentStateLabels[payment.transfer_status][lang]} />
   </div>;
 }
 
@@ -83,8 +83,10 @@ export function ActivityLog({ entries, lang }: { entries: Schema["AuditEntry"][]
     <ul className={styles.routes}>
       {entries.map(entry => <li key={entry.audit_event_id}>
         <span>{dateTime(entry.created_at)}</span>
-        <span>{actionLabels[entry.action]?.[lang] ?? entry.action}</span>
-        {entry.decision && <span>{entry.decision}</span>}
+        <span>{actionLabels[entry.action]?.[lang] ?? readableCode(entry.action)}</span>
+        {entry.decision && <span>{lang === "id"
+          ? ({ ALLOW: "Diizinkan", DENY: "Ditolak", HOLD: "Ditahan", REQUIRE_APPROVAL: "Perlu persetujuan" }[entry.decision] ?? readableCode(entry.decision))
+          : readableCode(entry.decision)}</span>}
       </li>)}
     </ul>
   </section>;
