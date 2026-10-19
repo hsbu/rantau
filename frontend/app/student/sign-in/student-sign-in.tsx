@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { CredentialsFields, validateCredentials, type FieldErrors } from "../../components/credentials-fields";
-import { WorkspaceHeader } from "../../components/workspace-header";
+import { StudentHeader } from "../../components/workspace-header";
 import uiStyles from "../../components/ui.module.css";
 import styles from "./student-sign-in.module.css";
 
@@ -77,8 +77,7 @@ export function StudentSignIn({ destination }: { destination: "/student/chat" | 
     finally { setBusy(false); }
   }
 
-  return <main id="main-content" tabIndex={-1} className={styles.page}>
-    <WorkspaceHeader label="Workspaces" links={[{ href: "/sponsor", label: "Sponsor workspace" }]} />
+  return <><StudentHeader current="account" /><main id="main-content" tabIndex={-1} className={styles.page}>
     <div className={styles.layout}>
       <div className={styles.intro}><p className="eyebrow">Student workspace</p>
         <h1>A little closer<br />to home.</h1>
@@ -97,13 +96,14 @@ export function StudentSignIn({ destination }: { destination: "/student/chat" | 
         </form>}
         {mode === "student" && <><p>You’re signed in as a student.</p>
           <Link className={styles.primary} href={destination}>Continue to {destination.endsWith("payments") ? "Payments" : "Chat"} →</Link>
-          <button className={styles.secondary} onClick={() => void signOut()} disabled={busy}>Sign out</button></>}
+          <button className={`${uiStyles.button} ${uiStyles.secondary} ${styles.secondary}`} onClick={() => void signOut()} disabled={busy}>Sign out</button></>}
         {mode === "other" && <><p>This session belongs to another workspace. Sign out to use student credentials.</p>
-          <button onClick={() => void signOut()} disabled={busy}>Sign out</button></>}
+          <button className={uiStyles.button} onClick={() => void signOut()} disabled={busy}>Sign out</button></>}
         {mode === "unavailable" && <><p role="status">Your session could not be checked. No financial action was requested.</p>
-          <button onClick={() => window.location.reload()}>Check session again</button></>}
+          <button className={uiStyles.button} onClick={() => window.location.reload()}>Check session again</button></>}
         <Link className={styles.preview} href="/student/chat/preview">Explore scenarios without signing in ↗</Link>
+        <Link className={styles.preview} href="/sponsor">Sponsor workspace →</Link>
       </div>
     </div>
-  </main>;
+  </main></>;
 }

@@ -17,8 +17,7 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
   const lang = pickLang((await searchParams).lang);
   const scenarios = await financeGet<Schema["ScenarioInfo"][]>("/api/v1/demo/scenarios");
   if (!scenarios.ok) {
-    return <main id="main-content" tabIndex={-1} lang={lang} className={styles.page}>
-      <WorkspaceHeader label="Demo workspace" links={[{ href: "/", label: "Home" }]} />
+    return <><WorkspaceHeader label="Demo workspace" links={[{ href: "/", label: "Home" }]} /><main id="main-content" tabIndex={-1} lang={lang} className={styles.page}>
       <SimulatedBanner lang={lang} />
       <h1>Demo</h1>
       <p className={styles.notice} role="alert">
@@ -26,11 +25,10 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
       </p>
       <p>{lang === "id" ? "Akses demo disediakan oleh administrator Anda." : "Demo access is provided by your administrator."}</p>
       <Link href="/">{lang === "id" ? "Kembali ke beranda" : "Return home"}</Link>
-    </main>;
+    </main></>;
   }
   const trail = await financeGet<Schema["AuditEntry"][]>("/api/v1/demo/audit");
-  return <main id="main-content" tabIndex={-1} lang={lang} className={styles.page}>
-    <WorkspaceHeader label="Demo workspace" links={[{ href: "/", label: "Home" }, { href: "/student/chat", label: "Student workspace" }]} />
+  return <><WorkspaceHeader label="Demo workspace" links={[{ href: "/", label: "Home" }, { href: "/student/chat", label: "Student workspace" }]} /><main id="main-content" tabIndex={-1} lang={lang} className={styles.page}>
     <SimulatedBanner lang={lang} />
     <h1>Demo</h1>
     <DemoControls scenarios={scenarios.data} />
@@ -44,5 +42,5 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
         </tr>)}</tbody>
       </table></TableScroll>
     </section>
-  </main>;
+  </main></>;
 }

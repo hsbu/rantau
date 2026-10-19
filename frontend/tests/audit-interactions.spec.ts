@@ -15,7 +15,7 @@ test("all pages share a brand and a working keyboard skip destination", async ({
 
 test("Payments has a return route and denied demo access has a heading and home destination", async ({ page }) => {
   await page.goto("/student/payments");
-  await expect(page.getByRole("navigation", { name: "Student workspace" }).getByRole("link", { name: "Chat", exact: true })).toHaveAttribute("href", "/student/chat");
+  await expect(page.getByRole("navigation", { name: "Chat views" }).getByRole("link", { name: "Chat", exact: true })).toHaveAttribute("href", "/student/chat");
   await page.goto("/demo");
   await expect(page.getByRole("heading", { level: 1, name: "Demo" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Return home" })).toHaveAttribute("href", "/");

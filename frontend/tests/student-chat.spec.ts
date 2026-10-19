@@ -1,5 +1,25 @@
 import { test, expect } from "@playwright/test";
 
+test("Chat views keep the same tab positions when switching routes at every breakpoint", async ({ page }) => {
+  for (const width of [320, 390, 600, 601, 768, 1440]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/student/chat");
+    const tabs = page.getByRole("navigation", { name: "Chat views" });
+    const geometry = async () => Promise.all(["Chat", "Scenarios"].map(async name => {
+      const box = await tabs.getByRole("link", { name, exact: true }).boundingBox();
+      return { x: box!.x, y: box!.y, width: box!.width, height: box!.height };
+    }));
+    const original = await geometry();
+    await tabs.getByRole("link", { name: "Scenarios", exact: true }).click();
+    await expect(page).toHaveURL("/student/chat/preview");
+    expect(await geometry(), `Scenarios changed the tab geometry at ${width}px`).toEqual(original);
+    await tabs.getByRole("link", { name: "Chat", exact: true }).click();
+    await expect(page).toHaveURL("/student/chat");
+    expect(await geometry(), `Chat changed the tab geometry at ${width}px`).toEqual(original);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+  }
+});
+
 test("page scroll chains past the transcript and new replies do not pull readers away from history", async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 720 });
   let release: (() => void) | undefined;
