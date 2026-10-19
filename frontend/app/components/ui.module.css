@@ -16,6 +16,7 @@
 .brand:hover, .header nav a:hover { color: var(--color-accent); }
 .button { min-height: 44px; max-width: 100%; padding: 10px 16px; border: 1px solid var(--color-accent); border-radius: 8px; background: var(--color-accent); color: white; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
 .button:not(:disabled):hover { background: var(--color-accent-hover); }
+.button:is(a) { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; line-height: 1.4; }
 .secondary { color: var(--color-ink); background: var(--color-surface); border-color: var(--color-control-border); }
 .secondary:not(:disabled):hover { background: var(--color-soft); }
 .button:disabled { opacity: .55; cursor: not-allowed; }

@@ -70,6 +70,7 @@ createServer(async (request, response) => {
   }
   if (url.startsWith("/api/v1/demo/")) {
     if (!admin) { response.statusCode = 404; return response.end(JSON.stringify({ detail: "Resource unavailable" })); }
+    if ((request.headers.cookie ?? "").includes("variant=unavailable")) { response.statusCode = 503; return response.end("{}"); }
     if (url === "/api/v1/demo/scenarios") return response.end(JSON.stringify([{ id: "tuition_happy_path", description: "Happy path" }]));
     if (url === "/api/v1/demo/audit") return response.end(JSON.stringify([{
       audit_event_id: "audit_9", run_no: 1, action: "PAYMENT_DEBITED", resource_id: "transfer_001",
@@ -80,6 +81,8 @@ createServer(async (request, response) => {
   }
   if (!signedIn) { response.statusCode = 401; return response.end("{}"); }
   const cookie = request.headers.cookie ?? "";
+  if (cookie.includes("variant=unavailable")) { response.statusCode = 503; return response.end("{}"); }
+  if (cookie.includes("variant=empty") && ["/api/v1/tuition/obligations", "/api/v1/payment-intents", "/api/v1/documents"].includes(url)) return response.end("[]");
   const pending = cookie.includes("variant=pending") ? "AWAITING_APPROVAL"
     : cookie.includes("variant=authorized") ? "AUTHORIZED"
     : cookie.includes("variant=held") ? "ON_HOLD" : null;

@@ -47,7 +47,7 @@ test("failed login clears passwords, stays accessible on mobile and does not exp
     await expect(page.getByLabel("Password", { exact: true })).toHaveValue("");
     await expect(page.locator("body")).not.toContainText("private diagnostic");
   }
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.body.clientWidth)).toBe(true);
 });
 
 test("uncertain session does not automatically repeat login", async ({ page }) => {

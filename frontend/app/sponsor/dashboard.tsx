@@ -6,9 +6,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { components } from "../../lib/api-contracts/generated";
 import Link from "next/link";
+import { PageHeading } from "../components/workspace-page";
 import { WorkspaceHeader } from "../components/workspace-header";
 import { CredentialsFields, validateCredentials, type FieldErrors } from "../components/credentials-fields";
 import uiStyles from "../components/ui.module.css";
+import { SignInLayout } from "../components/sign-in-layout";
+import signInStyles from "../components/sign-in.module.css";
 import styles from "./sponsor.module.css";
 
 type Approval = components["schemas"]["ApprovalView"];
@@ -356,17 +359,40 @@ export function SponsorDashboard() {
   const pending = approvals.filter(item => item.state === "PENDING");
   const history = approvals.filter(item => item.state !== "PENDING");
 
-  return <><WorkspaceHeader label="Workspaces" links={[{ href: "/student/sign-in", label: "Student workspace" }]}>
-      {mode === "ready" && <button className={`${uiStyles.button} ${uiStyles.secondary}`} onClick={() => void signOut()} disabled={busy}>Sign out</button>}
-    </WorkspaceHeader><main id="main-content" tabIndex={-1} className={styles.page}>
+  const header = <WorkspaceHeader label="Workspaces" links={[{ href: "/student/sign-in", label: "Student workspace" }]}>
+    {mode === "ready" && <button className={`${uiStyles.button} ${uiStyles.secondary}`} onClick={() => void signOut()} disabled={busy}>Sign out</button>}
+  </WorkspaceHeader>;
 
+  if (mode !== "ready") return <>{header}
+    <SignInLayout role="Sponsor" title={<>Support from<br />where you are.</>}
+      description="Review payment requests, check the full cost and support each next step with Rantau.">
+      {error && <p id="signin-error" className={signInStyles.error} role="alert">{error}</p>}
+      {mode === "checking" && <p role="status">Checking your sponsor session…</p>}
+      {mode === "signed-out" && <form onSubmit={signIn} noValidate>
+        <CredentialsFields username={username} password={password} setUsername={setUsername} setPassword={setPassword}
+          busy={busy} errors={fieldErrors} errorId={error ? "signin-error" : undefined} />
+        <button className={uiStyles.button} type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
+      </form>}
+      {mode === "wrong-role" && <>
+        <h3>This workspace is for sponsors</h3>
+        <p>Your current session does not have a sponsor role.</p>
+        <button className={uiStyles.button} onClick={() => void signOut()} disabled={busy}>Sign out</button>
+      </>}
+      <div className={signInStyles.links}>
+        <Link href="/student/chat/preview">Explore scenarios without signing in ↗</Link>
+        <Link href="/student/sign-in">Student workspace →</Link>
+      </div>
+    </SignInLayout>
+  </>;
+
+  return <>{header}<main id="main-content" tabIndex={-1} className={styles.page}>
     <section className={styles.intro}>
-      <p className={styles.eyebrow}>Sponsor workspace</p>
-      <h1>Review payment requests</h1>
+      <PageHeading eyebrow="Sponsor workspace" title="Review payment requests"
+        description="Check the recipient and full cost before recording a decision.">
       <label className={styles.summaryLanguage}>Summary language <select aria-label="Summary language" value={language}
         onChange={event => setLanguage(event.target.value === "id" ? "id" : "en")}><option value="en">English</option><option value="id">Bahasa Indonesia</option></select></label>
+      </PageHeading>
       <p className={styles.muted}>Language applies to payment summaries and confirmation. Dates use China time (UTC+08:00).</p>
-      <p>Check the recipient and full cost before recording a decision.</p>
       <div className={styles.safety} role="note">
         <span aria-hidden="true">ⓘ</span>
         <p>An approval authorizes an attempt. It does not move money or confirm tuition has been posted.</p>
@@ -376,27 +402,7 @@ export function SponsorDashboard() {
     {error && <p id="signin-error" className={styles.error} role="alert">{error}</p>}
     {notice && <p className={styles.notice} role="status">{notice}</p>}
 
-    {mode === "checking" && <div className={styles.loading} role="status">Checking your sponsor session…</div>}
-    {mode === "signed-out" && <form className={styles.signIn} onSubmit={signIn} noValidate>
-      <div>
-        <p className={styles.eyebrow}>Sponsor sign-in</p>
-        <h2>Welcome back</h2>
-        <p className={styles.muted}>Use the sponsor credentials provided for this simulated environment.</p>
-      </div>
-      <CredentialsFields username={username} password={password} setUsername={setUsername} setPassword={setPassword}
-        busy={busy} errors={fieldErrors} errorId={error ? "signin-error" : undefined} />
-      <button className={uiStyles.button} type="submit" disabled={busy}>
-        {busy ? "Signing in…" : "Sign in"}
-      </button>
-    </form>}
-    {mode === "wrong-role" && <section className={styles.signIn}>
-      <h2>This workspace is for sponsors</h2>
-      <p className={styles.muted}>Your current session does not have a sponsor role.</p>
-      <Link href="/student/sign-in">Open student workspace →</Link>
-      <button className={styles.primary} onClick={() => void signOut()} disabled={busy}>Sign out</button>
-    </section>}
-
-    {mode === "ready" && <div className={styles.dashboard}>
+    <div className={styles.dashboard}>
       <section className={styles.section} aria-labelledby="pending-title">
         <div className={styles.sectionHeading}>
           <div><p className={styles.eyebrow}>Needs your review</p><h2 id="pending-title">Pending requests</h2></div>
@@ -418,7 +424,7 @@ export function SponsorDashboard() {
         </div>
       </section>}
 
-      <section className={styles.section} aria-labelledby="cases-title">
+      <section className={`${styles.section} ${styles.securitySection}`} aria-labelledby="cases-title">
         <div className={styles.sectionHeading}>
           <div><p className={styles.eyebrow}>Security review</p><h2 id="cases-title">Security cases</h2></div>
           <button className={styles.textButton} onClick={() => void loadCases()}>Refresh</button>
@@ -440,7 +446,7 @@ export function SponsorDashboard() {
           </li>)}
         </ul>
       </section>
-    </div>}
+    </div>
 
     {confirmation && <dialog ref={confirmationDialog} className={uiStyles.dialog} lang={language}
       aria-labelledby="confirm-title" aria-describedby="confirm-copy"
