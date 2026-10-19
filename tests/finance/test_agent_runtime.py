@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from openai import AsyncOpenAI
 
 from backend.agent.classifier import IntentClassification
-from backend.agent.explanations import utc_time
+from backend.agent.explanations import display_time
 from backend.agent.migrations import migrate_agent_storage
 from backend.agent.state import TuitionInput
 from backend.contracts.enums import Intent
@@ -96,14 +96,14 @@ def test_default_chat_uses_real_reads_and_atomic_durable_memory(runtime, monkeyp
     client = student_client(services)
     first = message(client, "Plan tuition private@example.org")
     assert first.status_code == 200, first.text
-    assert "Which permitted funding account" in first.json()["message"]
+    assert "Which funding account" in first.json()["message"]
     with services.database.connection() as connection:
         due = connection.execute("SELECT due_at FROM tuition_obligations").fetchone()["due_at"]
-    assert f"Simulated tuition due date: {utc_time(due)}" in first.json()["message"]
-    assert "remaining CNY 20,000.00" in first.json()["message"]
+    assert f"Due date: {display_time(due)}" in first.json()["message"]
+    assert "Tuition remaining: CNY 20,000.00" in first.json()["message"]
     second = message(client, "Use my own account")
     assert second.status_code == 200, second.text
-    assert "Draft intent preview" in second.json()["message"]
+    assert "Selected:" in second.json()["message"]
     assert "No payment has been requested or executed" in second.json()["message"]
     assert "Prior intent: TUITION" in payloads[1]["messages"][1]["content"]
     assert "private@example.org" not in json.dumps(payloads)

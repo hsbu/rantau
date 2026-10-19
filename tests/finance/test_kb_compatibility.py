@@ -39,12 +39,19 @@ def tools_for(services):
 
 def assert_no_financial_effects(database, balances):
     with database.connection() as connection:
-        assert connection.execute(
-            "SELECT alias, balance_minor FROM funding_accounts ORDER BY alias"
-        ).fetchall() == balances
+        assert (
+            connection.execute(
+                "SELECT alias, balance_minor FROM funding_accounts ORDER BY alias"
+            ).fetchall()
+            == balances
+        )
         for table in (
-            "payment_intents", "transfers", "ledger_entries", "university_postings",
-            "reconciliation_cases", "approvals",
+            "payment_intents",
+            "transfers",
+            "ledger_entries",
+            "university_postings",
+            "reconciliation_cases",
+            "approvals",
         ):
             assert connection.execute(f"SELECT count(*) AS n FROM {table}").fetchone()["n"] == 0
 
@@ -65,12 +72,13 @@ async def test_all_seeded_scenarios_have_known_policy_and_read_only_quote_previe
     assert not known_policy(policy, load_bundle(), policy.effective_to)
     assert load_bundle().simulation.policy == POLICY
     guidance = await AgentGraph(FixedClassifier(Intent.ASK_POLICY), tools).run("Policy", student)
-    assert f"Fictional university policy {policy.version}" in guidance.message
-    assert "authored demo rules, not official university terms" in guidance.message
+    assert "Payment requirements for this tuition bill" in guidance.message
+    assert "This reference does not verify the configured posting window" in guidance.message
+    assert "simulat" not in guidance.message.lower()
     if policy.topup_allowed:
         assert "Partial payments: not allowed; top-ups: allowed" in guidance.message
     result = await AgentGraph(SelfFundedTuition(), tools).run("Pay tuition", student)
-    assert "Draft intent preview" in result.message
+    assert "Selected:" in result.message
     assert "No payment has been requested or executed" in result.message
     assert any(
         event.tool == "get_fx_quotes" and event.status == "OK" for event in result.tool_events

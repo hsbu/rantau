@@ -1,0 +1,36 @@
+{
+  "run_id": "run_detail_quote",
+  "revision": 2,
+  "checked_at": "2026-11-01T09:00:00Z",
+  "simulation_at": "2026-11-01T09:00:00Z",
+  "summary": {
+    "obligation": {
+      "amount_due_minor": 2000000,
+      "posted_minor": 0,
+      "balance_minor": 2000000,
+      "due_at": "2026-11-21T09:00:00Z",
+      "state": "UNPAID",
+      "posting_deadline_at": null,
+      "shortfall_minor": 0,
+      "topup_permitted": false
+    },
+    "quote": {
+      "provider": "Synthetic route A",
+      "source_currency": "IDR",
+      "destination_currency": "CNY",
+      "source_principal_minor": 46000000,
+      "fee_minor": 25000,
+      "source_total_minor": 46025000,
+      "destination_amount_minor": 2000000,
+      "rate": "0.0004347826086956521739130435",
+      "expires_at": "2026-11-01T09:15:00Z",
+      "estimated_delivery_at": "2026-11-02T09:00:00Z"
+    },
+    "approval": null,
+    "payment": null,
+    "case": null,
+    "intent_state": null,
+    "beneficiary": "Fictional university · •• 0101",
+    "funding": "Sponsor-owned funding"
+  }
+}

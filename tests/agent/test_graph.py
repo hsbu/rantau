@@ -39,7 +39,7 @@ async def test_six_allowlisted_paths(intent, operation):
     assert result.requested_action == intent
     assert operation in port.calls
     assert result.run_id.startswith("run_")
-    assert "Simulated" in result.message
+    assert "simulat" not in result.message.lower()
     assert not any(name in port.calls for name in ("execute", "approve", "post", "clear_hold"))
 
 

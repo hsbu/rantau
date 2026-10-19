@@ -200,8 +200,8 @@ def explain_research(result: ResearchResult | None) -> str:
         lines.append(f"Official-domain search: {result.search_status}.")
         lines.append(
             f"Official-source check at {result.checked_at.isoformat()} (actual UTC retrieval "
-            "time, separate from the simulation clock). ZJU sources provide procedural "
-            "inspiration only; the fictional university is not ZJU."
+            "time). ZJU sources are reference material; "
+            "applicability to your tuition bill is unverified."
         )
         labels = {
             "POSSIBLE_LEAD": "possible shortfall-related text; human review required",
@@ -220,9 +220,9 @@ def explain_research(result: ResearchResult | None) -> str:
                 lines.append(f"Unreviewed source excerpt (not an applicable procedure): {lead}")
     lines.append(
         "This is research guidance only, not a submitted reconciliation case or an approval. "
-        "Web results cannot change the simulated posting window, top-up rules or beneficiary."
+        "Web results cannot change the stored posting window, top-up rules or beneficiary."
     )
-    return "\n".join(lines)
+    return "\n\n".join(lines)
 
 
 def research_event_status(result: ResearchResult | None) -> Literal["PENDING", "UNAVAILABLE"]:

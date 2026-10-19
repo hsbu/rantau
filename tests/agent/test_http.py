@@ -36,6 +36,7 @@ def test_actor_override_cannot_replace_required_trusted_configuration(monkeypatc
 
 def test_scoped_run_round_trip_and_foreign_reference(monkeypatch):
     monkeypatch.setenv("AUTH_ENABLED", "false")
+
     class Runs:
         def __init__(self):
             self.values = {}
@@ -118,9 +119,9 @@ def test_existing_conversation_metadata_preserves_tuition_selections_over_http()
                 },
             )
         assert first.status_code == second.status_code == separate.status_code == 200
-        assert "Which permitted funding account" in first.json()["message"]
-        assert "Draft intent preview" in second.json()["message"]
-        assert "Which permitted funding account" in separate.json()["message"]
+        assert "Which funding account" in first.json()["message"]
+        assert "Selected:" in second.json()["message"]
+        assert "Which funding account" in separate.json()["message"]
         assert set(second.json()) == {
             "run_id",
             "message",

@@ -34,7 +34,9 @@ async def test_openrouter_transport_uses_configured_model_schema_and_redacts():
         requests.append(json.loads(request.content))
         return httpx.Response(
             200,
-            json=response_body('{"intent":"TUITION","needs_clarification":false,"tuition":null}'),
+            json=response_body(
+                '{"intent":"TUITION","needs_clarification":false,"tuition":null,"reply_kind":null}'
+            ),
         )
 
     client = AsyncOpenAI(
@@ -75,18 +77,28 @@ async def test_configured_reasoning_budget_and_effort():
 
     def handler(request):
         requests.append(json.loads(request.content))
-        return httpx.Response(200, json=response_body(
-            '{"intent":"TUITION","needs_clarification":false,"tuition":null}'
-        ))
+        return httpx.Response(
+            200,
+            json=response_body(
+                '{"intent":"TUITION","needs_clarification":false,"tuition":null,"reply_kind":null}'
+            ),
+        )
 
     client = AsyncOpenAI(
-        base_url=OPENROUTER_BASE_URL, api_key="synthetic-test-key", max_retries=0,
+        base_url=OPENROUTER_BASE_URL,
+        api_key="synthetic-test-key",
+        max_retries=0,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
-    classifier = OpenRouterIntentClassifier(Settings(
-        _env_file=None, openrouter_model="provider/configurable-model",
-        openrouter_max_tokens=4096, openrouter_reasoning_effort="none",
-    ), client)
+    classifier = OpenRouterIntentClassifier(
+        Settings(
+            _env_file=None,
+            openrouter_model="provider/configurable-model",
+            openrouter_max_tokens=4096,
+            openrouter_reasoning_effort="none",
+        ),
+        client,
+    )
     try:
         await classifier.classify("Plan tuition")
         assert requests[0]["max_tokens"] == 4096
@@ -144,8 +156,8 @@ async def test_openrouter_multi_turn_extraction_reaches_only_a_verified_preview(
     )
     first = await graph.run("Pay tuition", ACTOR, "conversation_1")
     second = await graph.run("The second", ACTOR, "conversation_1")
-    assert "Which permitted funding account" in first.message
-    assert "Draft intent preview" in second.message
+    assert "Which funding account" in first.message
+    assert "Selected:" in second.message
     assert "Tuition awaiting: FUNDING" in payloads[1]["messages"][1]["content"]
     assert "acct_sponsor" not in json.dumps(payloads)
     assert "par_001" not in json.dumps(payloads)
@@ -180,6 +192,7 @@ async def test_openrouter_multi_turn_extraction_reaches_only_a_verified_preview(
         "empty",
         "authority",
         "missing_fields",
+        "conversation_flag",
     ],
 )
 async def test_refusal_invalid_output_and_api_error_are_unavailable(mode):
@@ -203,6 +216,13 @@ async def test_refusal_invalid_output_and_api_error_are_unavailable(mode):
                 200,
                 json=response_body(
                     '{"intent":"TUITION","needs_clarification":false,"tuition":{"approved":true}}'
+                ),
+            )
+        if mode == "conversation_flag":
+            return httpx.Response(
+                200,
+                json=response_body(
+                    '{"intent":null,"needs_clarification":false,"tuition":null,"reply_kind":"HELP"}'
                 ),
             )
         return httpx.Response(

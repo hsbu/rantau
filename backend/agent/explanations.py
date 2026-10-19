@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from backend.contracts.enums import CURRENCY_SCALE, Currency
 from backend.contracts.models import FxQuote, Money, TuitionObligation
@@ -20,6 +21,17 @@ def utc_time(value: datetime) -> str:
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
+def display_time(value: datetime) -> str:
+    utc_time(value)
+    return value.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%d %b %Y, %H:%M China time")
+
+
+def route_label(quote: FxQuote, index: int = 1) -> str:
+    return {"mock_remit_a": "Standard route", "mock_remit_b": "Faster route"}.get(
+        quote.provider, f"Route {index}"
+    )
+
+
 def explain_tuition_record(obligation: TuitionObligation) -> str:
     expected = format_money(
         Money(currency=obligation.currency, amount_minor=obligation.amount_due_minor)
@@ -29,10 +41,10 @@ def explain_tuition_record(obligation: TuitionObligation) -> str:
         Money(currency=obligation.currency, amount_minor=obligation.balance_minor)
     )
     return (
-        f"Simulated university tuition record: expected {expected}; posted {posted}; "
-        f"remaining {remaining}. These posted funds refer to the university record; "
-        "a credit to a student's bank account alone does not establish tuition completion. "
-        f"Simulated tuition due date: {utc_time(obligation.due_at)}."
+        f"**Tuition remaining: {remaining}**\n\n"
+        f"- Amount due: {expected}\n"
+        f"- University credited: {posted}\n"
+        f"- Due date: {display_time(obligation.due_at)}"
     )
 
 
@@ -68,11 +80,10 @@ def explain_quotes(quotes: tuple[FxQuote, ...], destination: Money, now: datetim
     current = comparable_quotes(quotes, destination, now)
     if not current:
         return (
-            "No current comparable simulated IDR-to-CNY quotes are available for this balance. "
-            "Refresh quotes before planning a payment."
+            "I couldn’t find a current quote for this amount. Refresh the quote before proceeding."
         )
-    lines = ["Simulated quote comparison; these are not live exchange rates."]
-    for quote in current:
+    lines = ["**Available payment routes**"]
+    for index, quote in enumerate(current, 1):
         principal = format_money(
             Money(currency=quote.source_currency, amount_minor=quote.source_principal_minor)
         )
@@ -81,27 +92,51 @@ def explain_quotes(quotes: tuple[FxQuote, ...], destination: Money, now: datetim
             Money(currency=quote.source_currency, amount_minor=quote.source_total_minor)
         )
         lines.append(
-            f"{quote.id}: principal {principal} + fee {fee} = total {total}; "
-            f"simulated recipient amount {format_money(destination)}. "
-            f"Displayed rate (rounded): 1 IDR = {display_rate(quote.rate)} CNY. "
-            f"Expires {utc_time(quote.expires_at)}; "
-            f"estimated provider delivery {utc_time(quote.estimated_delivery_at)}."
+            f"{index}. **{route_label(quote, index)} — {total} total**\n"
+            f"Transfer amount: {principal}; fee: {fee}.\n"
+            f"University receives: {format_money(destination)}.\n"
+            f"Rate (rounded): 1 IDR = {display_rate(quote.rate)} CNY.\n"
+            f"Quote expires: {display_time(quote.expires_at)}.\n"
+            f"Estimated arrival: {display_time(quote.estimated_delivery_at)}."
         )
-    cheapest = current[0].source_total_minor
-    winners = ", ".join(quote.id for quote in current if quote.source_total_minor == cheapest)
-    lines.append(f"Lowest quoted total for the same recipient amount: {winners}.")
-    if current[-1].source_total_minor > cheapest:
+    winners = [
+        str(i)
+        for i, q in enumerate(current, 1)
+        if q.source_total_minor == current[0].source_total_minor
+    ]
+    lines.append(
+        "Lowest total for the same recipient amount: "
+        + ", ".join(f"route {i}" for i in winners)
+        + "."
+    )
+    if current[-1].source_total_minor > current[0].source_total_minor:
         saving = format_money(
             Money(
                 currency=Currency.IDR,
-                amount_minor=current[-1].source_total_minor - cheapest,
+                amount_minor=current[-1].source_total_minor - current[0].source_total_minor,
             )
         )
-        lines.append(f"The difference from the highest comparable quoted total is {saving}.")
+        lines.append(f"The difference from the highest quoted total is {saving}.")
     lines.append(
-        "IDR is shown in whole rupiah; CNY includes two decimal places (fen). "
-        "Totals include the stated simulated fees only. "
-        "Provider delivery does not establish university tuition posting. "
-        "Funding eligibility and authorization must be checked separately."
+        "Arrival estimates describe provider delivery. "
+        "Tuition is settled only when the university credits it."
     )
-    return "\n".join(lines)
+    return "\n\n".join(lines)
+
+
+def explain_selected_quote(quote: FxQuote, index: int) -> str:
+    total = format_money(
+        Money(currency=quote.source_currency, amount_minor=quote.source_total_minor)
+    )
+    fee = format_money(Money(currency=quote.source_currency, amount_minor=quote.fee_minor))
+    destination = format_money(
+        Money(currency=quote.destination_currency, amount_minor=quote.destination_amount_minor)
+    )
+    return (
+        f"**Selected: {route_label(quote, index)}**\n\n"
+        f"- Total debit: **{total}** (includes {fee} fee)\n"
+        f"- University receives: {destination}\n"
+        f"- Rate (rounded): 1 IDR = {display_rate(quote.rate)} CNY\n"
+        f"- Estimated arrival: {display_time(quote.estimated_delivery_at)}\n"
+        f"- Quote expires: {display_time(quote.expires_at)}"
+    )

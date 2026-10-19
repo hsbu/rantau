@@ -43,7 +43,7 @@ def test_generic_tracking_lists_then_requires_explicit_selection_without_financi
     before = financial_snapshot(services.database)
     listed = message(client, "Track my payment")
     assert listed.status_code == 200, listed.text
-    assert "Payment 1:" in listed.json()["message"]
+    assert "1. **Payment 1**" in listed.json()["message"]
     assert "select payment 1" in listed.json()["message"]
     assert "acct_" not in listed.json()["message"] and "par_" not in listed.json()["message"]
     assert listed.json()["resources"] == []
@@ -72,7 +72,7 @@ def test_exact_list_and_selection_do_not_need_model_credentials(recovery_runtime
     before = financial_snapshot(services.database)
     monkeypatch.setenv("OPENROUTER_API_KEY", "")
     monkeypatch.setenv("OPENROUTER_MODEL", "")
-    assert "Payment 1:" in message(client, "list payments").json()["message"]
+    assert "1. **Payment 1**" in message(client, "list payments").json()["message"]
     selected = message(client, "select payment 1")
     assert selected.status_code == 200
     assert selected.json()["tool_events"][0]["tool"] == "select_student_payment"
@@ -198,7 +198,8 @@ def test_numbered_choices_distinguish_two_payments_and_use_the_advertised_ids(re
     second = executed.json()["payment_id"]
     before = financial_snapshot(services.database)
     listed = message(client, "list payments")
-    assert "Payment 1:" in listed.json()["message"] and "Payment 2:" in listed.json()["message"]
+    assert "1. **Payment 1**" in listed.json()["message"]
+    assert "2. **Payment 2**" in listed.json()["message"]
     assert (
         "CNY 10,000.00" in listed.json()["message"] and "CNY 20,000.00" in listed.json()["message"]
     )

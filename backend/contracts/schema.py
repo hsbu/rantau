@@ -5,11 +5,13 @@ from typing import Any
 from pydantic.json_schema import models_json_schema
 
 from backend.contracts import http, models
+from backend.contracts.agent_details import AgentDetailSnapshot
 from backend.contracts.auth import ConsentRequest, ConsentSummary, LoginRequest, SessionSummary
 from backend.contracts.authority import ApprovalView, MandateRequest, MandateView
 from backend.contracts.security import SecurityCaseList, SecurityCaseView
 
 SCHEMA_MODELS = (
+    AgentDetailSnapshot,
     models.ActorContext,
     models.Money,
     models.FxQuote,
@@ -88,6 +90,7 @@ def contract_schema() -> dict[str, Any]:
     responses = {
         "/agent/messages": "AgentResponse",
         "/agent/runs/{run_id}": "AgentResponse",
+        "/agent/conversations/{conversation_id}/details": "AgentDetailSnapshot",
         "/tuition/obligations": "TuitionObligationDetail",
         "/tuition/obligations/{id}": "TuitionObligationDetail",
         "/tuition/obligations/{id}/recheck": "TuitionObligationDetail",
@@ -208,6 +211,16 @@ def contract_schema() -> dict[str, Any]:
             parameter = path.split("{")[1].split("}")[0]
             parameters.append(
                 {"name": parameter, "in": "path", "required": True, "schema": {"type": "string"}}
+            )
+        if path == "/agent/conversations/{conversation_id}/details":
+            operation["x-implementation"] = "implemented"
+            parameters.append(
+                {
+                    "name": "run_id",
+                    "in": "query",
+                    "required": True,
+                    "schema": {"type": "string", "minLength": 1, "maxLength": 128},
+                }
             )
         if path.endswith("/execute"):
             parameters.append(

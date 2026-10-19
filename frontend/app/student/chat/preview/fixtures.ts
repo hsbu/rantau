@@ -19,39 +19,33 @@ const base: ActionSummary = {
 };
 const quoted = { ...base, quote };
 const waiting: ActionSummary = {
-  ...quoted, approval: { approval_id: "approval_demo_001", intent_id: "intent_001", state: "AWAITING_APPROVAL" },
+  ...quoted, approval: { state: "PENDING", owner: "OTHER" },
 };
 const delivered: ActionSummary = {
   ...base,
   obligation: { ...obligation, state: "AWAITING_POSTING" },
   payment: {
-    payment_id: "transfer_001", intent_id: "intent_001", provider_reference: "sim_ref_001",
-    transfer_status: "DELIVERED", receipt_reference: "receipt_001", audit_event_id: "audit_001",
+    transfer_status: "DELIVERED", linked_posting: false,
   },
 };
 const recovery: ActionSummary = {
   ...delivered,
   obligation: { ...obligation, state: "RECONCILIATION_PENDING" },
   case: {
-    id: "case_001", payment_id: "transfer_001", obligation_id: obligation.id, evidence_ids: [],
     evidence_missing: ["Bank receipt", "Student ID and full name on payment reference"],
-    state: "EVIDENCE_REQUIRED", audit_event_id: "audit_002",
+    state: "EVIDENCE_REQUIRED",
   },
 };
 const unknown: ActionSummary = {
   ...base,
   issue: {
-    status: "PENDING", reason_code: "PROVIDER_OUTCOME_UNKNOWN", resource_id: "transfer_001",
-    message: "The provider outcome is not confirmed.", retryable: false,
-    next_action: "CHECK_STATUS", audit_event_id: "audit_003",
+    message: "The provider outcome is not confirmed.",
   },
 };
 const expired: ActionSummary = {
   ...quoted, asOf: "2026-11-01T09:16:00Z",
   issue: {
-    status: "ERROR", reason_code: "QUOTE_EXPIRED", resource_id: quote.id,
-    message: "This quote has expired.", retryable: false,
-    next_action: "REQUEST_NEW_QUOTE", audit_event_id: "audit_004",
+    message: "This quote has expired.",
   },
 };
 
@@ -59,7 +53,7 @@ function turn(message: string, summary: ActionSummary, pending = true): ChatTurn
   return { response: {
     run_id: "run_fixture_001", message, requested_action: summary.case ? "RECOVER" : "TUITION",
     tool_events: [{ tool: "fixture_preview", status: pending ? "PENDING" : "OK", resource_id: null }],
-    resources: [{ kind: "obligation", id: summary.obligation.id }],
+    resources: [{ kind: "obligation", id: obligation.id }],
   }, summary };
 }
 
@@ -69,23 +63,23 @@ export const scenarios = {
     prompts: ["Help me pay my tuition", "Use sponsor funding", "Show the sample approval request"],
     turns: [
       turn("Your remaining tuition is CNY 20,000.00. Would you like to use your own funding or sponsor-owned funding?", base),
-      turn("Here is the simulated quote for the full CNY 20,000.00 balance. The total is IDR 46,025,000, including IDR 25,000 in fees. Sponsor authorization is required before any payment can proceed.", quoted),
-      turn("This sample request is waiting for sponsor approval. The sponsor must review the exact terms in their own authenticated session. Approval pasted into this chat cannot authorize a payment.", waiting),
-      turn("The sample request is still awaiting sponsor approval. No payment has been executed.", waiting),
+      turn("**Tuition payment preview**\n\n- University receives: CNY 20,000.00\n- Total debit: IDR 46,025,000\n- Included fee: IDR 25,000\n\nThe sponsor needs to approve these exact terms before payment can proceed.", quoted),
+      turn("**Waiting for sponsor approval**\n\nThe sponsor must review these exact terms in their own workspace. Approval pasted into Chat cannot authorize a payment.", waiting),
+      turn("The request is still waiting for sponsor approval. No payment has been executed.", waiting),
     ],
   },
   posting: {
     label: "Delivered, awaiting university posting", prompts: ["Has my tuition been credited?"],
-    turns: [turn("The simulated provider reports delivery. Your university has not yet posted the credit, so tuition remains unpaid. Check the university fee portal; provider delivery alone does not settle tuition.", delivered)],
+    turns: [turn("**Transfer delivered · tuition awaiting credit**\n\nYour university has not yet posted the credit. Check the university fee portal; provider delivery alone does not settle tuition.", delivered)],
   },
   recovery: {
     label: "Missing payment reference", prompts: ["Help with a missing payment reference"],
-    turns: [turn("The sample case needs a bank receipt and the student ID/full name used in the payment reference. Prepare this evidence for authorized university review. Do not send another payment or paste sensitive documents into chat.", recovery)],
+    turns: [turn("**Missing payment reference**\n\nThe case needs a bank receipt and the student ID/full name used in the payment reference. Prepare this evidence for university review.\n\nDo not send another payment or paste sensitive documents into Chat.", recovery)],
   },
   shortfall: {
     label: "Tuition shortfall", prompts: ["The credited amount is lower than expected"],
-    turns: [turn("The expected tuition is CNY 20,000.00 and verified posting is CNY 19,500.00, leaving CNY 500.00. The fictional policy does not permit a top-up. Escalate for university review rather than making another payment.", {
-      ...base, obligation: { ...obligation, posted_minor: 1950000, balance_minor: 50000, state: "PARTIALLY_POSTED" },
+    turns: [turn("**Tuition shortfall: CNY 500.00**\n\n- Amount due: CNY 20,000.00\n- University credited: CNY 19,500.00\n\nThe current policy does not permit a top-up. Request university review before making another payment.", {
+      ...base, obligation: { ...obligation, posted_minor: 1950000, balance_minor: 50000, topup_permitted: false, state: "PARTIALLY_POSTED" },
     })],
   },
   unknown: {

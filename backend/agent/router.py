@@ -5,11 +5,12 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Annotated, Protocol
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from backend.agent.graph import AgentGraph
+from backend.contracts.agent_details import AgentDetailSnapshot
 from backend.contracts.http import AgentMessage, AgentResponse
-from backend.contracts.models import ActorContext, ScopeDenied, ServiceUnavailable
+from backend.contracts.models import ActorContext, Identifier, ScopeDenied, ServiceUnavailable
 from backend.dependencies import auth_settings, verified_actor
 from backend.kb.search import research_deadline
 
@@ -22,10 +23,17 @@ class RunRepository(Protocol):
     async def get(self, run_id: str, actor: ActorContext) -> AgentResponse: ...
 
 
+class DetailRepository(Protocol):
+    async def get(
+        self, actor: ActorContext, conversation_id: str, run_id: str
+    ) -> AgentDetailSnapshot: ...
+
+
 @dataclass(frozen=True)
 class AgentServices:
     graph: AgentGraph
     runs: RunRepository
+    details: DetailRepository | None = None
 
 
 async def agent_services(request: Request) -> AsyncIterator[AgentServices]:
@@ -52,6 +60,26 @@ async def agent_services(request: Request) -> AsyncIterator[AgentServices]:
 Actor = Annotated[ActorContext, Depends(verified_actor)]
 Services = Annotated[AgentServices, Depends(agent_services)]
 router = APIRouter(prefix="/api/v1/agent", tags=["agent"])
+
+
+@router.get("/conversations/{conversation_id}/details", response_model=AgentDetailSnapshot)
+async def conversation_details(
+    conversation_id: Identifier,
+    run_id: Identifier,
+    actor: Actor,
+    services: Services,
+    response: Response,
+) -> AgentDetailSnapshot:
+    headers = {"Cache-Control": "no-store"}
+    response.headers.update(headers)
+    if services.details is None:
+        raise HTTPException(503, detail="Chat details unavailable", headers=headers)
+    try:
+        return await services.details.get(actor, conversation_id, run_id)
+    except ScopeDenied:
+        raise HTTPException(404, detail="Resource unavailable", headers=headers) from None
+    except ServiceUnavailable:
+        raise HTTPException(503, detail="Chat details unavailable", headers=headers) from None
 
 
 @router.post("/messages", response_model=AgentResponse)

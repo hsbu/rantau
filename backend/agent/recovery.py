@@ -3,7 +3,7 @@
 import re
 from dataclasses import dataclass
 
-from backend.agent.explanations import explain_tuition_record, format_money, utc_time
+from backend.agent.explanations import display_time, explain_tuition_record, format_money
 from backend.agent.persistence import _database_call, _Storage
 from backend.agent.state import RecoveryDraft
 from backend.authz.policy_repository import PolicyConnection
@@ -92,7 +92,7 @@ class RecoveryWorkflow(_Storage):
     ) -> tuple[AgentResponse, RecoveryDraft]:
         choices = await _database_call(lambda: self._choices(actor))
         lines = [
-            "Up to 10 eligible tuition payments in your current scope. Listing makes no changes."
+            "**Your tuition payments**\n\nHere are up to 10 payments you can review."
         ]
         for index, item in enumerate(choices, 1):
             amount = format_money(
@@ -101,12 +101,12 @@ class RecoveryWorkflow(_Storage):
                 )
             )
             lines.append(
-                f"Payment {index}: tuition expected {amount}; provider "
+                f"{index}. **Payment {index}** — tuition expected {amount}; provider "
                 f"{item.payment.transfer_status.value}; university {item.obligation.state.value}; "
-                f"tuition due {utc_time(item.obligation.due_at)}."
+                f"tuition due {display_time(item.obligation.due_at)}."
             )
         lines.append(
-            "Say 'select payment 1' (or another listed number) to inspect its linked records. "
+            "Say `select payment 1` (or another listed number) to inspect its linked records. "
             "Selection does not submit a case or execute a payment."
             if choices
             else "No eligible tuition payment was found. Review the Payments workspace."
@@ -115,7 +115,7 @@ class RecoveryWorkflow(_Storage):
         return AgentResponse(
             run_id="pending",
             requested_action=intent,
-            message="\n".join(lines),
+            message="\n\n".join(lines),
             tool_events=(ToolEvent(tool="list_student_payments", status="OK"),),
         ), draft
 
@@ -241,7 +241,7 @@ class RecoveryWorkflow(_Storage):
         return response.model_copy(
             update={
                 "message": response.message
-                + ("\n" + explain_research(result) if fresh.obligation.balance_minor else ""),
+                + ("\n\n" + explain_research(result) if fresh.obligation.balance_minor else ""),
                 "tool_events": response.tool_events
                 + (
                     ToolEvent(
@@ -360,16 +360,14 @@ class RecoveryWorkflow(_Storage):
 
     @staticmethod
     def reply(text: str, intent: Intent = Intent.RECOVER) -> AgentResponse:
-        return AgentResponse(
-            run_id="pending", requested_action=intent, message="Simulated Rantau recovery. " + text
-        )
+        return AgentResponse(run_id="pending", requested_action=intent, message=text)
 
     def describe(
         self, snapshot: RecoverySnapshot, intent: Intent = Intent.RECOVER
     ) -> AgentResponse:
         payment, obligation = snapshot.payment, snapshot.obligation
-        text = f"Provider state: {payment.transfer_status.value}. "
-        text += explain_tuition_record(obligation) + " "
+        text = f"**Provider status: {payment.transfer_status.value.replace('_', ' ').title()}**\n\n"
+        text += explain_tuition_record(obligation) + "\n\n"
         if obligation.state == TuitionState.PAID and snapshot.linked_posting:
             text += "PAID is verified by university postings linked to this payment and obligation."
         elif obligation.state == TuitionState.PAID:
@@ -390,9 +388,9 @@ class RecoveryWorkflow(_Storage):
             text += (
                 "Tuition is not confirmed paid. "
                 + (
-                    "The synthetic policy permits separate top-up planning with fresh approval. "
+                    "A separate top-up can be planned, with fresh approval. "
                     if obligation.topup_permitted
-                    else "The synthetic policy forbids a top-up; request university review. "
+                    else "A top-up is not permitted; request university review. "
                 )
                 + "Recovery does not authorize or execute an additional payment."
             )
@@ -408,8 +406,8 @@ class RecoveryWorkflow(_Storage):
             else:
                 text += "University posting is pending. "
                 if obligation.posting_deadline_at:
-                    deadline = obligation.posting_deadline_at.isoformat()
-                    text += f"Simulated posting deadline: {deadline}. "
+                    deadline = display_time(obligation.posting_deadline_at)
+                    text += f"Posting deadline: {deadline}. "
             text += "Say 'check recovery' to reload provider and university records."
         resources: tuple[ResourceReference, ...] = (
             ResourceReference(kind="payment", id=payment.payment_id),
@@ -435,7 +433,7 @@ class RecoveryWorkflow(_Storage):
         return AgentResponse(
             run_id="pending",
             requested_action=intent,
-            message="Simulated Rantau recovery. " + text,
+            message=text,
             tool_events=events,
             resources=resources,
         )

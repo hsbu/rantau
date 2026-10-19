@@ -26,17 +26,19 @@ def test_agent_requests_actual_sponsor_approval_and_executes_once(runtime):
     client = student_client(services)
     assert message(client, "Plan tuition").status_code == 200
     preview = message(client, "Use my sponsor account")
-    assert "Draft intent preview" in preview.json()["message"]
+    assert "Selected:" in preview.json()["message"]
     requested = message(client, "confirm tuition")
     assert requested.status_code == 200
-    assert "AWAITING_APPROVAL" in requested.json()["message"]
+    assert "Waiting for funding-owner approval" in requested.json()["message"]
     with services.database.connection() as c:
         assert c.execute("SELECT count(*) AS n FROM agent_actions").fetchone()["n"] == 1
         assert c.execute("SELECT count(*) AS n FROM payment_intents").fetchone()["n"] == 1
         assert c.execute("SELECT count(*) AS n FROM approvals").fetchone()["n"] == 1
         assert c.execute("SELECT count(*) AS n FROM transfers").fetchone()["n"] == 0
-    assert "AWAITING_APPROVAL" in message(client, "continue").json()["message"]
-    assert "AWAITING_APPROVAL" in message(client, "confirm tuition").json()["message"]
+    assert "Waiting for funding-owner approval" in message(client, "continue").json()["message"]
+    assert (
+        "Waiting for funding-owner approval" in message(client, "confirm tuition").json()["message"]
+    )
     decide("APPROVED")
     count_before = len(payloads)
     completed = message(client, "continue")
@@ -74,8 +76,10 @@ def confirmed(runtime):
     services, _, _ = runtime
     client = student_client(services)
     assert message(client, "Plan tuition").status_code == 200
-    assert "Draft intent preview" in message(client, "Use my sponsor account").json()["message"]
-    assert "AWAITING_APPROVAL" in message(client, "confirm tuition").json()["message"]
+    assert "Selected:" in message(client, "Use my sponsor account").json()["message"]
+    assert (
+        "Waiting for funding-owner approval" in message(client, "confirm tuition").json()["message"]
+    )
     return client
 
 
@@ -161,7 +165,7 @@ def test_changed_funding_cannot_reuse_an_old_approval(runtime):
     services, _, _ = runtime
     client = confirmed(runtime)
     decide("APPROVED")
-    assert "Draft intent preview" in message(client, "Use my own account").json()["message"]
+    assert "Selected:" in message(client, "Use my own account").json()["message"]
     changed = message(client, "confirm tuition")
     assert "Cancel or revise" in changed.json()["message"]
     assert "No confirmed proposal" in message(client, "continue").json()["message"]
@@ -183,7 +187,9 @@ def test_committed_proposal_survives_conversation_save_failure(runtime, monkeypa
     monkeypatch.setattr(PostgresConversations, "_save", fail)
     assert message(client, "confirm tuition").status_code == 503
     monkeypatch.setattr(PostgresConversations, "_save", save)
-    assert "AWAITING_APPROVAL" in message(client, "confirm tuition").json()["message"]
+    assert (
+        "Waiting for funding-owner approval" in message(client, "confirm tuition").json()["message"]
+    )
     with services.database.connection() as c:
         assert c.execute("SELECT count(*) AS n FROM payment_intents").fetchone()["n"] == 1
         assert c.execute("SELECT count(*) AS n FROM approvals").fetchone()["n"] == 1
@@ -205,7 +211,7 @@ def test_lost_execution_response_checks_existing_transfer_before_retry(runtime, 
 
     monkeypatch.setattr(ExecutionService, "execute", lose_response)
     first = message(client, "continue")
-    assert "outcome could not be confirmed" in first.json()["message"]
+    assert "couldn’t confirm the outcome" in first.json()["message"]
     assert message(client, "check").status_code == 200
     assert len(calls) == 1
     with services.database.connection() as c:
@@ -261,7 +267,7 @@ def test_proposal_and_correlation_rollback_together(runtime, monkeypatch):
         raise ServiceUnavailable("Synthetic interruption before action journal insert")
 
     monkeypatch.setattr(IntentService, "create_in_transaction", fail_after_insert)
-    assert "outcome could not be confirmed" in message(client, "confirm tuition").json()["message"]
+    assert "couldn’t confirm the outcome" in message(client, "confirm tuition").json()["message"]
     with services.database.connection() as c:
         for table in ("agent_actions", "payment_intents", "approvals"):
             assert c.execute(f"SELECT count(*) AS n FROM {table}").fetchone()["n"] == 0
@@ -306,7 +312,7 @@ def test_student_owned_funding_uses_its_actual_owner_authority(runtime):
         ).fetchone()["balance_minor"]
     requested = message(client, "confirm tuition")
     assert requested.status_code == 200
-    if "AWAITING_APPROVAL" in requested.json()["message"]:
+    if "Waiting for funding-owner approval" in requested.json()["message"]:
         approval = client.get("/api/v1/student/approvals").json()[0]
         decision = client.post(
             f"/api/v1/student/approvals/{approval['approval_id']}/decision",
