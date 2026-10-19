@@ -134,7 +134,16 @@ Use this sequence wherever a case says **run the sponsor-payment flow**:
 
 ### TC-01 — Tuition balance and deadline
 
-- [ ] Final acceptance evidence captured. **Owner:** A/C. **Result:** NOT RUN.
+- [ ] Final acceptance evidence captured. **Owner:** A lead / C review. **Result:** LIMITED — owner verification passed; independent review and final release capture pending.
+
+**Owner run, 2026-10-19 (A-08):** visible IAB against isolated real student authentication,
+PostgreSQL 17 and OpenRouter `deepseek/deepseek-v4.1-flash-1017`, base `5d9962a` plus
+local A-08 changes. The initial balance-only reply unnecessarily requested funding;
+the fixed reply shows CNY 20,000.00 remaining, CNY 0.00 credited and 21 Nov 2026,
+17:00 China time without planning questions. A contextual reminder also passed after
+a prompt correction. SQL confirms unchanged balances and no payment effects.
+Local screenshots/state evidence: `.generated/acceptance/a08/`; source/checks and
+remaining review limits: [A-08 progress](progress/progress-a.md). This is not final release sign-off.
 
 **Setup:** reset `tuition_happy_path`; use the student context.
 
@@ -154,7 +163,14 @@ uv run pytest tests/finance/test_agent_runtime.py::test_default_chat_uses_real_r
 
 ### TC-02 — Compare two IDR-to-CNY routes
 
-- [ ] Final acceptance evidence captured. **Owner:** A/C. **Result:** NOT RUN.
+- [ ] Final acceptance evidence captured. **Owner:** A lead / C review. **Result:** LIMITED — owner verification passed; independent review and final release capture pending.
+
+**Owner run, 2026-10-19 (A-08):** the same isolated actual-model browser run verified
+Standard IDR 46,025,000 versus Faster IDR 46,050,000, explicit principal/fees and
+the IDR 25,000 difference for equal CNY delivery. Switching to earliest delivery
+preserves funding; the live panel now uses readable route names and an explicitly
+rounded `0.00043478` rate. No confirmation was sent and SQL shows no financial
+effects. Local evidence and source/review limits are recorded under TC-01/A-08 above.
 
 **Setup:** reset `tuition_happy_path`; stop before confirmation.
 
@@ -548,7 +564,15 @@ uv run pytest tests/finance/test_agent_recovery_security.py::test_unbound_bad_em
 
 ### UX-01 — Essential clarification and remembered selection
 
-- [ ] Final acceptance evidence captured. **Owner:** A. **Result:** NOT RUN.
+- [ ] Final acceptance evidence captured. **Owner:** A. **Result:** LIMITED — owner verification passed; independent review and final release capture pending.
+
+**Owner run, 2026-10-19 (A-08):** visible connected Chat asked for funding on
+`Help me pay my tuition`, accepted sponsor funding, selected Standard and switched
+to Faster without asking for funding again. A balance reminder kept the selected
+route/funding. Changing to own funding and lowest cost retained the obligation.
+Amount ambiguity/full-balance behavior remains backed by automated regressions,
+not a claimed live amount-edit walkthrough. Source/model/evidence match TC-01/A-08;
+financial records stayed unchanged and final acceptance remains unchecked.
 
 **Setup:** reset `tuition_happy_path`; start a new connected conversation.
 

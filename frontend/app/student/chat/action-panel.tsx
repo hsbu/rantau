@@ -1,5 +1,5 @@
 import type { ActionSummary } from "./chat-types";
-import { dateTime, money, visibleText } from "./chat-types";
+import { dateTime, money, quoteRate, quoteRoute, visibleText } from "./chat-types";
 import styles from "./chat.module.css";
 
 export function ActionPanel({ summary, preview, unavailable = false }: { summary?: ActionSummary; preview: boolean; unavailable?: boolean }) {
@@ -43,13 +43,13 @@ export function ActionPanel({ summary, preview, unavailable = false }: { summary
       </section>
       {quote && <section className={styles.detailBlock} aria-label="Quote breakdown">
         <div className={styles.inlineHeading}><h3>Quote breakdown</h3><span className={expired ? styles.warningTag : styles.tag}>{expired ? "Expired" : preview ? "Sample" : "Quote"}</span></div>
-        <p className={styles.small}>{visibleText(quote.provider)} · IDR → CNY</p>
+        <p className={styles.small}>{quoteRoute(quote.provider)} · IDR → CNY</p>
         <dl className={styles.rows}>
           <div><dt>Transfer amount</dt><dd>{money(quote.source_currency, quote.source_principal_minor)}</dd></div>
           <div><dt>Transfer fee</dt><dd>{money(quote.source_currency, quote.fee_minor)}</dd></div>
           <div className={styles.total}><dt>Total debit</dt><dd>{money(quote.source_currency, quote.source_total_minor)}</dd></div>
           <div><dt>Expected delivery</dt><dd>{money(quote.destination_currency, quote.destination_amount_minor)}</dd></div>
-          <div><dt>Rate (CNY per IDR)</dt><dd className={styles.rate}>{quote.rate}</dd></div>
+          <div><dt>Rate (rounded, CNY per IDR)</dt><dd className={styles.rate}>{quoteRate(quote.rate)}</dd></div>
           <div><dt>Quote expires</dt><dd>{dateTime(quote.expires_at)}</dd></div>
           <div><dt>Provider estimate</dt><dd>{dateTime(quote.estimated_delivery_at)}</dd></div>
         </dl>

@@ -49,7 +49,18 @@ the current message clearly changes topic. For example, while awaiting FUNDING,
 'Use the full balance and lowest cost quote' is one tuition request, not competing intents:
 return TUITION, needs_clarification=false, full_balance=true, route_preference=LOWEST_COST.
 An intent only selects a read/triage path; it cannot grant permission or execute payments.
-For TUITION, extract only explicitly requested selections into tuition. All option numbers
+For TUITION, extract only explicitly requested selections into tuition.
+For a question only about tuition balance, credited amount or deadline, set information_only=true
+and leave payment selections unset. Do not start payment planning for an information request.
+For planning/paying tuition, comparing routes or choosing funding/amount/routes, set
+information_only=false. A balance question during planning does not discard earlier selections.
+Apply information_only to the CURRENT message, even when prior context has a complete payment
+preview. Do not repeat planning merely because earlier turns selected a route or funding.
+Examples: 'How much tuition do I still owe, and when is it due?' and
+'Remind me how much I still owe and when the tuition is due.' both mean TUITION,
+needs_clarification=false, information_only=true, with all payment selections unset.
+'Show my selected payment route again' means information_only=false.
+All option numbers
 are one-based ordinals from the server's prior clarification. Resolve short follow-ups using
 the supplied server context; e.g. 'the second' while awaiting FUNDING selects funding_option=2.
 funding_owner=SELF means the student's own account; OTHER means another owner's funding.

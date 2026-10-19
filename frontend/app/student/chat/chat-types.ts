@@ -68,6 +68,22 @@ export function dateTime(value: string): string {
   }).format(new Date(value)) + " CST";
 }
 
+export function quoteRoute(provider: string): string {
+  return ({ mock_remit_a: "Standard route", mock_remit_b: "Faster route" } as Record<string, string>)[provider] ?? "Payment route";
+}
+
+// Round only the displayed decimal string; the exact quote remains unchanged.
+export function quoteRate(rate: string): string {
+  const [whole, fraction = ""] = rate.split(".");
+  let scaled = BigInt(whole + fraction.padEnd(8, "0").slice(0, 8));
+  const tail = fraction.slice(8);
+  if (tail && (tail[0] > "5" || (tail[0] === "5" && (/[1-9]/.test(tail.slice(1)) || scaled % BigInt(2) !== BigInt(0))))) scaled += BigInt(1);
+  // Keep very small positive rates exact rather than displaying a false zero.
+  if (scaled === BigInt(0)) return rate;
+  const decimal = scaled.toString().padStart(9, "0");
+  return `${decimal.slice(0, -8)}.${decimal.slice(-8)}`.replace(/\.?0+$/, "");
+}
+
 export function visibleText(value: string): string {
   return value
     .replace(/\bBearer\s+[^\s]+/gi, "[hidden credential]")

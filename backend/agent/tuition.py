@@ -7,6 +7,7 @@ from decimal import Decimal
 from backend.agent.explanations import (
     comparable_quotes,
     display_time,
+    explain_cost_difference,
     explain_quotes,
     explain_selected_quote,
     explain_tuition_record,
@@ -58,14 +59,14 @@ class TuitionPlanner:
     async def plan(
         self, inputs: TuitionInput, draft: TuitionDraft, actor: ActorContext
     ) -> tuple[AgentResponse, TuitionDraft]:
-        if inputs.restart:
+        if inputs.restart and not inputs.information_only:
             draft = TuitionDraft()
         events: list[ToolEvent] = []
         resources: tuple[ResourceReference, ...] = ()
 
         def reply(text: str, updated: TuitionDraft) -> tuple[AgentResponse, TuitionDraft]:
             trace = tuple(events)
-            if updated.awaiting is not None:
+            if updated.awaiting is not None and not inputs.information_only:
                 trace += (ToolEvent(tool="clarify_tuition", status="PENDING"),)
             return (
                 AgentResponse(
@@ -110,6 +111,8 @@ class TuitionPlanner:
             draft = TuitionDraft(obligation_id=selected, obligation_options=ids)
         resources = (ResourceReference(kind="obligation", id=selected),)
         summary = explain_tuition_record(obligation) + "\n\n"
+        if inputs.information_only:
+            return reply(summary.rstrip(), draft)
         if obligation.state == TuitionState.PAID:
             return reply(summary + "No outstanding tuition balance; no payment is needed.", draft)
         if obligation.state != TuitionState.UNPAID:
@@ -305,7 +308,10 @@ class TuitionPlanner:
         alternatives = [
             f"{index}. {route_label(other, index)}: "
             f"{format_money(Money(currency=Currency.IDR, amount_minor=other.source_total_minor))} "
-            f"total; estimated arrival {display_time(other.estimated_delivery_at)}."
+            f"total; fee: "
+            f"{format_money(Money(currency=Currency.IDR, amount_minor=other.fee_minor))}.\n"
+            f"Receives the same {format_money(destination)}; "
+            f"estimated arrival {display_time(other.estimated_delivery_at)}."
             for index, other in enumerate(current, 1)
             if other.id != quote.id
         ]
@@ -313,6 +319,7 @@ class TuitionPlanner:
         return reply(
             summary
             + explain_selected_quote(quote, current.index(quote) + 1)
+            + explain_cost_difference(quote, current)
             + other_routes
             + f"\n\nFunding: {funding_label}.\nRecipient: {payee}.\n\n"
             + approval

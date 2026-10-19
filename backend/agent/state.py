@@ -17,6 +17,7 @@ Option = Annotated[int, Field(strict=True, ge=1, le=100)]
 
 
 class TuitionInput(Contract):
+    information_only: bool = False
     obligation_option: Option | None = None
     funding_option: Option | None = None
     quote_option: Option | None = None
