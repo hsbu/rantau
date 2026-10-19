@@ -19,39 +19,33 @@ const base: ActionSummary = {
 };
 const quoted = { ...base, quote };
 const waiting: ActionSummary = {
-  ...quoted, approval: { approval_id: "approval_demo_001", intent_id: "intent_001", state: "AWAITING_APPROVAL" },
+  ...quoted, approval: { state: "PENDING", owner: "OTHER" },
 };
 const delivered: ActionSummary = {
   ...base,
   obligation: { ...obligation, state: "AWAITING_POSTING" },
   payment: {
-    payment_id: "transfer_001", intent_id: "intent_001", provider_reference: "sim_ref_001",
-    transfer_status: "DELIVERED", receipt_reference: "receipt_001", audit_event_id: "audit_001",
+    transfer_status: "DELIVERED", linked_posting: false,
   },
 };
 const recovery: ActionSummary = {
   ...delivered,
   obligation: { ...obligation, state: "RECONCILIATION_PENDING" },
   case: {
-    id: "case_001", payment_id: "transfer_001", obligation_id: obligation.id, evidence_ids: [],
     evidence_missing: ["Bank receipt", "Student ID and full name on payment reference"],
-    state: "EVIDENCE_REQUIRED", audit_event_id: "audit_002",
+    state: "EVIDENCE_REQUIRED",
   },
 };
 const unknown: ActionSummary = {
   ...base,
   issue: {
-    status: "PENDING", reason_code: "PROVIDER_OUTCOME_UNKNOWN", resource_id: "transfer_001",
-    message: "The provider outcome is not confirmed.", retryable: false,
-    next_action: "CHECK_STATUS", audit_event_id: "audit_003",
+    message: "The provider outcome is not confirmed.",
   },
 };
 const expired: ActionSummary = {
   ...quoted, asOf: "2026-11-01T09:16:00Z",
   issue: {
-    status: "ERROR", reason_code: "QUOTE_EXPIRED", resource_id: quote.id,
-    message: "This quote has expired.", retryable: false,
-    next_action: "REQUEST_NEW_QUOTE", audit_event_id: "audit_004",
+    message: "This quote has expired.",
   },
 };
 
@@ -59,7 +53,7 @@ function turn(message: string, summary: ActionSummary, pending = true): ChatTurn
   return { response: {
     run_id: "run_fixture_001", message, requested_action: summary.case ? "RECOVER" : "TUITION",
     tool_events: [{ tool: "fixture_preview", status: pending ? "PENDING" : "OK", resource_id: null }],
-    resources: [{ kind: "obligation", id: summary.obligation.id }],
+    resources: [{ kind: "obligation", id: obligation.id }],
   }, summary };
 }
 
@@ -85,7 +79,7 @@ export const scenarios = {
   shortfall: {
     label: "Tuition shortfall", prompts: ["The credited amount is lower than expected"],
     turns: [turn("The expected tuition is CNY 20,000.00 and verified posting is CNY 19,500.00, leaving CNY 500.00. The fictional policy does not permit a top-up. Escalate for university review rather than making another payment.", {
-      ...base, obligation: { ...obligation, posted_minor: 1950000, balance_minor: 50000, state: "PARTIALLY_POSTED" },
+      ...base, obligation: { ...obligation, posted_minor: 1950000, balance_minor: 50000, topup_permitted: false, state: "PARTIALLY_POSTED" },
     })],
   },
   unknown: {

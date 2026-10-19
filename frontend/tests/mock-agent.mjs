@@ -1,5 +1,7 @@
 // Local transport test double. Never imported by application or container runtime.
 import { createServer } from "node:http";
+import { URL } from "node:url";
+import detailFixture from "./chat-detail-fixture.json" with { type: "json" };
 
 // Sponsor workspace fixtures; the relay validates every field strictly.
 const TOKEN = "a".repeat(43);
@@ -39,6 +41,7 @@ const securityCase = {
 
 const sessionSummary = { authenticated: true, role: "SPONSOR" };
 let received;
+let receivedDetails;
 
 function send(response, status, body, headers = {}) {
   response.writeHead(status, { "Content-Type": "application/json", ...headers });
@@ -55,6 +58,36 @@ createServer(async (request, response) => {
   const url = request.url ?? "";
   if (url === "/health") return send(response, 200, {});
   if (url === "/inspect") return send(response, 200, received ?? {});
+  if (url === "/inspect-details") return send(response, 200, receivedDetails ?? {});
+  if (url.startsWith("/api/v1/agent/conversations/") && request.method === "GET") {
+    receivedDetails = { url, cookie: request.headers.cookie, actorHeader: request.headers["x-actor-id"], authorization: request.headers.authorization };
+    const run = new URL(url, "http://test.local").searchParams.get("run_id");
+    const snapshot = JSON.parse(JSON.stringify(detailFixture));
+    snapshot.run_id = run;
+    if (!run?.startsWith("run_detail_")) return send(response, 200, { ...snapshot, summary: null });
+    const mode = run.slice("run_detail_".length);
+    const s = snapshot.summary;
+    if (mode === "denied") return send(response, 401, { detail: "private diagnostic" });
+    if (mode === "unavailable") return send(response, 503, { detail: "private diagnostic" });
+    if (mode === "bad") s.sponsor_balance = "acct_secret 123456789012";
+    if (mode === "wrongrun") snapshot.run_id = "run_someone_else";
+    if (["approved", "expired", "held"].includes(mode)) {
+      s.approval = { state: mode === "expired" ? "EXPIRED" : "APPROVED", expires_at: "2026-11-01T09:10:00Z", owner: "OTHER" };
+      s.intent_state = mode === "held" ? "ON_HOLD" : "AWAITING_APPROVAL";
+    }
+    if (mode === "expired") snapshot.checked_at = "2026-11-01T09:16:00Z";
+    if (mode === "offset") snapshot.simulation_at = "2026-11-10T09:00:00Z";
+    if (["delivered", "paid", "recovery", "unknown"].includes(mode)) {
+      s.payment = { transfer_status: mode === "unknown" ? "OUTCOME_UNKNOWN" : "DELIVERED", linked_posting: false };
+      s.obligation.state = mode === "paid" ? "PAID" : "AWAITING_POSTING";
+      if (mode === "paid") { s.obligation.posted_minor = 2000000; s.obligation.balance_minor = 0; }
+      if (mode === "recovery") s.case = { state: "SUBMITTED", evidence_missing: [] };
+    }
+    if (mode === "topup") {
+      Object.assign(s.obligation, { state: "PARTIALLY_POSTED", posted_minor: 1950000, balance_minor: 50000, shortfall_minor: 50000, topup_permitted: true });
+    }
+    return send(response, 200, snapshot);
+  }
 
   if (url === "/api/v1/auth/login" && request.method === "POST") {
     let text = "";
@@ -107,7 +140,7 @@ createServer(async (request, response) => {
     return send(response, 401, { detail: "private diagnostic must not reach browser" });
   }
   send(response, 200, {
-    run_id: "run_test_001", message: "Scoped response from the test backend.", requested_action: "TUITION",
+    run_id: body.message.startsWith("panel:") ? `run_detail_${body.message.slice(6)}` : "run_test_001", message: "Scoped response from the test backend.", requested_action: "TUITION",
     tool_events: [], resources: [],
   });
 }).listen(8101, "127.0.0.1");

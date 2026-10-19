@@ -6,17 +6,21 @@ export type AgentResponse = Schema["AgentResponse"];
 
 // Presentation data assembled by a trusted adapter, never parsed from assistant prose.
 export type ActionSummary = {
-  obligation: Schema["TuitionObligation"];
-  quote?: Schema["FxQuote"];
-  approval?: Schema["ApprovalRequest"];
-  payment?: Schema["PaymentResult"];
-  case?: Schema["ReconciliationCase"];
-  issue?: Schema["DomainError"];
+  obligation: Pick<Schema["TuitionObligation"], "amount_due_minor" | "posted_minor" | "balance_minor" | "due_at" | "state"> & {
+    posting_deadline_at?: string | null; shortfall_minor?: number; topup_permitted?: boolean;
+  };
+  quote?: Pick<Schema["FxQuote"], "provider" | "source_currency" | "destination_currency" | "source_principal_minor" | "fee_minor" | "source_total_minor" | "destination_amount_minor" | "rate" | "expires_at" | "estimated_delivery_at">;
+  approval?: { state: Schema["ApprovalView"]["state"] | "NOT_REQUIRED"; expires_at?: string | null; owner: "SELF" | "OTHER" };
+  payment?: { transfer_status: Schema["PaymentResult"]["transfer_status"]; linked_posting: boolean };
+  case?: Pick<Schema["ReconciliationCase"], "state" | "evidence_missing">;
+  issue?: Pick<Schema["DomainError"], "message">;
   beneficiary: string;
   funding: string;
   asOf: string;
+  checkedAt?: string;
+  intent_state?: Schema["PaymentIntentView"]["state"];
 };
-export type ChatTurn = { response: AgentResponse; summary?: ActionSummary };
+export type ChatTurn = { response: AgentResponse; summary?: ActionSummary; detailsUnavailable?: boolean };
 export interface ChatTransport {
   send(body: AgentMessage, signal: AbortSignal): Promise<ChatTurn>;
   reset?(): void;
@@ -47,26 +51,6 @@ export function parseAgentResponse(value: unknown): AgentResponse {
   return value as AgentResponse;
 }
 
-export const connectedTransport: ChatTransport = {
-  async send(body, signal) {
-    let response: Response;
-    try {
-      response = await fetch("/student/chat/api", {
-        method: "POST", credentials: "same-origin", cache: "no-store", signal,
-        headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-      });
-    } catch {
-      throw new ChatError("uncertain");
-    }
-    if (response.status === 401 || response.status === 403) throw new ChatError("session");
-    if (!response.ok) throw new ChatError(response.status === 503 ? "unavailable" : "uncertain");
-    try {
-      return { response: parseAgentResponse(await response.json()) };
-    } catch {
-      throw new ChatError("invalid");
-    }
-  },
-};
 
 export function money(currency: "IDR" | "CNY", minor: number): string {
   if (!Number.isSafeInteger(minor) || minor < 0) throw new Error("Invalid money");

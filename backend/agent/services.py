@@ -2,6 +2,7 @@
 
 from backend.agent.actions import TuitionActions
 from backend.agent.classifier import IntentClassifier
+from backend.agent.details import AgentDetails
 from backend.agent.graph import AgentGraph
 from backend.agent.persistence import PostgresConversations, PostgresRuns
 from backend.agent.recovery import RecoveryWorkflow
@@ -29,4 +30,5 @@ def durable_agent_services(
             recovery=recovery,
         ),
         PostgresRuns(database, auth),
+        AgentDetails(actions.finance) if actions is not None else None,
     )

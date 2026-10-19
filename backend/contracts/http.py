@@ -147,6 +147,7 @@ class ContractCatalogue(Contract):
 HTTP_ENDPOINTS = (
     ("POST", "/api/v1/agent/messages"),
     ("GET", "/api/v1/agent/runs/{run_id}"),
+    ("GET", "/api/v1/agent/conversations/{conversation_id}/details"),
     ("GET", "/api/v1/tuition/obligations"),
     ("GET", "/api/v1/tuition/obligations/{id}"),
     ("GET", "/api/v1/quotes"),

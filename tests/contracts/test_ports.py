@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from backend.contracts.models import IntentProposal, ServiceUnavailable
@@ -46,7 +48,10 @@ def test_export_has_full_catalogue_and_no_actor_request():
     from backend.contracts.schema import contract_schema
 
     schema = contract_schema()
-    assert len(schema["paths"]) == 40
+    assert len(schema["paths"]) == 41
+    detail = schema["paths"]["/api/v1/agent/conversations/{conversation_id}/details"]["get"]
+    assert any(p["name"] == "run_id" and p["required"] for p in detail["parameters"])
+    assert "ActorContext" not in json.dumps(detail)
     assert schema["paths"]["/api/v1/security-cases"]["get"]["x-owner"] == "B"
     execution = schema["paths"]["/api/v1/payment-intents/{id}/execute"]["post"]
     assert any(p["name"] == "Idempotency-Key" for p in execution["parameters"])

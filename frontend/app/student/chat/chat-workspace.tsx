@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ActionPanel } from "./action-panel";
-import { ChatError, connectedTransport, visibleText } from "./chat-types";
+import { ChatError, visibleText } from "./chat-types";
+import { connectedTransport } from "./connected-transport";
 import type { ActionSummary, ChatTransport } from "./chat-types";
 import styles from "./chat.module.css";
 
@@ -21,6 +22,7 @@ export function ChatWorkspace({ transport = connectedTransport, preview = false,
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [summary, setSummary] = useState<ActionSummary>();
+  const [detailsUnavailable, setDetailsUnavailable] = useState(false);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<keyof typeof errorText>();
@@ -52,7 +54,7 @@ export function ChatWorkspace({ transport = connectedTransport, preview = false,
     conversation.current = null;
     following.current = true;
     setShowLatest(false);
-    setMessages([]); setSummary(undefined); setDraft(""); setBusy(false); setError(undefined);
+    setMessages([]); setSummary(undefined); setDetailsUnavailable(false); setDraft(""); setBusy(false); setError(undefined);
     input.current?.focus({ preventScroll: true });
   }
 
@@ -68,12 +70,14 @@ export function ChatWorkspace({ transport = connectedTransport, preview = false,
     setBusy(true); setError(undefined); setDraft("");
     // Do not leave a previous quote looking current while a new turn is being evaluated.
     setSummary(undefined);
+    setDetailsUnavailable(false);
     setMessages(previous => [...previous, { id, role: "user", text: text.trim() }]);
     try {
       const result = await transport.send({ message: text.trim(), conversation_id: conversation.current }, controller.signal);
       if (sequence.current !== id) return;
       setMessages(previous => [...previous, { id, role: "assistant", text: result.response.message }]);
       setSummary(result.summary);
+      setDetailsUnavailable(!!result.detailsUnavailable);
     } catch (failure) {
       if (sequence.current !== id) return;
       const kind = failure instanceof ChatError ? failure.kind : "uncertain";
@@ -148,7 +152,7 @@ export function ChatWorkspace({ transport = connectedTransport, preview = false,
           <p id="composer-hint" className={styles.composerHint}>{preview ? "Each message advances the selected sample scenario. New chat clears your messages." : "Keep account numbers, credentials and private documents out of chat."}</p>
         </div>
       </div>
-      <ActionPanel summary={summary} preview={preview} />
+      <ActionPanel summary={summary} preview={preview} unavailable={detailsUnavailable} />
     </main>
     <footer className={styles.footer}><span>Across borders. With clarity.</span><span>Student workspace · Rantau</span></footer>
   </div>;

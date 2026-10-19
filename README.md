@@ -459,6 +459,26 @@ changes the beneficiary or replaces simulator rules. The authored posting window
 and scenario clock remain simulation configuration. Real university SLA research
 is not a blocker to the approved simulator. Scenarios remain isolated and scripted.
 
+Connected Chat now populates its detail panel after successful turns using
+`GET /api/v1/agent/conversations/{conversation_id}/details?run_id={run_id}`.
+The read requires the original current student session, an unexpired conversation,
+the current scenario and the current committed run. Selected tuition, stored
+quote, correlated request/approval, provider and linked recovery records are
+projected into bounded fields; raw draft/account IDs, sponsor balances, terms
+hashes and private evidence are excluded. Nothing is parsed from assistant prose
+or chosen by guessing the latest payment. The Next.js detail relay validates the
+entire snapshot, uses a fixed upstream path and forwards only the session cookie.
+
+Cards show exact quote totals, actual approval/provider/case states and distinct
+university posting status. Quote/approval expiry uses the security clock; provider
+and university dates use the separate simulation clock. These are point-in-time
+snapshots, refreshed after Chat turns, not live authorization. Reading details
+cannot issue quotes, refresh/expire stored approvals, settle transfers, post
+university credit, submit recovery or execute payments. Failed detail reads clear
+old cards while retaining a successful assistant reply; session denial clears the
+conversation. New chat and in-flight cancellation discard stale results. No new
+financial action controls, migrations or transcript restoration are added.
+
 A-03 remembers tuition obligation, funding and quote selections across turns.
 The backend reloads current permissions, policy, quotes and verified payee each
 turn; remembered IDs are not financial authority. Server wiring supplies the
