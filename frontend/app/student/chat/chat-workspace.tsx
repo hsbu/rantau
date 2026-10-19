@@ -99,9 +99,9 @@ export function ChatWorkspace({ transport = connectedTransport, preview = false,
         <Link href="/student/chat" className={styles.viewTab} aria-current={!preview ? "page" : undefined}>Chat</Link>
         <Link href="/student/chat/preview" className={styles.viewTab} aria-current={preview ? "page" : undefined}>Scenarios</Link>
       </nav>
-      {!preview && <nav className={styles.workspaceLinks} aria-label="Student workspace">
-        <Link href="/student/payments">Payments</Link><Link href="/student/sign-in">Sign in / account</Link>
-      </nav>}
+      <nav className={styles.workspaceLinks} aria-label="Student workspace">
+        <Link href="/student/payments" prefetch={false}>Payments</Link><Link href="/student/sign-in" prefetch={false}>Sign in / account</Link>
+      </nav>
     </header>
     <div className={styles.safetyBanner}>{preview
       ? <>Scenario preview · Scripted responses, no model calls, authentication or payment actions.</>
