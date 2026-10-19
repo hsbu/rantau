@@ -34,16 +34,17 @@ def test_approved_policy_recognized_at_persisted_seed_time(at, topup):
     assert bundle.simulation.policy == POLICY
 
 
-def test_citation_uses_stored_validity_without_rebasing_official_evidence():
+@pytest.mark.parametrize("query_at", [SEED_TIME, SEED_TIME + timedelta(days=4)])
+def test_citation_uses_stored_validity_without_rebasing_official_evidence(query_at):
     policy = seeded_policy()
-    text = explain_policy(policy, load_bundle(), SEED_TIME)
+    text = explain_policy(policy, load_bundle(), query_at)
     assert (
         f"Validity: {policy.effective_from.isoformat()} to {policy.effective_to.isoformat()}"
         in text
     )
     assert "48 elapsed hours" in text
     assert "Partial payments: not allowed; top-ups: not allowed" in text
-    assert "payment period is 2026-08-10 to 2026-09-10" in text
+    assert "notice covers 2026-08-10 to 2026-09-10" in text
     assert "current applicability requires rechecking" in text
 
 
