@@ -8,13 +8,18 @@ const intents: components["schemas"]["Intent"][] = [
 ];
 
 export default function Home() {
-  return <><div className="homeHeader"><WorkspaceHeader label="Workspaces" links={[
+  return <><WorkspaceHeader label="Workspaces" links={[
     { href: "/student/sign-in", label: "Student workspace" }, { href: "/sponsor", label: "Sponsor workspace" },
-  ]} /></div><main id="main-content" tabIndex={-1} className="home">
+  ]} /><main id="main-content" tabIndex={-1} className="home">
     <p className="eyebrow">Rantau / Development preview</p>
     <h1>A clearer path<br />from home to campus.</h1>
     <p className="description">A financial agent for students abroad and the people supporting them.</p>
-    <p><Link href="/student/sign-in">Student sign-in →</Link> · <Link href="/student/chat">Open student chat →</Link> · <Link href="/student/chat/preview">Explore the sample conversation →</Link> · <Link href="/sponsor">Sponsor approvals →</Link></p>
+    <nav className="homeActions" aria-label="Start with Rantau">
+      <Link href="/student/sign-in">Student sign-in →</Link>
+      <Link href="/student/chat">Open student chat →</Link>
+      <Link href="/student/chat/preview">Explore the sample conversation →</Link>
+      <Link href="/sponsor">Sponsor approvals →</Link>
+    </nav>
     <section aria-labelledby="status"><h2 id="status">Foundation in progress</h2>
       <p>All quotes, payments and university records in this project are simulated.
         Sign in to plan tuition, request approval and track simulated payments.</p>

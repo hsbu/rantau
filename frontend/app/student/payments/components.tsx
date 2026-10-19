@@ -61,7 +61,7 @@ export function IntentSummary({ intent, lang }: { intent: Schema["PaymentIntentV
     <Stat label={ui.receives[lang]} value={money(intent.destination_currency, intent.destination_amount_minor)} />
     <Stat label={ui.payee[lang]} value={intent.beneficiary_label} />
     <Stat label={ui.expires[lang]} value={dateTime(intent.quote_expiry)} />
-    <Stat label="" value={intent.funded_by_requester ? ui.fundedByYou[lang] : ui.fundedByOwner[lang]} />
+    <Stat label={lang === "id" ? "Sumber dana" : "Funding source"} value={intent.funded_by_requester ? ui.fundedByYou[lang] : ui.fundedByOwner[lang]} />
   </div>;
 }
 

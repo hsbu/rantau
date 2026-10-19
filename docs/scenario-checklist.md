@@ -253,7 +253,7 @@ uv run pytest tests/finance/test_agent_approval.py::test_agent_requests_actual_s
 
 ### TC-04 — Student-owned funding
 
-- [ ] Final acceptance evidence captured. **Owner:** A/B/C. **Result:** NOT RUN.
+- [ ] Final acceptance evidence captured. **Owner:** A/B/C. **Result:** C-lane PASS 2026-10-19 (real browser student/sponsor/admin on Docker + SQL before/after; simulated; evidence `.generated/acceptance/TC-04/`). Actual-model Chat evidence and non-author review pending.
 
 **Setup:** reset `tuition_happy_path`. **Required path:** authenticated HTTP/SQL;
 Chat can prepare the request, but do not assume a student-owner approval UI exists.
@@ -301,7 +301,7 @@ uv run pytest tests/approvals/test_finance_integration.py::test_real_allowance_m
 
 ### TC-06 — Duplicate requests and concurrent retries
 
-- [ ] Final acceptance evidence captured. **Owner:** A/B/C. **Result:** NOT RUN.
+- [ ] Final acceptance evidence captured. **Owner:** A/B/C. **Result:** C-lane PASS 2026-10-19 (real browser student/sponsor/admin on Docker + SQL before/after; simulated; evidence `.generated/acceptance/TC-06/`). Actual-model Chat evidence and non-author review pending.
 
 **Setup:** reset `tuition_happy_path`; complete one approved sponsor payment.
 
@@ -322,7 +322,7 @@ uv run pytest tests/finance/test_agent_approval.py::test_concurrent_confirmation
 
 ### TC-07 — Provider timeout after acceptance
 
-- [ ] Final acceptance evidence captured. **Owner:** A/C. **Result:** NOT RUN.
+- [ ] Final acceptance evidence captured. **Owner:** A/C. **Result:** C-lane PASS 2026-10-19 (real browser student/sponsor/admin on Docker + SQL before/after; simulated; evidence `.generated/acceptance/TC-07/`). Actual-model Chat evidence and non-author review pending.
 
 **Setup:** reset `provider_timeout`.
 
@@ -343,7 +343,7 @@ uv run pytest tests/finance/test_agent_approval.py::test_provider_unknown_is_pol
 
 ### TC-08 — Missing-reference recovery, the hero scenario
 
-- [ ] Final acceptance evidence captured. **Owner:** A/C, with B approval evidence. **Result:** NOT RUN.
+- [ ] Final acceptance evidence captured. **Owner:** A/C, with B approval evidence. **Result:** C-lane PASS 2026-10-19 (real browser student/sponsor/admin on Docker + SQL before/after; simulated; evidence `.generated/acceptance/TC-08/`). Actual-model Chat evidence and non-author review pending.
 
 **Setup:** reset `tuition_missing_reference`.
 
@@ -370,7 +370,7 @@ uv run pytest tests/finance/test_agent_recovery_security.py::test_agent_submits_
 
 ### TC-09 — Delivered, awaiting university posting
 
-- [ ] Final acceptance evidence captured. **Owner:** A/C. **Result:** NOT RUN.
+- [ ] Final acceptance evidence captured. **Owner:** A/C. **Result:** C-lane PASS 2026-10-19 (real browser student/sponsor/admin on Docker + SQL before/after; simulated; evidence `.generated/acceptance/TC-09/`). Actual-model Chat evidence and non-author review pending.
 
 **Setup:** reset `delayed_posting`.
 
@@ -391,7 +391,7 @@ uv run pytest tests/finance/test_university.py tests/finance/test_agent_recovery
 
 ### TC-10 — Exact shortfall and policy-gated next action
 
-- [ ] Final acceptance evidence captured. **Owner:** A/B/C. **Result:** NOT RUN.
+- [ ] Final acceptance evidence captured. **Owner:** A/B/C. **Result:** C-lane PASS 2026-10-19 (real browser student/sponsor/admin on Docker + SQL before/after; simulated; evidence `.generated/acceptance/TC-10-topup-off, TC-10-topup-on/`). Actual-model Chat evidence and non-author review pending.
 
 **Setup:** run `shortfall_topup_off` and `shortfall_topup_on` independently, saving
 evidence before each reset.
@@ -686,7 +686,7 @@ npm --prefix frontend run test:e2e -- tests/sponsor-language.spec.ts
 
 ### UX-04 — Provider unavailable
 
-- [ ] Final acceptance evidence captured. **Owner:** A/C. **Result:** NOT RUN.
+- [ ] Final acceptance evidence captured. **Owner:** A/C. **Result:** C-lane PASS 2026-10-19 (real browser student/sponsor/admin on Docker + SQL before/after; simulated; evidence `.generated/acceptance/UX-04/`). Actual-model Chat evidence and non-author review pending.
 
 **Setup:** reset `provider_unavailable`.
 

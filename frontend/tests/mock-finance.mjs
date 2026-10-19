@@ -22,10 +22,10 @@ const partial = (topup) => ({
 });
 const options = {
   obligation_id: "obl_2026_demo_01", beneficiary_id: "benef_uni_cn_01",
-  beneficiary_label: "Fictional university •••• DEMO",
+  beneficiary_label: "Fictional university â€¢â€¢â€¢â€¢ DEMO",
   accounts: [
-    { id: "acct_idr_01", label: "•••• dr_01", funded_by_requester: false },
-    { id: "acct_idr_stu_01", label: "•••• u_01", funded_by_requester: true },
+    { id: "acct_idr_01", label: "â€¢â€¢â€¢â€¢ dr_01", funded_by_requester: false },
+    { id: "acct_idr_stu_01", label: "â€¢â€¢â€¢â€¢ u_01", funded_by_requester: true },
   ],
 };
 const created = { id: "intent_new", terms_hash: "hash", tier: "T2", state: "AWAITING_APPROVAL",
@@ -34,7 +34,7 @@ const intent = (state) => ({
   id: "intent_001", purpose: "TUITION", state, tier: "T2", obligation_id: "obl_2026_demo_01",
   source_currency: "IDR", destination_currency: "CNY", source_total_minor: 46025000,
   destination_amount_minor: 2000000, quote_id: "quote_001", quote_expiry: "2026-10-17T10:00:00Z",
-  terms_hash: "hash", beneficiary_label: "Fictional university •••• DEMO", funded_by_requester: false,
+  terms_hash: "hash", beneficiary_label: "Fictional university â€¢â€¢â€¢â€¢ DEMO", funded_by_requester: false,
   hold_reason: state === "ON_HOLD" ? "UNKNOWN_BENEFICIARY" : null,
 });
 const trail = (resource) => [
@@ -70,10 +70,11 @@ createServer(async (request, response) => {
   }
   if (url.startsWith("/api/v1/demo/")) {
     if (!admin) { response.statusCode = 404; return response.end(JSON.stringify({ detail: "Resource unavailable" })); }
+    if ((request.headers.cookie ?? "").includes("variant=unavailable")) { response.statusCode = 503; return response.end("{}"); }
     if (url === "/api/v1/demo/scenarios") return response.end(JSON.stringify([{ id: "tuition_happy_path", description: "Happy path" }]));
     if (url === "/api/v1/demo/state") return response.end(JSON.stringify({ scenario_id: "tuition_missing_reference", run_no: 7, simulated: true }));
     if (url === "/api/v1/demo/audit") return response.end(JSON.stringify([{
-      audit_event_id: "audit_9", run_no: 1, action: "PAYMENT_DEBITED", resource_id: "transfer_001",
+      audit_event_id: "audit_9", run_no: 7, action: "PAYMENT_DEBITED", resource_id: "transfer_001",
       decision: "ALLOW", reason_code: null, created_at: "2026-10-17T09:00:00Z",
     }]));
     response.statusCode = url.endsWith("/reset") ? 200 : 204;
@@ -81,6 +82,8 @@ createServer(async (request, response) => {
   }
   if (!signedIn) { response.statusCode = 401; return response.end("{}"); }
   const cookie = request.headers.cookie ?? "";
+  if (cookie.includes("variant=unavailable")) { response.statusCode = 503; return response.end("{}"); }
+  if (cookie.includes("variant=empty") && ["/api/v1/tuition/obligations", "/api/v1/payment-intents", "/api/v1/documents"].includes(url)) return response.end("[]");
   const own = cookie.includes("variant=ownpending");
   const pending = own || cookie.includes("variant=pending") ? "AWAITING_APPROVAL"
     : cookie.includes("variant=authorized") ? "AUTHORIZED"
@@ -104,7 +107,7 @@ createServer(async (request, response) => {
   if (url === "/api/v1/student/approvals") return response.end(JSON.stringify(own ? [{
     approval_id: "approval_own", intent_id: "intent_001", intent_revision: 1, terms_hash: "a".repeat(64),
     state: "PENDING", expires_at: "2030-10-20T09:00:00Z", purpose: "TUITION",
-    source_label: "Your IDR account •••• 0001", beneficiary_label: "Fictional university •••• DEMO",
+    source_label: "Your IDR account â€¢â€¢â€¢â€¢ 0001", beneficiary_label: "Fictional university â€¢â€¢â€¢â€¢ DEMO",
     source_principal_minor: 46000000, fee_minor: 25000, source_total_minor: 46025000,
     destination_amount_minor: 2000000, source_currency: "IDR", destination_currency: "CNY", simulated: true,
   }] : []));

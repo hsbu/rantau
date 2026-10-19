@@ -340,9 +340,30 @@ and confirmation can use Bahasa Indonesia; sponsor dates explicitly use China ti
    approval decisions. Students sign in at `/student/sign-in`; administrator access is
    provided separately by the environment administrator. No dedicated administrator
    sign-in page is available.
-4. With Docker running, the same setup commands can be run through
-   `docker compose run --rm backend uv run --no-sync python -m backend.demo.reset --migrate`
-   (not verified on this machine).
+4. Docker clean start (verified 2026-10-19 from an empty database; the stack was removed
+   afterwards). Set distinct local passwords first (12–128 characters, never committed):
+
+   ```powershell
+   $env:AUTH_ENABLED = "true"
+   $env:AUTH_DEMO_STUDENT_PASSWORD = "<student-password>"
+   $env:AUTH_DEMO_SPONSOR_PASSWORD = "<different-sponsor-password>"
+   $env:AUTH_DEMO_ADMIN_PASSWORD = "<different-admin-password>"
+   docker compose build
+   docker compose up -d db
+   docker compose run --rm backend uv run --no-sync python -m backend.authz.bootstrap --migrate --seed
+   docker compose run --rm backend uv run --no-sync python -m backend.authz.bootstrap --seed-admin
+   docker compose run --rm backend uv run --no-sync python -m backend.demo.reset --migrate --scenario tuition_happy_path
+   docker compose up -d
+   ```
+
+   Open `http://127.0.0.1:3000/student/sign-in` (student), `/sponsor` (sponsor and, with the
+   admin credentials, the administrator, then `/demo`). `/ready` stays `not_ready` without an
+   OpenRouter key because `domain_services`/`classifier_configuration` need the model; the
+   Payments and Demo pages do not. If host ports 3000, 8000 or 5432 are taken, publish other
+   ports in an override file and set `AUTH_TRUSTED_ORIGIN` to the new frontend origin
+   (state-changing requests must match it exactly). Remove everything with
+   `docker compose down -v`. Repeated sign-ins from one address are throttled (HTTP 429);
+   wait before retrying rather than clearing tables outside a disposable database.
 
 `/ready` reports `finance_storage` separately; `domain_services` remains false during
 the staged agent financial-workflow integration. Read-only Chat handles its own

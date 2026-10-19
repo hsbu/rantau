@@ -10,8 +10,8 @@ const viewports = [
 
 async function fitsPage(page: Page) {
   expect(await page.evaluate(() => ({
-    viewport: innerWidth, content: document.documentElement.scrollWidth,
-  }))).toEqual({ viewport: page.viewportSize()!.width, content: page.viewportSize()!.width });
+    viewport: innerWidth, fits: document.documentElement.scrollWidth <= document.body.clientWidth,
+  }))).toEqual({ viewport: page.viewportSize()!.width, fits: true });
 }
 
 for (const path of ["/", "/student/sign-in", "/student/chat", "/student/chat/preview", "/sponsor", "/student/payments", "/demo"]) {

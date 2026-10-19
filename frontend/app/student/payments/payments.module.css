@@ -1,14 +1,13 @@
-.page { width: min(920px, 100%); margin: auto; padding: 32px max(20px, env(safe-area-inset-right)) max(40px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; overflow-wrap: anywhere; }
+.page { width: min(1120px, 100%); margin: auto; padding: 48px max(32px, env(safe-area-inset-right)) max(64px, env(safe-area-inset-bottom)) max(32px, env(safe-area-inset-left)); display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; overflow-wrap: anywhere; }
 .page > *, .card > * { min-width: 0; }
-.page h1 { margin: 12px 0; font-size: clamp(2rem, 5vw, 3.25rem); }
 .page :is(button, input, select, textarea) { font: inherit; }
 .page :is(button, a, input, select, textarea, [tabindex]):focus-visible { outline: 2px solid #315b49; outline-offset: 3px; }
 .banner { border: 1px solid #bac8bf; background: #eef2ea; padding: 8px 12px; font-size: .85rem; border-radius: 8px; }
-.card { min-width: 0; max-width: none; margin: 0; background: #fff; border: 1px solid #d3ddd5; border-radius: 12px; padding: 18px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.card { min-width: 0; max-width: none; margin: 0; background: #fff; border: 1px solid #d3ddd5; border-radius: 14px; padding: 24px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .card section { margin: 0; padding-top: 16px; border-top: 1px solid #d3ddd5; }
 .card pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .875rem; line-height: 1.6; }
-.card h2 { margin: 0; font-size: 1.1rem; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); gap: 10px; }
+.card h2 { margin: 0; font-size: 22px; font-weight: 500; letter-spacing: -.025em; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 24px; }
 .stat { display: grid; gap: 2px; }
 .stat span { font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: #5a756e; }
 .stat strong { font-size: 1.05rem; }
@@ -17,6 +16,7 @@
 .done { background: #e3f1e6; border-color: #8ab79a; }
 .current { background: #fff4d6; border-color: #d4b25a; }
 .problem { background: #fde4e1; border-color: #d98a80; }
+.nextActor { margin: 12px 0; font-size: .95rem; }
 .notice { border-left: 4px solid #b8860b; background: #fff8e6; padding: 10px 12px; font-size: .9rem; }
 .tableScroll { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; border-radius: 4px; }
 .table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: .9rem; overflow-wrap: normal; font-variant-numeric: tabular-nums; }
@@ -30,8 +30,26 @@
 .form select, .form input, .form textarea { min-width: 0; max-width: 100%; min-height: 44px; padding: 7px 8px; border: 1px solid #bac8bf; border-radius: 8px; background: white; color: var(--color-ink); }
 .form label :is(input, select, textarea) { width: 100%; }
 .form textarea { min-height: 100px; resize: vertical; }
-.lang { font-size: .85rem; }
 .routes { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
 .routes li { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .routes button { min-height: 44px; max-width: 100%; border: 1px solid var(--color-accent); background: var(--color-accent); color: #fff; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
 .routes button:disabled { opacity: .6; cursor: progress; }
+
+.controlGroup { min-width: 0; margin: 0; padding: 24px; border: 1px solid var(--color-line); border-radius: 14px; background: var(--color-surface); }
+.controlGroup legend { padding: 0 8px; color: var(--color-ink); font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+.controlCopy { margin: 0 0 20px; color: var(--color-muted); font-size: 13px; line-height: 1.7; }
+.controlGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.documentFields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.documentFields label { display: grid; gap: 8px; font-size: 13px; min-width: 0; }
+.documentFields label:last-of-type { grid-column: 1 / -1; }
+.documentFields input, .documentFields select, .documentFields textarea { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--color-control-border); border-radius: 8px; background: var(--color-surface); }
+.documentFields textarea { min-height: 120px; resize: vertical; }
+.controlActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+@media (max-width: 760px) {
+  .page { padding: 28px 20px 40px; gap: 24px; }
+  .controlGrid, .documentFields { grid-template-columns: minmax(0, 1fr); }
+  .card, .controlGroup { padding: 20px; }
+}
+
+.controls { display: grid; gap: 24px; }
+@media (max-width: 600px) { .grid { grid-template-columns: minmax(0, 1fr); } }

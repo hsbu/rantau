@@ -1,4 +1,4 @@
-import { upstream } from "../../finance-api";
+import { relayResponse, upstream } from "../../finance-api";
 
 const headers = { "Cache-Control": "no-store" };
 const failure = (status: number) => Response.json({ error: "Finance service unavailable" }, { status, headers });
@@ -74,9 +74,7 @@ export async function POST(request: Request, context: { params: Promise<{ action
     },
     body: next.payload ? JSON.stringify(next.payload) : undefined,
   });
-  const relay = async (response: Response) => new Response(await response.text(), {
-    status: response.status, headers: { ...headers, "Content-Type": "application/json" },
-  });
+  const relay = (response: Response) => relayResponse(response, headers);
   try {
     const first = await send(target);
     const followUp = first.ok && target.after ? target.after(await first.clone().json().catch(() => null)) : null;

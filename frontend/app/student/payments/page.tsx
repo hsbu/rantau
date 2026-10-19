@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { PageHeading, PageLanguage, WorkspaceState } from "../../components/workspace-page";
+import pageStyles from "../../components/workspace-page.module.css";
+import uiStyles from "../../components/ui.module.css";
 import { StudentHeader } from "../../components/workspace-header";
 import { dateTime, money } from "../chat/chat-types";
 import {
@@ -12,7 +15,7 @@ import { RouteChoices } from "./route-choices";
 import { type Schema, financeGet } from "./finance-api";
 import styles from "./payments.module.css";
 import { caseStateLabels, paymentStateLabels, pickLang, safeNextStep, tuitionStateLabels, ui } from "./status-labels";
-import { trustSteps } from "./trust";
+import { nextActor, trustSteps } from "./trust";
 
 export const metadata = { title: "Payments | Rantau" };
 export const dynamic = "force-dynamic";
@@ -28,22 +31,32 @@ export default async function StudentPayments({ searchParams }: Props) {
     financeGet<Schema["UntrustedDocument"][]>("/api/v1/documents"),
   ]);
   const pending = intents.ok ? intents.data.filter(item => PENDING.includes(item.state)) : [];
-  return <main id="main-content" tabIndex={-1} lang={lang} className={styles.page}>
-    <StudentHeader payments lang={lang} />
+  return <><StudentHeader payments lang={lang} /><main id="main-content" tabIndex={-1} lang={lang} className={styles.page}>
+    <PageHeading eyebrow={lang === "id" ? "Ruang mahasiswa" : "Student workspace"} title={ui.title[lang]}
+      description={lang === "id" ? "Tinjau tagihan, ikuti pembayaran, dan periksa pencatatan universitas." : "Review what’s due, follow your payments and check university posting."}>
+      <PageLanguage lang={lang} />
+    </PageHeading>
     <SimulatedBanner lang={lang} />
-    <h1>{ui.title[lang]}</h1>
-    <p className={styles.lang}>
-      <Link href="?lang=en">English</Link> · <Link href="?lang=id">Bahasa Indonesia</Link>
-    </p>
-    {!list.ok && <p className={styles.notice} role="alert">
-      {list.reason === "signin" ? ui.signIn[lang] : ui.unavailable[lang]}
-      {list.reason === "signin" && <> <Link href="/student/sign-in?next=payments">{lang === "id" ? "Masuk sebagai mahasiswa →" : "Student sign-in →"}</Link></>}
-    </p>}
-    {list.ok && list.data.length === 0 && <p>{ui.none[lang]}</p>}
+    {!list.ok && <WorkspaceState label="Payment access" title={lang === "id"
+      ? list.reason === "signin" ? "Pembayaran Anda, dalam satu tempat." : "Rincian pembayaran belum tersedia."
+      : list.reason === "signin" ? "Your payments, in one place." : "Payment details are unavailable."}>
+      <p role={list.reason === "signin" ? undefined : "alert"}>{list.reason === "signin" ? ui.signIn[lang] : ui.unavailable[lang]}</p>
+      {list.reason === "signin" && <p>{lang === "id" ? "Gunakan akun mahasiswa untuk meninjau tagihan dan permintaan pembayaran Anda dengan aman." : "Use your student account to securely review your tuition and payment requests."}</p>}
+      <div className={pageStyles.stateActions}>
+        <Link className={uiStyles.button} href={list.reason === "signin" ? "/student/sign-in?next=payments" : `?lang=${lang}`}>
+          {list.reason === "signin" ? lang === "id" ? "Masuk sebagai mahasiswa →" : "Student sign-in →" : lang === "id" ? "Perbarui status" : "Refresh status"}
+        </Link>
+        <Link className={`${uiStyles.button} ${uiStyles.secondary}`} href="/student/chat">{lang === "id" ? "Buka Chat" : "Open Chat"}</Link>
+      </div>
+    </WorkspaceState>}
+    {list.ok && list.data.length === 0 && <WorkspaceState label="Payment access" title={lang === "id" ? "Belum ada tagihan untuk ditinjau." : "No tuition to review yet."}>
+      <p>{ui.none[lang]}</p><p>{lang === "id" ? "Periksa kembali nanti atau gunakan Chat untuk memahami langkah berikutnya." : "Check back later or use Chat to understand your next step."}</p>
+      <div className={pageStyles.stateActions}><Link className={uiStyles.button} href="/student/chat">{lang === "id" ? "Buka Chat" : "Open Chat"}</Link></div>
+    </WorkspaceState>}
     {list.ok && await Promise.all(list.data.map(item => <ObligationCard key={item.id} item={item} lang={lang}
       pending={pending.find(intent => intent.obligation_id === item.id)} />))}
     {documents.ok && documents.data.length > 0 && <UntrustedDocuments documents={documents.data} lang={lang} />}
-  </main>;
+  </main></>;
 }
 
 async function ObligationCard(
@@ -78,6 +91,9 @@ async function ObligationCard(
       {item.posting_deadline_at && <Stat label={ui.deadline[lang]} value={dateTime(item.posting_deadline_at)} />}
     </div>
     <TrustTimeline steps={trustSteps(item, pending)} lang={lang} />
+    <p className={styles.nextActor} data-next={nextActor(item, pending)}>
+      <strong>{ui.next[lang]}:</strong> {ui.nextActor[nextActor(item, pending)][lang]}
+    </p>
     {pending && <section aria-label="pending payment">
       <h3>{ownPending ? (lang === "id" ? "Menunggu persetujuan Anda" : "Waiting for your approval") : paymentStateLabels[pending.state][lang]}</h3>
       <IntentSummary intent={pending} lang={lang} />
