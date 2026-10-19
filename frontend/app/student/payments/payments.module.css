@@ -1,8 +1,14 @@
-.page { width: min(920px, 100%); margin: auto; padding: 32px 20px 64px; display: grid; gap: 20px; }
+.page { width: min(920px, 100%); margin: auto; padding: 32px max(20px, env(safe-area-inset-right)) max(40px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; overflow-wrap: anywhere; }
+.page > *, .card > * { min-width: 0; }
+.page h1 { margin: 12px 0; font-size: clamp(2rem, 5vw, 3.25rem); }
+.page :is(button, input, select, textarea) { font: inherit; }
+.page :is(button, a, input, select, textarea, [tabindex]):focus-visible { outline: 2px solid #315b49; outline-offset: 3px; }
 .banner { border: 1px solid #bac8bf; background: #eef2ea; padding: 8px 12px; font-size: .85rem; border-radius: 8px; }
-.card { background: #fff; border: 1px solid #d3ddd5; border-radius: 12px; padding: 18px; display: grid; gap: 14px; }
+.card { min-width: 0; max-width: none; margin: 0; background: #fff; border: 1px solid #d3ddd5; border-radius: 12px; padding: 18px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.card section { margin: 0; padding-top: 16px; border-top: 1px solid #d3ddd5; }
+.card pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .875rem; line-height: 1.6; }
 .card h2 { margin: 0; font-size: 1.1rem; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); gap: 10px; }
 .stat { display: grid; gap: 2px; }
 .stat span { font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: #5a756e; }
 .stat strong { font-size: 1.05rem; }
@@ -12,15 +18,20 @@
 .current { background: #fff4d6; border-color: #d4b25a; }
 .problem { background: #fde4e1; border-color: #d98a80; }
 .notice { border-left: 4px solid #b8860b; background: #fff8e6; padding: 10px 12px; font-size: .9rem; }
-.table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.tableScroll { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; border-radius: 4px; }
+.table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: .9rem; overflow-wrap: normal; font-variant-numeric: tabular-nums; }
 .table th, .table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #e7ede9; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.actions button, .form button { border: 1px solid #2f5d54; background: #2f5d54; color: #fff; padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+.actions button, .form button { min-height: 44px; max-width: 100%; border: 1px solid var(--color-accent); background: var(--color-accent); color: #fff; padding: 8px 14px; border-radius: 8px; cursor: pointer; }
 .actions button:disabled, .form button:disabled { opacity: .6; cursor: progress; }
+.actions button:not(:disabled):hover, .form button:not(:disabled):hover, .routes button:not(:disabled):hover { background: var(--color-accent-hover); }
 .form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
-.form select, .form input { padding: 7px 8px; border: 1px solid #bac8bf; border-radius: 8px; }
+.form label { display: grid; gap: 6px; min-width: 0; max-width: 100%; flex: 1 1 180px; }
+.form select, .form input, .form textarea { min-width: 0; max-width: 100%; min-height: 44px; padding: 7px 8px; border: 1px solid #bac8bf; border-radius: 8px; background: white; color: var(--color-ink); }
+.form label :is(input, select, textarea) { width: 100%; }
+.form textarea { min-height: 100px; resize: vertical; }
 .lang { font-size: .85rem; }
 .routes { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
 .routes li { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-.routes button { border: 1px solid #2f5d54; background: #2f5d54; color: #fff; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.routes button { min-height: 44px; max-width: 100%; border: 1px solid var(--color-accent); background: var(--color-accent); color: #fff; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
 .routes button:disabled { opacity: .6; cursor: progress; }

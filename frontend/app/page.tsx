@@ -1,5 +1,6 @@
 import type { components } from "../lib/api-contracts/generated";
 import Link from "next/link";
+import { WorkspaceHeader } from "./components/workspace-header";
 
 // Compile-time consumer of the shared Python contract, not a hand-copied enum.
 const intents: components["schemas"]["Intent"][] = [
@@ -7,7 +8,9 @@ const intents: components["schemas"]["Intent"][] = [
 ];
 
 export default function Home() {
-  return <main>
+  return <><div className="homeHeader"><WorkspaceHeader label="Workspaces" links={[
+    { href: "/student/sign-in", label: "Student workspace" }, { href: "/sponsor", label: "Sponsor workspace" },
+  ]} /></div><main id="main-content" tabIndex={-1} className="home">
     <p className="eyebrow">Rantau / Development preview</p>
     <h1>A clearer path<br />from home to campus.</h1>
     <p className="description">A financial agent for students abroad and the people supporting them.</p>
@@ -18,5 +21,5 @@ export default function Home() {
       <p>Scenarios use scripted responses and never request payment actions.</p>
       <ul>{intents.map(intent => <li key={intent}>{intent.replaceAll("_", " ").toLowerCase()}</li>)}</ul>
     </section>
-  </main>;
+  </main></>;
 }

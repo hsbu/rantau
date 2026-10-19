@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Brand } from "../../components/workspace-header";
 import { useEffect, useRef, useState } from "react";
 import { ActionPanel } from "./action-panel";
 import { ChatError, visibleText } from "./chat-types";
@@ -93,7 +94,7 @@ export function ChatWorkspace({ transport = connectedTransport, preview = false,
   const promptIndex = Math.min(messages.filter(message => message.role === "user").length, prompts.length - 1);
   return <div className={styles.workspace}>
     <header className={styles.nav}>
-      <Link href="/" className={styles.wordmark}>rantau<span aria-hidden="true">↗</span></Link>
+      <Brand />
       <nav className={styles.viewTabs} aria-label="Chat views">
         <Link href="/student/chat" className={styles.viewTab} aria-current={!preview ? "page" : undefined}>Chat</Link>
         <Link href="/student/chat/preview" className={styles.viewTab} aria-current={preview ? "page" : undefined}>Scenarios</Link>
@@ -107,12 +108,13 @@ export function ChatWorkspace({ transport = connectedTransport, preview = false,
       : <>Sandbox · No real funds move in this workspace.</>}
     </div>
     {children}
-    <main className={styles.main}>
+    <main id="main-content" tabIndex={-1} className={styles.main}>
       <div className={styles.conversation}>
         <header className={styles.chatHeader}>
           <div><p className={styles.kicker}>A LITTLE CLOSER TO HOME</p><h1>Let’s work through it.</h1><p>Tuition, transfers and the steps in between.</p></div>
           <button type="button" className={styles.newChat} onClick={reset}>New chat <span aria-hidden="true">＋</span></button>
         </header>
+        <a className={styles.detailsLink} href="#payment-details">View payment details</a>
         <div ref={transcript} className={styles.messages} role="log" aria-label="Conversation" aria-live="polite" aria-busy={busy} tabIndex={0}
           onScroll={event => {
             const log = event.currentTarget;

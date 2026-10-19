@@ -71,7 +71,7 @@ test("a pending request shows the waiting-for-sponsor state with exact terms and
   await expect(page.getByText("Waiting for the funding owner's approval of these exact terms.")).toBeVisible();
   await expect(page.getByText("IDR 46,025,000").first()).toBeVisible();
   await expect(page.getByText("Fictional university")).toBeVisible();
-  await expect(page.getByText("mock_remit_a").first()).toBeVisible();
+  await expect(page.getByText("Simulated route A").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue the approved payment" })).toHaveCount(0);
 });
 
@@ -79,6 +79,7 @@ test("cancelling relays to the fixed cancel path", async ({ context, page, reque
   await context.addCookies([{ name: "variant", value: "pending", url: origin }]);
   await page.goto("/student/payments");
   await page.getByRole("button", { name: "Cancel this payment request" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Confirm cancellation", exact: true }).click();
   await expect.poll(async () => (await (await request.get(`${MOCK}/__calls`)).json())
     .some((call: { url: string }) => call.url === "/api/v1/payment-intents/intent_001/cancel")).toBe(true);
 });
