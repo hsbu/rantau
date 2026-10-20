@@ -48,13 +48,13 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
   const current = await financeGet<Schema["DemoState"]>("/api/v1/demo/state");
   return <><WorkspaceHeader label="Demo workspace" links={[{ href: "/", label: "Home" }, { href: "/student/chat", label: "Student workspace" }]} /><main id="main-content" tabIndex={-1} lang={lang} className={styles.page}>
     <PageHeading eyebrow={lang === "id" ? "Ruang administrator" : "Administrator workspace"} title="Demo"
-      description={lang === "id" ? "Siapkan skenario, atur waktu simulasi, dan tinjau jejak audit sesi ini." : "Prepare a scenario, control simulated time and review the current runÃ¢â‚¬â„¢s audit trail."} />
+      description={lang === "id" ? "Siapkan skenario, atur waktu simulasi, dan tinjau jejak audit sesi ini." : "Prepare a scenario, control simulated time and review the current run's audit trail."} />
     <SimulatedBanner lang={lang} />
     <p className={styles.notice}>{controlsNote[lang]}</p>
     <section className={styles.card} aria-label="Active scenario">
       <h2>Active scenario</h2>
       {current.ok ? <p data-run={current.data.run_no}>{current.data.scenario_id
-        ? <><strong>{current.data.scenario_id}</strong> Ã‚Â· Run {current.data.run_no}</>
+        ? <><strong>{current.data.scenario_id}</strong> {"\u00b7"} Run {current.data.run_no}</>
         : "No scenario has been initialized."}</p>
         : <p role="alert">Current scenario state is unavailable. Refresh before operating controls.</p>}
       <p>This is the observed sandbox run. The selector below chooses the next reset.</p>
