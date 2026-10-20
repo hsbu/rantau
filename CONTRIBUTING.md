@@ -52,6 +52,14 @@ implementation completion; review and merge remain separate explicit states.
 Do not create a separate Markdown plan, report or progress log for each task.
 Follow `AGENTS.md` section 7 for the complete workflow and file-creation limits.
 
+Keep the documentation focused: `README.md` is the setup and usage guide;
+[the product specification](docs/product-spec.md) defines approved scope;
+[the roadmap](docs/roadmap.md) and [scenario checklist](docs/scenario-checklist.md)
+define implementation and acceptance work. Keep dated execution notes in the three
+existing progress files. Consolidate superseded task plans there instead of adding
+more design/session reports. Generated evidence stays in ignored `.generated/`;
+do not delete another contributor's local evidence or database during cleanup.
+
 ## 2. Ownership and change coordination
 
 | Area | Default owner |

@@ -1,7 +1,7 @@
 # Dev B progress
 
 Owner: Identity, authorization, approvals, fraud and sponsor UI. Updated: 2026-10-18.
-Scope and acceptance: [MVP](../../Rantau-MVP-Spec.md) and [roadmap](../../Rantau-3Dev-Roadmap.md).
+Scope and acceptance: [MVP](../product-spec.md) and [roadmap](../roadmap.md).
 Workflow: [AGENTS.md section 7](../../AGENTS.md#7-mandatory-progress-workflow-and-documentation-limits).
 Shared kickoff evidence: [S-01/S-02 under Dev A](progress-a.md).
 
@@ -147,7 +147,7 @@ This file holds the approved design, execution plan and evidence; no separate sk
 
 ## B-04 inline implementation plan
 
-Design: [B-04 Sponsor Approval Dashboard](../superpowers/specs/2026-10-17-sponsor-approval-dashboard-design.md). Keep this execution plan in the owner progress file under AGENTS.md's documentation limit.
+The approved 2026-10-17 design is consolidated here. Its separate, superseded design file was removed during the requester-authorized documentation cleanup on 2026-10-20. This record retains the interface, security constraints and historical validation; current setup and workspace entry points are in the [README](../../README.md).
 
 **Goal:** deliver a sponsor-only same-origin sign-in and approval page that shows exact B-03 terms and records owner decisions without claiming payment execution.
 

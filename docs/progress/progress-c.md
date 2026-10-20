@@ -1,7 +1,7 @@
 # Dev C progress
 
 Owner: Financial provider/university simulator, ledger, reconciliation, seeds and status/demo UI. Updated: 2026-10-18 (integration/gap status only; owner task evidence remains dated).
-Scope and acceptance: [MVP](../../Rantau-MVP-Spec.md) and [roadmap](../../Rantau-3Dev-Roadmap.md).
+Scope and acceptance: [MVP](../product-spec.md) and [roadmap](../roadmap.md).
 Workflow: [AGENTS.md section 7](../../AGENTS.md#7-mandatory-progress-workflow-and-documentation-limits).
 Shared kickoff evidence: [S-01/S-02 under Dev A](progress-a.md).
 

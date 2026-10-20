@@ -3,12 +3,12 @@
 > **Version:** 1.1 — 19 October 2026; original implementation plan retained, scenario/UX refinement added in section 12.
 > **Deadline:** 20 October 2026, 23:59 Beijing time = **22:59 WIB**  
 > **Team:** 3 developers, full time until deadline  
-> **Source of truth:** `Rantau-MVP-Spec.md` (product scope and detailed domain semantics).  
+> **Source of truth:** `docs/product-spec.md` (product scope and detailed domain semantics).
 > **Name:** Rantau (confirmed by the team).  
 > **Geography:** Indonesia → mainland China primary simulation; Southeast Asia → China architecture extensible.  
 > **Non-negotiable:** All payments, university records, quotes, policies, and identities in the demo are **synthetic**. No claimed access to live bank or Chinese university APIs.
 
-**How to use this roadmap:** Sections 1–11 are Phase 1 (implementation); section 12 is Phase 2 (scenario acceptance, UX refinement and submission). After completing your Phase 1 implementation responsibilities and available checks, continue with your Phase 2 tickets without waiting for every other owner. Carry unresolved prerequisites into your progress file; do not declare the whole earlier phase complete or waive acceptance gaps. Once all Phase 1 items are complete, Phase 2 is the default next work. See [AGENTS.md section 8](AGENTS.md#8-roadmap-progression-and-scenario-refinement).
+**How to use this roadmap:** Sections 1–11 are Phase 1 (implementation); section 12 is Phase 2 (scenario acceptance, UX refinement and submission). After completing your Phase 1 implementation responsibilities and available checks, continue with your Phase 2 tickets without waiting for every other owner. Carry unresolved prerequisites into your progress file; do not declare the whole earlier phase complete or waive acceptance gaps. Once all Phase 1 items are complete, Phase 2 is the default next work. See [AGENTS.md section 8](../AGENTS.md#8-roadmap-progression-and-scenario-refinement).
 
 ## 1. Delivery objective
 
@@ -237,7 +237,7 @@ flowchart TD
 
 ---
 
-*Source basis:* The approved `Rantau-MVP-Spec.md` (v1.0); excludes real remittance provider integrations and real Chinese university API access. Estimates and milestone dates are execution recommendations, not claims from external sources.
+*Source basis:* The approved `docs/product-spec.md` (v1.0); excludes real remittance provider integrations and real Chinese university API access. Estimates and milestone dates are execution recommendations, not claims from external sources.
 
 ## 12. Phase 2 — Scenario acceptance, UX refinement and submission
 
@@ -245,7 +245,7 @@ flowchart TD
 
 Turn the implemented MVP into a smooth, independently replayable experience with evidence for all **24 specification scenarios**, three additional Chat checks and deliverables **04–06**. Refine the current interface; the separate Paper redesign is paused.
 
-This is a three-owner compound work plan, authorized on **19 October 2026**. Baseline: main `69950e5` (PR #32). Existing merged code and historical tests are starting evidence, not final acceptance. The [scenario checklist](docs/scenario-checklist.md) contains the executable steps and currently unchecked final acceptance records. UX-02 explicitly has limited free-form editing; discovering or fixing missing acceptance behavior is part of this phase.
+This is a three-owner compound work plan, authorized on **19 October 2026**. Baseline: main `69950e5` (PR #32). Existing merged code and historical tests are starting evidence, not final acceptance. The [scenario checklist](scenario-checklist.md) contains the executable steps and currently unchecked final acceptance records. UX-02 explicitly has limited free-form editing; discovering or fixing missing acceptance behavior is part of this phase.
 
 **In scope:** scenario-specific fixes, natural concise replies, essential clarification, accurate financial states, clear next actions, English student/Bahasa Indonesia sponsor summaries, responsive/accessible interactions, reproducible resets and redacted evidence. Each ticket includes its own checks and documentation.
 
@@ -254,9 +254,9 @@ This is a three-owner compound work plan, authorized on **19 October 2026**. Bas
 **Working surfaces** (existing files/directories; modify only when the ticket needs it):
 
 ```text
-Rantau-3Dev-Roadmap.md          [MODIFIED] Phase 1 retained; Phase 2 scope/acceptance
+docs/roadmap.md                [MODIFIED] Phase 1 retained; Phase 2 scope/acceptance
 AGENTS.md                      [MODIFIED] Progression and execution workflow
-Rantau-MVP-Spec.md              [UNCHANGED] Product/security authority
+docs/product-spec.md           [UNCHANGED] Product/security authority
 backend/agent/, backend/kb/    [EXISTING] A-owned dialogue/tools
 backend/authz/, approvals/, fraud/ [EXISTING under backend/] B-owned authority
 backend/finance/, university/, demo/ [EXISTING under backend/] C-owned outcomes
@@ -360,7 +360,7 @@ For the judge, capture model ID/timing and bounded redacted tool/run references 
 
 ### 12.9 Verification and documentation per slice
 
-The [checklist](docs/scenario-checklist.md) remains the source for per-scenario setup, exact test selectors and expected state. Start with its targeted commands; do not run the whole database suite for every copy/layout adjustment. Depending on touched code, use the applicable owner suite below and existing frontend schema-generation/build prerequisites from README:
+The [checklist](scenario-checklist.md) remains the source for per-scenario setup, exact test selectors and expected state. Start with its targeted commands; do not run the whole database suite for every copy/layout adjustment. Depending on touched code, use the applicable owner suite below and existing frontend schema-generation/build prerequisites from README:
 
 ```powershell
 # A: agent/dialogue and integrated UX; select relevant modules for a small fix.

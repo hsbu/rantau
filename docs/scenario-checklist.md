@@ -3,8 +3,8 @@
 Prepared: 2026-10-19. Source baseline: main `caa75e7` (PR #31).
 
 This is the requester-authorized acceptance artifact for the 24 scenarios in the
-[MVP specification](../Rantau-MVP-Spec.md#11-automated-benchmark-24-p0-scenarios) and the
-[team roadmap](../Rantau-3Dev-Roadmap.md#7-test-to-ticket-traceability).
+[MVP specification](product-spec.md#11-automated-benchmark-24-p0-scenarios) and the
+[team roadmap](roadmap.md#7-test-to-ticket-traceability).
 Implementation status and ongoing work remain in the
 [Dev A](progress/progress-a.md), [Dev B](progress/progress-b.md) and
 [Dev C](progress/progress-c.md) progress files.
