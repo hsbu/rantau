@@ -1,719 +1,491 @@
 # Rantau
 
-A simulated financial agent for students from Southeast Asia studying in mainland
-China and their sponsors. All quotes, payments and university records are synthetic.
+**An AI financial assistant for students from Southeast Asia studying in mainland China and the people who sponsor them.**
 
-Product sources: [MVP specification](Rantau-MVP-Spec.md) and
-[team roadmap](Rantau-3Dev-Roadmap.md). Development follows [AGENTS.md](AGENTS.md).
+Built by **Punteun Shenzhen**, Institut Teknologi Bandung, for **FinTechathon 2026 — Topic C**.
 
-## Local setup
+Rantau brings tuition planning, exchange-route comparison, funding-owner approval,
+payment tracking and tuition exception recovery into one workspace. It answers a
+question that a transfer receipt alone cannot settle: **has the university actually
+credited the student's tuition?**
 
-Use Python 3.12, uv, Node 22.13+ and npm. Copy `.env.example` to ignored `.env` if
-needed. Set `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` locally to configure the classifier;
-offline tests and the explicit synthetic harness need neither.
+> This is a sandbox MVP. Balances, exchange quotes, transfers, providers and
+> university ledgers are simulated. No real money moves. Live agent interpretation
+> uses OpenRouter when configured; model requests may consume provider credits.
+
+[Getting started](#getting-started-with-docker) · [Local development](#local-development) ·
+[Demo walkthrough](#demo-walkthrough) · [Tests](#testing-and-quality-checks) ·
+[Project layout](#project-layout) · [Team](#team)
+
+## What Rantau does
+
+- **Plan tuition payments:** read the student's obligation, credited amount, balance
+  and deadline; compare simulated IDR-to-CNY routes with itemized fees and expiry.
+- **Keep approval separate from execution:** sponsors approve their own funding;
+  students confirm payments from their own accounts. Changed terms require fresh
+  authority. A message claiming approval never substitutes for a protected decision.
+- **Track the original payment:** distinguish provider delivery from university
+  credit, check uncertain outcomes and prevent duplicate debits during retries.
+- **Resolve tuition exceptions:** investigate missing references, wait for delayed
+  posting and calculate exact shortfalls. Recovery submission does not itself mark
+  tuition paid; the university simulator posts credit independently.
+- **Protect the workflow:** enforce verified recipients, spending limits, expiring
+  approvals, security holds, scoped access and redacted audit records.
+- **Explain the next step:** show connected tuition, quote, approval, payment and
+  recovery panels alongside Chat. Sponsor summaries support English and Indonesian.
+
+The language model classifies requests within a fixed LangGraph workflow. Financial
+rules, approvals and ledger changes are enforced by backend services. User-facing
+financial responses are generated from checked state and templates, rather than
+unrestricted model-written payment instructions.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    User[Student or sponsor] --> Web[Next.js workspace and same-origin relays]
+    Web --> API[FastAPI authenticated services]
+    API --> Agent[LangGraph agent]
+    Agent --> Model[OpenRouter intent classification]
+    Agent --> Gate[Authorization and approval services]
+    API --> Gate
+    Gate --> Finance[Protected financial simulator]
+    Finance --> Provider[Simulated payment provider]
+    Finance --> University[Independent university posting and recovery]
+    API --> DB[(PostgreSQL)]
+    Finance --> DB
+    University --> DB
+```
+
+| Layer | Implementation |
+| --- | --- |
+| Frontend | Next.js 16, React 19, TypeScript; server-side relays keep provider keys out of the browser |
+| Agent | Python, LangGraph, configurable OpenRouter model, bounded policy/source lookup |
+| API and security | FastAPI, verified database sessions, exact-term approvals and deterministic policy checks |
+| Persistence | PostgreSQL 17; migrations, ledger, approvals, cases, conversation drafts and audit metadata |
+| Quality checks | pytest, mypy, Ruff, TypeScript, ESLint and Playwright; GitHub Actions |
+
+Provider delivery and tuition completion are separate states. All monetary
+calculations use integers: IDR is stored in whole rupiah and CNY in fen
+(100 fen = CNY 1).
+
+## Prerequisites
+
+Choose Docker for the complete sandbox, or install the local toolchain for development.
+
+| Tool | Docker sandbox | Local development |
+| --- | --- | --- |
+| Git | Required | Required |
+| Docker Engine/Desktop with Compose v2 | Required | Optional, for PostgreSQL |
+| Python | Included in image | Python 3.12 recommended; supported range is 3.12–3.13 |
+| uv | Included in image; build pins 0.11.27 | Required; 0.11.27 matches CI |
+| Node.js and npm | Included in image | Node.js 22.13+; Node 22 matches CI |
+| PostgreSQL | Included, version 17 | PostgreSQL 17 recommended |
+| OpenRouter account/key | Needed for connected natural-language Chat | Needed for connected natural-language Chat |
+
+The scripted Scenarios page and offline agent harness need no model key. Payment,
+Sponsor and Demo services still require database setup and real sandbox sessions.
+The offline harness is not a substitute for authenticated integration testing.
+
+## Getting started with Docker
+
+The commands below use PowerShell and run from the repository root. The same
+`git`, `docker`, `uv` and `npm` commands work in other shells; adapt file-copy and
+environment-variable syntax as needed.
+
+### 1. Clone and configure
 
 ```powershell
-uv sync --locked
-uv run python -m scripts.export_openapi
-Push-Location frontend
-npm ci
-npm run generate:contracts
-npm run dev
-Pop-Location
+git clone https://github.com/hsbu/rantau.git
+Set-Location rantau
+Copy-Item .env.example .env
 ```
 
-In another terminal, run `uv run python -m backend.server --host 127.0.0.1 --port 8000`.
-Open the frontend at `http://127.0.0.1:3000` and backend docs at
-`http://127.0.0.1:8000/docs`. With Docker running, `docker compose up --build`
-starts PostgreSQL, backend and frontend. Container services use service DNS.
-
-`/health` reports process liveness. `/ready` remains a conservative 503 gate during
-the staged agent financial integration; it reports authentication and finance
-storage separately. Chat is wired to verified sessions, scoped
-simulator reads, OpenRouter and PostgreSQL draft/run storage. It requires the
-configuration and explicit setup below. Explicit tuition confirmation/continuation
-uses B/C protected services; no identity is accepted from claimed headers/chat text.
-
-## Student chat
-
-Use the **Chat** and **Scenarios** navigation tabs to switch between the connected
-agent workspace and scripted examples. The active tab stays highlighted; changing
-views clears the visible conversation so fixture state never carries into Chat.
-This is the first working interface, with further layout refinement expected
-after integrated agent testing.
-
-The workspace uses a light theme with neutral form focus indicators. Scroll within
-the conversation to read older messages, or continue scrolling past its edge to
-move the page. New replies follow the bottom only while you are already there;
-use **Latest messages** to return after reading history.
-
-Open `http://127.0.0.1:3000/student/chat/preview` to explore the isolated fixture
-preview. Select a scenario, then use the suggested messages or type a message to
-advance its scripted steps. It demonstrates clarification, an exact quote,
-sponsor waiting, provider delivery versus university posting, missing-reference
-evidence, shortfall escalation, uncertain outcomes and expired quotes. It makes
-no model or backend calls and cannot authenticate, request real approval or move
-money. The November 2026 fixture clock is displayed beside the sample details.
-New chat resets the conversation; changing the scenario clears its state.
-
-`/student/chat` is the connected workspace. For local development, create an
-ignored `frontend/.env.local` containing only:
-
-```dotenv
-AGENT_API_ORIGIN=http://127.0.0.1:8000
-```
-
-Restart Next.js after changing this server-only setting. Compose supplies
-`http://backend:8000` instead. The student chat relay accepts only
-message/conversation fields, forwards the browser's session cookie to the fixed
-agent endpoint, rejects foreign origins, disables caching and never forwards
-claimed actor/role headers or browser bearer tokens. It does not create a
-session; B-01 supplies backend verification. The sponsor workspace at `/sponsor`
-uses fixed same-origin relays for sign-in, session, approval list and owner
-decisions. Both flows keep API keys and session tokens out of browser code.
-Missing trusted adapters/configuration produce a visible unavailable state,
-with no fallback to mocks. Session expiry clears the visible chat conversation.
-
-The current agent HTTP contract supplies assistant text, tool events and resource
-references. The connected page renders text safely and keeps structured details
-empty until an agreed trusted adapter supplies them; it does not parse monetary
-amounts or approval states out of prose. Rich financial panels currently use
-generated contract types in the isolated preview. A-04/B/C must connect persisted
-intents, approval continuation and scoped financial details. There are no payment
-or approval execution buttons in this A-06 slice. Browser messages live only in
-component memory and clear on reload/new chat; server draft-memory limits still apply.
-
-## Backend demo authentication (B-01)
-
-Use a dedicated, disposable PostgreSQL database for this synthetic demo. No tables
-or accounts are created at application startup. Add these values to your ignored
-local `.env` (keep both passwords private, distinct, and 12–128 characters):
+Edit the ignored `.env` file. At minimum, configure:
 
 ```dotenv
 AUTH_ENABLED=true
 AUTH_TENANT_ID=demo_001
 AUTH_TRUSTED_ORIGIN=http://127.0.0.1:3000
-AUTH_DEMO_STUDENT_PASSWORD=<local-student-password>
-AUTH_DEMO_SPONSOR_PASSWORD=<different-local-sponsor-password>
+AUTH_DEMO_STUDENT_PASSWORD=<choose-a-private-student-password>
+AUTH_DEMO_SPONSOR_PASSWORD=<choose-a-different-sponsor-password>
+AUTH_DEMO_ADMIN_PASSWORD=<choose-a-different-admin-password>
+OPENROUTER_API_KEY=<your-private-openrouter-key>
+OPENROUTER_MODEL=<provider/model-id>
 ```
 
-Set `DATABASE_URL` to that isolated database, then run:
+Replace every placeholder. Choose distinct passwords of 12–128 characters. The
+model must support JSON-schema structured output. Leave optional web research
+disabled for the initial setup. Never copy `.env` into the frontend or commit it.
+
+Compose configures the backend database connection using the `db` service name.
+The database username/password in `compose.yaml` are disposable local-demo
+credentials, not deployment secrets. Ports 3000, 8000 and 5432 must be free.
+
+### 2. Build, initialize and start
 
 ```powershell
-uv run python -m backend.authz.bootstrap --migrate --seed
+docker compose build
+docker compose up -d db
+docker compose run --rm backend uv run --no-sync python -m backend.authz.bootstrap --migrate --seed --seed-admin
+docker compose run --rm backend uv run --no-sync python -m backend.agent.migrations
+docker compose run --rm backend uv run --no-sync python -m backend.demo.reset --scenario tuition_happy_path
+docker compose up -d backend frontend
 ```
 
-This explicitly applies the ordered, checksummed auth, policy, authority and
-security migrations (`001`–`005`) and provisions the `student` and
-`sponsor` usernames for `stu_001` / `par_001` in `demo_001`. Bootstrap rejects
-environments other than development/test and refuses to overwrite an existing demo
-tenant. Migration replays check a stored checksum. The CLI uses local settings;
-no password is supplied on its command line. Remove the two bootstrap passwords
-from local configuration after seeding; stored credentials use salted scrypt.
-Session tokens are random and only their SHA-256 digests are stored.
+These explicit steps create the synthetic `student`, `sponsor` and `admin`
+identities, apply all authentication/finance/agent migrations and initialize a
+scenario. Application startup never creates identities, migrates or seeds data.
+Bootstrap deliberately refuses to overwrite an existing demo tenant. On subsequent
+starts, use `docker compose up -d`; do not repeat the identity-seeding command.
 
-To use the `/demo` controls in a browser, set `AUTH_DEMO_ADMIN_PASSWORD` (12–128
-characters) and run `uv run python -m backend.authz.bootstrap --seed-admin`. It adds only
-the `admin` user (`DEMO_ADMIN`, scope `demo:manage`, no payment or approval authority) to
-the existing tenant and refuses to overwrite one. Sign in with it through the sponsor
-sign-in form, then open `/demo`.
+### 3. Open the workspaces
 
-The additive endpoints are:
+| Workspace | URL | Sign in as |
+| --- | --- | --- |
+| Student entry | http://127.0.0.1:3000/student/sign-in | `student` |
+| Connected Chat | http://127.0.0.1:3000/student/chat | Current student session |
+| Payment status and student approval | http://127.0.0.1:3000/student/payments | Current student session |
+| Sponsor decisions | http://127.0.0.1:3000/sponsor | `sponsor` |
+| Demo controls | http://127.0.0.1:3000/demo | `admin` |
+| Scripted Scenarios | http://127.0.0.1:3000/student/chat/preview | No account required |
+| API documentation | http://127.0.0.1:8000/docs | Protected endpoints still require a session |
 
-- `POST /api/v1/auth/login`: `{username, password}`; sets the host-only `session`
-  cookie and returns `{authenticated: true, role}`.
-- `GET /api/v1/auth/session`: verifies the cookie against current database records.
-- `POST /api/v1/auth/logout`: empty body; revokes the session and clears its cookie.
-- `PUT /api/v1/student/sharing-consents/{sponsor_id}`: a student grants
-  `{allowed_shared_fields, expires_at}` to a same-tenant sponsor. Allowed fields are
-  `tuition_summary`, `payment_summary`, and `case_summary`.
-- `DELETE /api/v1/student/sharing-consents/{sponsor_id}`: empty body; revokes that
-  student's sharing grant.
+Use the passwords chosen in `.env`; there is no shared default password. There is
+no dedicated administrator sign-in page: use the existing form at `/sponsor` with
+`admin`, then navigate to `/demo`. The sponsor page will correctly reject the admin
+role for the sponsor inbox; the authenticated admin session can access Demo.
 
-State-changing requests must send `Origin` matching `AUTH_TRUSTED_ORIGIN` exactly;
-forwarded identity/host headers are ignored. Plain HTTP is permitted only for
-loopback development (plus the isolated test host). HTTPS cookies are `Secure`;
-all session cookies are `HttpOnly`, `SameSite=Strict`, and expire after one hour.
-Login admits five attempts per username and thirty per direct client address in
-each fifteen-minute window, including successful attempts. Counters persist across
-workers; deployments behind a proxy share its direct address until a separately
-reviewed trusted-proxy configuration exists. Do not disable these limits to work
-around a proxy. The `backend.server` entrypoint explicitly disables Uvicorn proxy
-header processing; use it for local/container startup so caller-supplied forwarded
-addresses cannot evade the client limit. Authentication errors and validation
-failures are sanitized.
+The seeded tenant already links the student to the sponsor's permitted funding
+account. This permission does not grant the sponsor unrestricted access to the
+student's private records; summary sharing is controlled separately by consent.
+The default fixture starts with CNY 20,000 tuition due, IDR 60,000,000 in the
+student account and IDR 150,000,000 in the sponsor account.
 
-`backend.authz.access.AccessPolicy` provides current-session, tenant, ownership,
-sponsor-role and field-specific consent guards for domain adapters. A sponsor's
-approval authority over their own funds does not grant access to student records.
-Consent grants visibility only and is checked against current expiry/revocation.
-Dev C's scoped reads use these guards; the agent domain wiring remains pending.
-The B-04 sponsor page provides browser sign-in and protected owner decisions
-through fixed same-origin relays. Its complete browser-to-finance flow still
-needs an integrated browser run.
-Do not connect fake domain services to make Chat appear ready.
+Use separate browser profiles or private windows for the student, sponsor and
+administrator. Tabs in one browser profile share a session cookie and cannot
+represent independent actors simultaneously. Use `127.0.0.1` consistently; changing
+to `localhost` changes the cookie host and trusted browser origin.
 
-`backend.authz.policy_transaction.TransactionAuthorization` implements B-02's
-existing `AuthorizationPort` against a trusted `PolicyRepository` and the caller's
-PostgreSQL connection. `backend.approvals.finance.FinanceApprovalRepository`
-implements the trusted C SQL handoff. The runtime finance builder installs B-03's
-protected execution wrapper on a worker thread, after locking current
-financial/authority state. The adapter rechecks the session and current database
-clock, then records a minimal redacted decision in `policy_decisions`. It never
-commits: a returned audit ID is durable only after the caller commits; a rollback
-invalidates the result. Preview decisions cannot authorize a later debit.
-Repository locking, complete accounting coverage and authority provenance are
-documented in `backend/authz/policy_repository.py`. No financial test repository
-is connected to application wiring. `/ready` still reports unavailable domain
-services during the remaining agent financial-workflow integration; its global
-status does not serve as the read-only Chat availability probe.
-
-New demo seeds grant the student `payment:execute` and `reconciliation:submit`,
-and the sponsor `payment:execute`, in addition to their existing scopes. These
-only permit gate evaluation: ownership, mandate/approval, holds and financial
-checks still apply. Migrations do not grant existing actors new privileges or
-overwrite credentials. Existing demo tenants require an explicitly coordinated
-scope update/reset; bootstrap continues refusing to overwrite them. B-03 authority
-and B-06 active holds now feed C's actual simulated executor. Hold writers take
-the same account/obligation/intent locks as execution before touching security
-rows. `backend.fraud.finance_access.build_security_service` exposes this backend
-service for payment-intent resources; no public hold-clearing endpoint is added.
-
-The default Chat `VERIFY_MESSAGE` path uses B's `SecurityAgentReadPort` for
-advisory assessment. It rechecks the current student session before and after
-classification, combines bounded local cues with optional redacted OpenRouter
-signals, and falls back to local cues if semantic assessment is unavailable.
-It does not infer beneficiary legitimacy or create financial authority. With no
-signals, the result still requests verification with a trusted source. This
-read adapter remains advisory. Separately, the agent checks the current confirmed
-tuition action before model routing: existing deterministic B hard findings or
-local prompt-injection cues place a scoped persistent hold and security case
-atomically. Model-only signals cannot select a hold, grant approval or change a
-recipient. Without a confirmed action in this session/conversation/scenario,
-message verification remains advisory and cannot target a different request. Request-scoped classifier clients are closed when
-the request completes.
-
-`backend.approvals.service.ApprovalService` persists B-03's owner requests,
-decisions and allowance mandates in PostgreSQL. `APPROVAL_TTL_SECONDS` defaults
-to 600 (valid range 1–3600); approval expiry is also capped by quote expiry.
-Dev C must use `backend.contracts.terms.canonical_terms_hash` when constructing
-immutable intents. SHA-256 covers every `PaymentTerms` field except the hash
-itself, with sorted compact JSON, exact integers and UTC-normalized timestamps
-with six fractional digits. C's compatibility import delegates to that helper.
-Existing immutable C intents hashed with the old zero-fraction timestamp format
-fail the integrity gate; create a fresh intent and obtain fresh approval rather
-than rewriting the stored digest or reusing old authority.
-An approval is permission to attempt execution; current policy/balance/holds
-are still checked when executing, and it never means money has moved.
-
-The protected endpoints add student own-account review/confirmation at
-`GET /api/v1/student/approvals` and
-`POST /api/v1/student/approvals/{id}/decision`; the sponsor routes keep their
-existing decision payloads. Both lists return masked `ApprovalView` records
-without balances, bank identifiers, raw terms or student-private summaries.
-`POST /api/v1/payment-intents/{id}/approval-requests` has an empty body. Owner
-confirmation requires the exact reviewed `terms_hash` and trusted origin.
-Stale/expired/consumed/conflicting authority returns a sanitized 409.
-
-Sponsors manage own-account allowance mandates through GET/POST
-`/api/v1/sponsor/mandates` and PUT/DELETE `/api/v1/sponsor/mandates/{id}`.
-Writes require `mandate:manage`, granted to new sponsor seeds only. Existing
-actors are not silently upgraded. Limits are integer minor units; source
-timezone, active student relationship and verified beneficiary fingerprint
-come from trusted server records. Updates retain immutable revisions and
-revocation retains history. Expired mandates may be replaced; creating or
-replacing one never resets account-wide spending. Reading/revoking existing
-owned mandates remains available during a financial-adapter outage.
-
-`FinanceApprovalRepository` implements the full-terms CAS state hook and is
-installed in runtime approval and finance services. Missing tables or required
-configuration still return sanitized 503 responses. Call
-`service.invalidate_for_revision(connection, actor, intent_id)` after revising
-terms. Inside protected execution, use
-`await service.authorize_execution(connection, actor, action)` on the worker
-thread with the caller's connection. This wraps B-02 with authority loaded
-from B's store and consumes an approved T2 record once. It rechecks time-sensitive
-policy after audit/session work and rolls back stale authority. C retains
-locks, creates the transfer and ledger debit on that same transaction, then runs
-a rejecting-only finalizer before commit to recheck authority/quote/policy
-expiry and the current session. The provider is called only after commit. Rollback
-restores consumption/audit, and caller idempotency must resolve prior outcomes
-before invoking authorization again. Do not cache or reuse preview decisions.
-Tests cover both the isolated adapter and actual default HTTP wiring with real
-sessions, B authority and C's simulated SQL ledger. Test-only adapters are never
-installed in application wiring. Sponsor browser sign-in, approve/reject and
-student continuation against the real backend were manually verified on
-2026-10-17; see B-04 in `docs/progress/progress-b.md` for database evidence.
-The complete agent-driven flow remains a separate check. Real-session HTTP tests also
-verify simulated T1 allowance execution, cumulative mandate limits, revocation,
-and current beneficiary ownership/purpose checks before debit. Demo reset also revokes open approvals,
-mandates and consent, clears holds and resolves open cases (history is kept, sessions stay
-signed in); admin provisioning is `bootstrap --seed-admin`.
-
-`GET /api/v1/security-cases/{id}` returns a scoped `SecurityCaseView` with
-`case_id`, `resource_id`, `state`, `reason`, `created_at`, `updated_at` and
-`audit_event_id`. Reporter identity and evidence references remain internal.
-Reads require a current real session and the existing role-specific read scope;
-related funding owners and explicitly scoped reviewers use the trusted resource
-adapter. Missing and inaccessible cases both return the same 404; unavailable
-case storage returns a sanitized 503. Responses are `no-store`. This read endpoint
-does not expose hold placement/clearing or reviewer decisions. Agent invocation
-is recorded under B-07 and the read-only sponsor case panel under B-06 in
-`docs/progress/progress-b.md`.
-
-`GET /api/v1/security-cases` returns `SecurityCaseList`, a bounded page of the
-same seven fields for cases in the caller's relationship scope (cases they
-opened, or the tenant page for an explicitly scoped reviewer). The storage bound
-is 100 cases ordered by `updated_at DESC`; an actor with no case receives
-`{"cases": []}` rather than a 404, and the same session revalidation, `no-store`
-and sanitized-503 rules apply. It is read-only: no hold-clear or case-decision
-route is exposed. The sponsor workspace shows the signed-in sponsor's own cases
-from this endpoint; clearing a hold or deciding a case still happens in separate
-trusted review tooling.
-
-Auth tests use a fresh temporary PostgreSQL instance when `initdb` and `pg_ctl`
-are on PATH. Its files remain ignored under `.generated/`. Alternatively set
-`RANTAU_TEST_DATABASE_URL` to a **dedicated test database whose name starts with
-`rantau_test`**. Tests truncate its auth and policy-decision tables; never point it
-at an application database. CI provisions its own PostgreSQL 17 service. Tests do
-not use the local application's `DATABASE_URL` or bootstrap passwords.
-
-## Finance, university simulator and demo (Dev C)
-
-Apply the ordered auth and finance migrations, then reset the isolated demo fixture
-(development/test only; touches Dev C tables, never identities or audit history):
+### 4. Check and stop the stack
 
 ```powershell
-uv run python -m backend.demo.reset --migrate --scenario tuition_happy_path
+docker compose ps
+docker compose logs --tail 80 backend frontend
+Invoke-RestMethod http://127.0.0.1:8000/health
+docker compose down
 ```
 
-Scenarios: `tuition_happy_path`, `forged_beneficiary`, `demo_long_quotes`,
-`tuition_missing_reference`, `shortfall_topup_off`, `shortfall_topup_on`,
-`provider_timeout`, `provider_unavailable`, `delayed_posting`. All data is synthetic.
+`/health` reports process liveness. **`/ready` currently always returns HTTP 503**
+because its `domain_services` gate is still hard-coded false. It reports individual
+database, authentication, finance-storage and classifier checks, but is not yet a
+passing deployment-readiness probe—even when the configured application works.
 
-Finance routes live under `/api/v1` (obligations, quotes, payment intents, transfers,
-reconciliations, audit) and demo controls under `/api/v1/demo` (administrator only).
-Payment writes use B's stored approval/mandate/hold readers and protected consumption;
-no scripted authority is installed in the application. The provider and university are
-simulated: payment delivery is never tuition paid, and posting happens only when the
-simulated clock reaches the receipt's posting time (`POST /demo/university/tick`,
-`POST /tuition/obligations/{id}/recheck`).
+`docker compose down` preserves the database volume. After bootstrap, passwords
+can be removed from `.env`; recreate the backend container to remove them from its
+environment. Keep them privately for sign-in. The replay CLI needs the student and
+sponsor passwords configured again when explicitly used.
 
-Finance tests need PostgreSQL binaries on PATH (for example
-`C:\Program Files\PostgreSQL\18\bin`) or `RANTAU_TEST_DATABASE_URL`; they use their own
-`rantau_test_finance` database. The `/student/payments` and `/demo` pages read the backend
-through the server-only `FINANCE_API_ORIGIN` (falls back to `AGENT_API_ORIGIN`) and relay
-mutations through fixed-path same-origin handlers.
+## Local development
 
+Use this route when editing Python or frontend source. Do not run the Docker
+backend/frontend at the same time on the same ports.
 
-Payment-request cancellation and scenario reset require explicit confirmation; backing
-out sends no mutation. If a payment/demo request times out after 30 seconds or its
-outcome cannot be confirmed, the UI stops that control group and offers **Check current
-status**, which reloads the page. Check the original state before repeating an action;
-requests are never automatically retried. A timeout does not prove that nothing happened.
-The shared navigation and keyboard skip link work across all page routes; mobile Chat
-also links directly to payment details and back to the message input. Sponsor summaries
-and confirmation can use Bahasa Indonesia; sponsor dates explicitly use China time
-(UTC+08:00). Quotes, transfers and university records remain simulated.
+### Install dependencies and generate API types
 
-## Demo runbook (simulated)
+```powershell
+uv sync --locked
+uv run python -m scripts.export_openapi
+npm --prefix frontend ci
+npm --prefix frontend run generate:contracts
+```
 
-1. Prepare the isolated database once (see the backend authentication section for
-   bootstrap): `uv run python -m backend.authz.bootstrap --migrate --seed`, then
-   `uv run python -m backend.demo.reset --migrate --scenario tuition_missing_reference`.
-2. Run the whole story without a browser. The student and sponsor act through real
-   sessions (set both bootstrap passwords in the local `.env`); the sponsor's exact-terms
-   approval is a real owner decision that the executor consumes once:
+The schema exporter writes `.generated/openapi.json`; the frontend generator writes
+`frontend/lib/api-contracts/generated.d.ts`. Both are ignored outputs. Regenerate
+when API contracts change; do not hand-edit or commit generated types.
 
-   ```powershell
-   uv run python -m backend.demo.replay --flow all
-   ```
+### Initialize the local database
 
-   `happy` shows provider delivery is not tuition paid, then the university posts after the
-   simulated clock moves. `hero` recovers a payment that arrived without a reference and
-   posts it once with no second debit. `attack` plants untrusted messages, holds a forged
-   payee with zero debit, and still pays the verified university.
-3. In the browser, `/student/payments` shows the trust timeline, pending requests with exact
-   terms, quotes, receipts and untrusted messages (English or `?lang=id`). `/demo` offers
-   scenario reset, clock, fault injection, the university tick and the redacted audit trail
-   for a demo administrator. `/sponsor` provides sponsor browser sign-in and
-   approval decisions. Students sign in at `/student/sign-in`; administrator access is
-   provided separately by the environment administrator. No dedicated administrator
-   sign-in page is available.
-4. Docker clean start (verified 2026-10-19 from an empty database; the stack was removed
-   afterwards). Set distinct local passwords first (12–128 characters, never committed):
+Copy/configure `.env` as above. For the PostgreSQL service supplied by Compose:
 
-   ```powershell
-   $env:AUTH_ENABLED = "true"
-   $env:AUTH_DEMO_STUDENT_PASSWORD = "<student-password>"
-   $env:AUTH_DEMO_SPONSOR_PASSWORD = "<different-sponsor-password>"
-   $env:AUTH_DEMO_ADMIN_PASSWORD = "<different-admin-password>"
-   docker compose build
-   docker compose up -d db
-   docker compose run --rm backend uv run --no-sync python -m backend.authz.bootstrap --migrate --seed
-   docker compose run --rm backend uv run --no-sync python -m backend.authz.bootstrap --seed-admin
-   docker compose run --rm backend uv run --no-sync python -m backend.demo.reset --migrate --scenario tuition_happy_path
-   docker compose up -d
-   ```
+```powershell
+docker compose up -d db
+uv run python -m backend.authz.bootstrap --migrate --seed --seed-admin
+uv run python -m backend.agent.migrations
+uv run python -m backend.demo.reset --scenario tuition_happy_path
+```
 
-   Open `http://127.0.0.1:3000/student/sign-in` (student), `/sponsor` (sponsor and, with the
-   admin credentials, the administrator, then `/demo`). `/ready` stays `not_ready` without an
-   OpenRouter key because `domain_services`/`classifier_configuration` need the model; the
-   Payments and Demo pages do not. If host ports 3000, 8000 or 5432 are taken, publish other
-   ports in an override file and set `AUTH_TRUSTED_ORIGIN` to the new frontend origin
-   (state-changing requests must match it exactly). Remove everything with
-   `docker compose down -v`. Repeated sign-ins from one address are throttled (HTTP 429);
-   wait before retrying rather than clearing tables outside a disposable database.
+The template's host connection points to
+`postgresql://rantau_demo:local_demo_only@127.0.0.1:5432/rantau_demo`.
+For your own PostgreSQL instance, create a dedicated empty database and set
+`DATABASE_URL` accordingly. If the tenant is already initialized, skip bootstrap
+and apply migrations only. A scenario reset replaces the current financial run;
+it is not needed just to restart the servers.
 
-`/ready` reports `finance_storage` separately; `domain_services` remains false during
-the staged agent financial-workflow integration. Read-only Chat handles its own
-configuration/storage checks and does not change global readiness in this slice.
+Create `frontend/.env.local` containing only the server-side relay origin:
 
-## Checks and isolated demo
+```dotenv
+AGENT_API_ORIGIN=http://127.0.0.1:8000
+```
+
+`FINANCE_API_ORIGIN` is optional and falls back to `AGENT_API_ORIGIN`. Restart
+Next.js after changing either setting. The root `.env` is read by the Python
+application and Compose; Next.js reads its own environment file.
+
+### Start both servers
+
+Terminal 1, from the repository root:
+
+```powershell
+uv run python -m backend.server --host 127.0.0.1 --port 8000
+```
+
+Terminal 2, also from the repository root:
+
+```powershell
+npm --prefix frontend run dev
+```
+
+The workspace is at http://127.0.0.1:3000. For a local production build instead of
+the development server:
+
+```powershell
+npm --prefix frontend run build
+$env:HOSTNAME = "127.0.0.1"
+$env:PORT = "3000"
+npm --prefix frontend run start
+```
+
+The build script prepares Next.js standalone output and static assets. Keep
+`.next/`, dependency folders, credentials and local database files out of Git.
+
+## Demo walkthrough
+
+1. Select `tuition_missing_reference` in the administrator's Demo workspace and
+   confirm the reset. Begin a new student conversation afterward.
+2. As the student, ask: **“Help me pay my tuition using my sponsor's account.”**
+   Review the CNY obligation, IDR principal, fee, total debit, recipient and expiry.
+   Supply a missing funding or route choice if asked.
+3. Send **`confirm tuition`**. In the separate sponsor workspace, review the exact
+   request and explicitly approve it. Approval alone does not transfer funds.
+4. Return to the student and send **`continue`**. Verify provider delivery and
+   university credit separately; the missing-reference scenario is not paid yet.
+5. Send **`list payments`**, then **`select payment 1`** if it is the intended
+   payment. Review the payment details before sending **`submit recovery`**.
+6. In the independent administrator workspace, run the **University tick**.
+   Return to the student and send **`check recovery`**. Tuition is paid only after
+   the linked university posting is verified, with no second debit.
+
+For self-funding, request the student's own account and review/approve the request
+in Payments before continuing. For changed terms, review the revised draft and
+send `confirm revision`; valid replacements need fresh owner approval. Partial
+tuition payments and arbitrary recipients remain blocked by the agreed policy.
+
+The Scenarios page is a separate scripted preview with no API/model calls. It does
+not prove that authentication, approvals or financial execution work. The scenario
+table below describes the available fixtures. For connected journeys, verify the
+payment record and university credit independently in their respective workspaces.
+
+### Available simulator scenarios
+
+| Scenario ID | Purpose |
+| --- | --- |
+| `tuition_happy_path` | Verified university payment with normal delivery/posting |
+| `tuition_missing_reference` | Delivered funds require recovery before university credit |
+| `delayed_posting` | Provider delivery precedes the university posting window |
+| `shortfall_topup_off` | Exact shortfall; additional payment forbidden by synthetic policy |
+| `shortfall_topup_on` | Exact shortfall; protected top-up workflow requires fresh authority |
+| `provider_timeout` | Provider accepts a payment but its response is lost |
+| `provider_unavailable` | Authoritative failure; preserve debit/reversal history and avoid blind retry |
+| `forged_beneficiary` | Untrusted instructions and an unverified recipient |
+| `demo_long_quotes` | Longer quote expiry for a recorded walkthrough |
+
+### Reset and replay
+
+Only reset a database/run you own; a reset replaces synthetic balances and financial
+records, closes open authority and invalidates existing agent selections. Identities
+and historical audit records are retained. Do not reset another person's rehearsal.
+
+```powershell
+uv run python -m backend.demo.reset --scenario tuition_missing_reference
+uv run python -m backend.demo.replay --flow all
+```
+
+`replay` runs the `happy`, `hero` and `attack` flows with real local student/sponsor
+sessions and simulated financial services. **It resets the scenario for each flow.**
+It needs the configured bootstrap passwords and is not an actual-model browser demo.
+For Docker, prefix each Python command with
+`docker compose run --rm backend uv run --no-sync` and omit the host `uv run`.
+
+## Configuration reference
+
+| Setting | Purpose / default |
+| --- | --- |
+| `APP_ENV` | `development` for this sandbox; bootstrap/reset refuse non-development/test environments |
+| `DATABASE_URL` | Dedicated PostgreSQL connection; host uses `127.0.0.1`, containers use `db` |
+| `AUTH_ENABLED` | Must be `true` for integrated authenticated services; template default is `false` |
+| `AUTH_TENANT_ID` | Explicit seeded tenant: `demo_001` |
+| `AUTH_TRUSTED_ORIGIN` | Exact browser origin, normally `http://127.0.0.1:3000`; no trailing slash |
+| `AUTH_DEMO_STUDENT_PASSWORD` / `AUTH_DEMO_SPONSOR_PASSWORD` | Initial private credentials; also needed by the explicitly invoked replay CLI |
+| `AUTH_DEMO_ADMIN_PASSWORD` | Initial private credential for optional demo administration |
+| `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | Server-only live intent-classification configuration |
+| `OPENROUTER_MAX_TOKENS` | Shared reasoning/output budget, 512–8192; default `2048` |
+| `OPENROUTER_REASONING_EFFORT` | Optional provider-supported reasoning effort; omit for provider defaults |
+| `APPROVAL_TTL_SECONDS` | Owner approval lifetime, 1–3600 seconds; default `600`, capped by quote expiry |
+| `AGENT_API_ORIGIN` | Next.js server-only backend destination; set in `frontend/.env.local` for host development |
+| `FINANCE_API_ORIGIN` | Optional server-only Payments/Demo destination; defaults to the agent origin |
+| `AGENT_WEB_RESEARCH_ENABLED` | Default `false`; explicitly enables bounded, billed official-source research |
+| `OPENROUTER_RESEARCH_MODEL` | Optional research-capable model override; otherwise uses the classifier model |
+
+Optional web research sends fixed public topics, not private chat or financial
+state. Official-source excerpts remain cited, unreviewed leads: they cannot activate
+payment policy, change recipients, clear holds or authorize a transfer. Model
+capabilities and output budgets vary; an unsupported configuration fails safely.
+
+## Testing and quality checks
+
+Run from the repository root unless stated otherwise. Use a dedicated test database,
+never the demo database or a database containing information you need to retain.
+
+### Backend
 
 ```powershell
 uv run pytest tests -v
 uv run mypy
 uv run ruff check .
 uv run python scripts/check_repo_hygiene.py
-uv run python -m backend.agent.demo --fake-classifier
+```
+
+Database tests either create a temporary PostgreSQL cluster using `initdb` and
+`pg_ctl` on `PATH`, or use `RANTAU_TEST_DATABASE_URL`. If supplying that variable,
+the database name must start with `rantau_test` and the role must be able to create
+and drop the suite's sibling databases. **Tests truncate tables and drop/recreate
+test databases**, including `rantau_test_finance`. Use a separate test PostgreSQL
+instance/role rather than an application or shared development database.
+
+### Frontend
+
+```powershell
 uv run python -m scripts.export_openapi
+npm --prefix frontend run generate:contracts
+npm --prefix frontend run typecheck
+npm --prefix frontend run lint
+npm --prefix frontend run build
+```
+
+Then install Chromium and run Playwright from the frontend directory:
+
+```powershell
 Push-Location frontend
-npm run generate:contracts
-npm run typecheck
-npm run lint
-npm run build
-npm exec -- playwright install chromium
+npx playwright install chromium
 npm run test:e2e
 Pop-Location
+```
+
+On Linux, use `npx playwright install --with-deps chromium` if browser dependencies
+are missing. Playwright uses ports 3100, 8101 and 8102 and starts its own mocked
+agent/finance backends. A passing browser suite is not evidence of live-model
+behavior or real-session financial integration; those are separate scenario checks.
+
+Additional configuration/offline checks:
+
+```powershell
 docker compose config --quiet
+uv run python -m backend.agent.demo --fake-classifier
 ```
 
-Browser checks start a production frontend on port 3100 and an isolated transport
-test double on port 8101. Both ports must be free; they do not use the real backend
-or model. Test artifacts stay in ignored `.generated/`.
+Do not paste unfiltered `docker compose config` output into reports: expanded
+configuration may contain locally supplied credentials. CI runs backend tests,
+typing/lint, frontend generation/build/browser checks and repository hygiene; its
+workflow is in [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
-The offline demo forces six classifications and uses isolated synthetic adapters;
-it demonstrates graph routing, not live model quality or real payments. The OpenRouter
-adapter uses its `https://openrouter.ai/api/v1` endpoint with the compatible Python
-SDK, a configurable provider/model ID, JSON-schema output and safe failure handling.
-Provider routing requires parameter support and requests `data_collection: deny`.
-These are provider-routing preferences, not an independent privacy/compliance guarantee.
-Set the key/model
-locally; the old `OPENAI_API_KEY`/`OPENAI_MODEL` variables are not used.
-Live API access requires separate verification. Keep task updates in the shared
-progress folder: [Dev A](docs/progress/progress-a.md),
-[Dev B](docs/progress/progress-b.md), and [Dev C](docs/progress/progress-c.md).
-Each owner updates their task checkboxes, descriptions and validation evidence in
-the same commit/PR as the work. See `AGENTS.md` section 7 for the full workflow.
+## Evidence and current limitations
 
-`OPENROUTER_MAX_TOKENS` bounds combined reasoning and visible output (default
-2048, range 512–8192). An exhausted budget can return no JSON; the agent then
-fails safely without acting. Optionally set `OPENROUTER_REASONING_EFFORT` to an
-effort supported by the selected model; omitted/empty retains provider defaults.
-For optional-reasoning classifiers, `none` can leave more budget for the schema.
-Mandatory-reasoning models may reject `none`. These settings also pass through
-Compose. See [OpenRouter's reasoning guidance](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).
-Missing tuition funding/amount/quote selections are clarified by the deterministic
-planner; model clarification is reserved for an unclear intent.
+The [shared execution-evidence archive](https://drive.google.com/drive/folders/1VRynaCanS2q4AlguVjaf-M5s9FVr8flS)
+contains scenario records and available screenshots. Captures identify their own
+build, model and evidence level where recorded. Historical results are not a claim
+that every scenario passed on the current checkout.
 
-## Interactive agent and conversation state
-
-After setting `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` in the ignored local
-`.env`, start the explicit isolated harness:
-
-```powershell
-uv run python -m backend.agent.demo --openrouter
-# Or send several turns in one process:
-uv run python -m backend.agent.demo --openrouter --message "Pay my tuition" --message "Use the full balance"
-# Opt into public official-source reads when shortfall guidance is missing:
-uv run python -m backend.agent.demo --openrouter --web-guidance
-# Check those sources alone, without a model/key or financial data:
-uv run python -m backend.agent.demo --research-shortfall
-```
-
-This calls the configured OpenRouter model for intent and bounded tuition-field
-interpretation. Domain reads use synthetic fixtures and the explicit November
-scenario clock. Replies explain scoped data deterministically. The harness can
-build a typed draft preview; it cannot persist a payment intent, approve, debit,
-post tuition or clear a hold. It does not install fake authentication or a fake
-authorization gate in the application. `/quit` exits interactive mode.
-
-The KB explicitly lists two fictional simulator policies: `cn_demo_v1` keeps
-partial payments and top-ups disabled; `cn_demo_v1_topup` matches C's existing
-`shortfall_topup_on` scenario and permits top-ups while partial payments stay
-disabled. The original default record and ZJU reference remain unchanged.
-Recognition compares every policy field with its listed record, allowing only
-the verification/validity timestamps to move together to the persisted seed time.
-The validity offsets must match exactly, a future verification time is rejected,
-and the stored policy still expires; requests never renew it. Unknown identities,
-versions or changed rules stay pending. Unlisted JSON files cannot activate a
-policy. Recognizing the top-up variant supplies guidance only: it does not enable
-an agent payment action, grant approval or bypass the protected executor.
-
-Shortfall guidance checks the reviewed KB first. The isolated `--web-guidance` /
-`--research-shortfall` harness retains its two curated page reads. Live Chat can
-use official-domain search when `AGENT_WEB_RESEARCH_ENABLED=true` is configured in
-the ignored root `.env` (restart backend workers; Compose passes it through).
-`OPENROUTER_RESEARCH_MODEL` optionally overrides the configured model for research;
-otherwise it uses `OPENROUTER_MODEL`. The flag defaults to false.
-
-Research uses the [OpenRouter web-search server tool](https://openrouter.ai/docs/guides/features/server-tools/web-search)
-in a separate request containing a fixed public ZJU/current-international-student
-topic. It sends no private conversation, financial state, user IDs or documents.
-The Exa engine is restricted to `iczu.zju.edu.cn` and `cwcx.zju.edu.cn`, one search
-and at most three results. Search/model usage is billed to existing OpenRouter
-credits. Run a standalone public-topic check explicitly with:
-
-```powershell
-uv run python -m backend.agent.demo --search-shortfall
-```
-
-Only validated official HTTPS citation URLs are fetched. Redirects, credentials,
-query/fragment URLs, nonofficial hosts and oversized/unsupported responses are
-rejected; each public HTML read remains capped at six seconds and 256 KiB. No
-cookies, authentication headers or environment proxy are sent to source pages.
-The research lookup is bounded to 18 seconds, further reduced by the Chat turn's
-remaining 21-second research deadline; it never extends the financial action
-budget. A worker shares at most four public cache entries, caches successful
-search results for five minutes and failures for 30 seconds, and allows only one
-paid research request at a time. A busy worker returns a truthful unavailable
-result rather than starting another search. Search usage and citation metadata
-must validate before any discovered page is fetched; raw model prose is discarded.
-
-Responses include cited, bounded and sanitized extractive procedural leads,
-actual UTC check time and explicit date/cohort/applicability unknowns. Known
-curated source dates/scopes are preserved. Source instructions that try to
-override rules cause excerpts to be withheld. Raw pages are discarded; excerpts
-never enter the financial model, persisted runs or executable KB policy. Leads
-are **unreviewed**, not an applicable procedure. Missing or inaccessible evidence
-keeps guidance pending university review, with receipt/reference and
-expected-versus-posted evidence. Search never submits a case, approves a top-up,
-changes the beneficiary or replaces simulator rules. The authored posting window
-and scenario clock remain simulation configuration. Real university SLA research
-is not a blocker to the approved simulator. Scenarios remain isolated and scripted.
-
-Connected Chat now populates its detail panel after successful turns using
-`GET /api/v1/agent/conversations/{conversation_id}/details?run_id={run_id}`.
-The read requires the original current student session, an unexpired conversation,
-the current scenario and the current committed run. Selected tuition, stored
-quote, correlated request/approval, provider and linked recovery records are
-projected into bounded fields; raw draft/account IDs, sponsor balances, terms
-hashes and private evidence are excluded. Nothing is parsed from assistant prose
-or chosen by guessing the latest payment. The Next.js detail relay validates the
-entire snapshot, uses a fixed upstream path and forwards only the session cookie.
-
-Cards show exact quote totals, actual approval/provider/case states and distinct
-university posting status. Quote/approval expiry uses the security clock; provider
-and university dates use the separate simulation clock. These are point-in-time
-snapshots, refreshed after Chat turns, not live authorization. Reading details
-cannot issue quotes, refresh/expire stored approvals, settle transfers, post
-university credit, submit recovery or execute payments. Failed detail reads clear
-old cards while retaining a successful assistant reply; session denial clears the
-conversation. New chat and in-flight cancellation discard stale results. No new
-financial action controls, migrations or transcript restoration are added.
-
-A-03 remembers tuition obligation, funding and quote selections across turns.
-The backend reloads current permissions, policy, quotes and verified payee each
-turn; remembered IDs are not financial authority. Server wiring supplies the
-university-to-beneficiary-registry mapping; document/model text cannot supply it.
-Ambiguous selections ask only for the missing choice. Invalidated funding/quotes
-require a fresh choice, and partial/unclear amounts require clarification.
-
-For HTTP clients, generate one opaque `conversation_id` per new chat and send it
-in the existing agent-message field on each turn. The server namespaces memory
-by verified tenant, student, session and conversation ID. Omitting the ID keeps
-the existing stateless behavior. A new conversation ID starts fresh; an explicit
-restart clears the tuition draft. The integrated API still requires B/C services.
-
-The initial `InMemoryConversations` adapter holds at most 128 conversations,
-expires inactive drafts after 30 minutes and serializes turns for each key. It
-is single-worker/process-local: restart, worker change or expiry loses the draft.
-It stores no raw transcript, approval or cached authorization. Only the previous
-intent, pending field and option counts accompany the current redacted user text
-to the model; server IDs, balances and tool outputs stay outside model context.
-
-## Durable agent drafts and run diagnostics
-
-The connected tuition workflow supports these exact student commands after a
-complete preview: `confirm tuition` (also `request tuition approval` or
-`request approval`) saves a protected proposal and requests funding-owner approval
-when required; `check` / `continue` reload current server authority and invoke only
-the protected executor. Review the full preview before confirming. The funding
-owner records approval in their authenticated workspace/API; text pasted into Chat
-cannot approve anything. Exact commands need no model call or model credentials.
-Every default Chat POST requires `Origin` equal to `AUTH_TRUSTED_ORIGIN`; the
-same-origin frontend relay validates and forwards it with the session cookie.
-
-`021_agent_actions.sql` stores immutable session/conversation/scenario-scoped retry
-correlation. Intent creation and journal insertion commit together. A retry recovers
-the same proposal; started/unknown payments are rechecked before another execution
-attempt and use a stable server-owned idempotency key. No raw chat, credential,
-balance, approval object or cached authorization is stored in the journal. Records
-are retained during the MVP for correlation; they grant no permission. If changing
-confirmed terms, cancel or revise the original request in Payments before confirming
-a replacement. New sessions/scenario resets cannot resume the previous action.
-Provider delivery remains separate from verified university posting.
-
-Recovery uses the existing Chat input. Enter `recover <payment reference>` (for
-example, the actual `transfer_...` reference shown in Payments) to select and
-investigate a payment. The backend derives its obligation from the persisted
-payment/intent relationship; it does not infer linkage from unrelated records.
-`submit recovery` collects the backend receipt, provider reference, delivered
-amount and authenticated student's reference claim, then submits a case through
-the existing reconciliation gate when an exception requires review. Merely
-investigating creates no case. `check recovery` polls existing provider status and
-rechecks university records without executing another payment. These two exact
-commands need no model credentials; they require a current scoped selection and
-the same trusted Origin/session protections as tuition commands.
-
-Case creation/submission and session revalidation share one transaction through
-C's `create_in_transaction` / `submit_in_transaction` helpers. Retries recover the
-same case even after response loss or independent resolution; case/review states
-and linked university postings determine the reply. Only the independent
-simulated university reviewer resolves missing-reference cases. The agent cannot
-approve reconciliation or directly post credit. Provider delivery is never a
-paid claim. Delayed posting remains pending until C's due-posting recheck; a
-shortfall displays the exact remaining balance and current synthetic top-up
-permission, requiring a separate proposal/approval for any additional payment.
-
-For tracking/recovery without a known reference, Chat lists up to ten eligible
-tuition payments using existing scoped C reads. Say `list payments`, then
-`select payment 1` (or another advertised number). Listing never guesses a payment;
-selection refreshes the same student's persisted payment/intent/obligation link
-and changes no financial record. Exact list/selection commands work without a
-model key. Options are IDs only, scoped to the verified session, conversation and
-scenario. A new session, conversation or reset requires a fresh list. Exact
-`submit recovery` is still required before case creation/submission. Allowances
-and top-up execution are not added by these read-only choices. The existing C
-intent reader fetches its scoped list; the agent refuses lists over 100 intents
-rather than presenting a misleading truncated selection. A bounded DB pagination
-interface remains a separate C coordination improvement if needed.
-
-Fraud guidance translates only recognized existing B indicator codes into
-advisory reasons and trusted-channel verification steps. Unknown indicator text
-is never echoed, and absence of indicators never proves legitimacy. Model-only
-signals cannot approve payments or clear holds; existing deterministic B rules
-remain authoritative.
-
-Recovery stores only selected payment/obligation/case IDs in the existing scoped
-conversation JSON; no new migration or HTTP fields are required. Update backend
-workers together: older strict draft readers do not understand new recovery
-fields/options and fail closed rather than restore them. New readers also accept
-older drafts with no `payment_options` field. Browser transcript restoration
-remains separate work.
-
-The approved A-03-F1 adapters implement the same memory/run interfaces using
-PostgreSQL. Explicitly apply the existing B/C migrations followed by
-`020_agent_storage.sql` and `021_agent_actions.sql` to the configured database:
-
-```powershell
-uv run python -m backend.agent.migrations
-```
-
-This command creates no identities, sessions or financial fixtures. It does not
-run at application startup. Complete the existing explicit authentication bootstrap
-and C scenario seed for an isolated demo database, and configure authentication,
-`DATABASE_URL`, `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` locally. Chat uses the
-verified student cookie. Open `/student/sign-in` with the configured student
-credentials; successful sign-in continues to Chat. `/student/sign-in?next=payments`
-continues to Payments. Only these fixed local destinations are supported. The page
-reuses the existing login/session/logout relay and never selects an actor or role.
-An existing student session can continue or sign out from the same page; another
-role must sign out before using student credentials. Never put credentials or
-API keys in browser code or chat.
-
-Student tuition summaries show the exact outstanding amount and stored synthetic
-tuition deadline in UTC, separately from quote expiry, provider delivery and
-university posting windows. Displayed exchange-rate precision is rounded; exact
-integer amounts, fees and backend calculations are unchanged. In the sponsor
-workspace, **Summary language** switches exact-term summaries and confirmation
-headings between English and Bahasa Indonesia. Language changes send no decision;
-the existing explicit confirmation, terms hash and session checks remain required.
-
-The default HTTP dependency now calls `backend.agent.wiring.configured_agent_services`.
-It constructs B's real `AuthService`, C's `FinanceAgentReadPort`/scoped database reads,
-the existing OpenRouter classifier and the durable graph/run factory. The fixed
-fictional university binding is `uni_cn_01` to `benef_uni_cn_01`; only trusted server
-code supplies it. A-04 attaches protected tuition confirmation/continuation;
-A-05 attaches scoped recovery investigation, explicit case submission and status
-rechecks. Deterministic fraud/hold integration uses the existing B services; only
-a separate authorized reviewer can clear a hold.
-SDK clients are scoped to each request and closed afterward. Missing classifier
-configuration returns 503 `CLASSIFIER_NOT_CONFIGURED` on messages; missing required
-finance/agent storage returns 503 `AGENT_STORAGE_UNAVAILABLE` before a model call.
-No request migrates or seeds storage. Run retrieval uses the current verified
-session and storage without requiring an API key or making a model request.
-
-Scenarios stay scripted. The isolated CLI retains its explicit in-memory setup;
-configured PostgreSQL adapters never fall back to process-local storage on error.
-
-`PostgresConversations` retains only typed tuition/recovery selections and the previous
-intent, scoped by tenant, student, verified session and conversation ID. Drafts
-survive process/worker changes, expire after 30 idle minutes or earlier session
-expiry, and are invalidated by a simulator reset. Storage is limited to 128 active
-drafts per tenant and 64 KiB per draft; expired/invalid-session drafts are purged
-on access. Login under a new session starts a new namespace. All resource,
-permission, policy and quote checks still run again; stored IDs grant no authority.
-To continue a saved draft, a client must reuse its `conversation_id` within the
-same valid session. The current browser keeps that ID and visible messages only
-in component memory; reload starts a new conversation. This backend change does
-not restore a browser transcript or add a chat-history interface.
-
-Workers serialize each conversation with a PostgreSQL advisory lock and a
-five-second contention limit. Database work runs in bounded worker calls, including
-on Windows' default event loop. No open transaction or auth/financial row locks span
-model/network calls. A completed state and its run metadata commit together after
-fresh session/scope/scenario checks. Errors and cancellation before commit roll
-back the write; a completed commit remains recorded if the HTTP connection is
-subsequently lost. Missing/corrupt storage produces a sanitized unavailable result.
-
-`PostgresRuns` stores append-only diagnostic metadata: intent, allowlisted tool
-events/resource references, scope and scenario identifiers. It stores no user text,
-assistant prose, model output, credentials, account balances, full quotes or approval
-objects. Records are limited to 64 events/resources and 32 KiB; identical writes
-are idempotent and conflicting writes cannot replace history. There is no automatic
-run-history deletion during the MVP, including on logout or fixture reset.
-
-`GET /api/v1/agent/runs/{run_id}` keeps the existing response shape but reconstructs
-a fixed safe message plus the saved diagnostics. It does not replay the original
-assistant response or restore chat history. Only the original currently valid
-student session can retrieve a run; logout, expiry, changed scopes/credentials or
-disabled actors deny access. These are past orchestration diagnostics, not current
-financial state or the authoritative B/C financial/security audit. New financial
-tools must update the diagnostic allowlist and domain audit integration together.
-
-### Scenario refinement and local execution evidence
-
-Students paying from their own account review the existing owner approval in
-Payments, then explicitly approve or reject its exact terms. Approval alone sends
-no funds. Sponsor-funded requests keep their separate sponsor decision. Both flows
-still use the protected executor when continued.
-
-Chat stages changed amounts, funding, routes and recipient requests as a draft.
-Say `confirm revision` to cancel the earlier unstarted request or save a valid
-replacement with fresh approval. Partial tuition and arbitrary recipients remain
-blocked by the existing policy. A security hold or submitted payment cannot be
-bypassed by revising it. Correct a blocked amount with `full balance`, or select
-`use the verified university recipient`, then review and confirm the revision.
-
-The admin Demo page identifies the observed scenario/run independently of the
-scenario selected for the next reset. Follow `docs/scenario-checklist.md` for the
-continuous hero rehearsal, attack branch and review requirements.
-
-For an isolated development/test database configured in your ignored environment,
-save a current-run SQL/tool snapshot before resetting it:
+A read-only local export can capture the current simulator run and persisted agent
+diagnostics before a reset:
 
 ```powershell
 uv run python -m scripts.capture_demo_evidence --output .generated/acceptance/hero/before-posting.json
 ```
 
-Use a new filename for each checkpoint. This read-only export includes bounded,
-allowlisted synthetic financial records, current-run financial audit and saved
-agent diagnostics, plus a commit/application-source digest and model ID. It omits
-auth/session records, credentials, document bodies and raw chat/model prose. It
-does not export every B security/authority event or prove a browser interaction;
-keep the separate dialogue/screenshots and B's reviewed security evidence. Exports
-are local and unreviewed until redaction, financial assertions and team review;
-never commit them. The final video and deployed build must identify the selected
-reviewed release, not silently combine checkpoints from different runs.
+Use a new filename for each checkpoint. This output is ignored, bounded and requires
+redaction/review before sharing. It does not replace browser screenshots, a video,
+security evidence or independent scenario review. Do not commit logs, screenshots,
+database dumps or generated acceptance output.
+
+Current boundaries:
+
+- All financial connections and executable university policies are simulated;
+  official university references do not verify the synthetic posting timetable.
+- Agent replies use checked-state templates; open-ended conversational generation
+  is not implemented. Model interpretation remains a bounded routing task.
+- Drafts persist in PostgreSQL within the original valid session, with a 30-minute
+  idle expiry. Browser reload starts a new conversation; transcript restoration
+  and a chat-history interface are not implemented.
+- Allowance services and policy-permitted top-ups have protected backend workflows;
+  complete agent execution/UI journeys for both are not established by the current
+  agent slice. Shortfall guidance is not evidence of agent-executed top-up.
+- General web search, additional institutions and automatic activation of researched
+  policies are outside the approved source-lookup scope.
+- `/ready` is not a passing deployment probe. Public production deployment, native
+  device/accessibility verification, final release replay and independent scenario
+  acceptance must be assessed separately from historical/local test results.
+
+## Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| Chat reports `CLASSIFIER_NOT_CONFIGURED` | Set both OpenRouter settings and restart/recreate the backend. Scripted Scenarios does not exercise the live classifier. |
+| Chat reports `AGENT_STORAGE_UNAVAILABLE` | Check the dedicated database connection and run the explicit agent migration command after auth setup. No automatic fallback is installed. |
+| Sign-in fails or returns unavailable | Check `AUTH_ENABLED`, tenant configuration, migrated schema and seeded credentials. Bootstrap does not reset existing passwords. |
+| HTTP 403 on a write | Match `AUTH_TRUSTED_ORIGIN` exactly to the frontend URL; use the intended account and cookie host. |
+| HTTP 429 on sign-in | Wait for the login-throttle window instead of retrying repeatedly. Counters persist across workers. |
+| Sponsor inbox is empty | Confirm the student submitted a request for that sponsor's account. Access to student summaries also requires the relevant student consent. |
+| Quote or approval expired | Refresh current terms and obtain a fresh protected decision. Do not reuse a stale confirmation. |
+| A request timed out | Check the original payment/request status before retrying; a lost response does not prove failure. |
+| Types are missing | Export OpenAPI and regenerate frontend contracts before typechecking/building. |
+| Playwright cannot start | Build first, install Chromium and free ports 3100/8101/8102. |
+| Browser cannot reach a container service | Browser URLs use host ports; server-to-server container connections use service names. |
+
+If changing host ports, update the browser origin and server-only relay origins
+consistently. Report reproducible issues through the repository without credentials,
+session cookies or private account information.
+
+## Project layout
+
+| Location | Purpose |
+| --- | --- |
+| [Backend](backend/) | Agent, authentication, approvals, security, payment simulation and university services |
+| [API contracts](backend/contracts/) | Typed request, response and domain models; interactive API documentation is served at `/docs` |
+| [Frontend](frontend/app/) | Student, sponsor and demo workspaces |
+| [Database migrations](migrations/) | Versioned PostgreSQL schema changes applied by the explicit setup commands |
+| [Utility scripts](scripts/) | Schema export, repository hygiene and bounded local evidence capture |
+| [Tests](tests/) / [browser tests](frontend/tests/) | Automated checks described in the testing section |
+
+This README contains the product description, setup instructions, operating guide
+and known limitations. Temporary exports and test evidence belong in ignored
+`.generated/`, not in the source package.
+
+## Team
+
+**Punteun Shenzhen — Institut Teknologi Bandung**
+
+| Member | Team role |
+| --- | --- |
+| Muhamad Hasbullah Faris | Team leader |
+| Nazwan Siddqi Muttaqin | Team member |
+| Muhammad Zidni Alkindi | Team member |
+| Nathaniel Jonathan Rusli | Team member |
+| Sebastian Enrico Nathanael | Team member |
+
+## Support and reuse
+
+Report reproducible setup or product issues through the repository. Keep credentials,
+session cookies and private account information out of issue reports. All financial
+operations remain simulated. The repository currently has no license file; no
+open-source license grant is implied by this README.

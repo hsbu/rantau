@@ -5,7 +5,7 @@ joint agent/debit matrix below records where every SEC scenario is proven, so th
 is complete without duplicating coverage. Agent-route replays drive the real
 `POST /api/v1/agent/messages` seam and assert stored authorization/hold state.
 
-Evidence levels per SEC scenario (roadmap section 7 groups them role/payee/hold/terms):
+Evidence levels per SEC scenario, grouped by role, payee, hold and changed terms:
 
 - SEC-01 role/approval: HTTP decision routes + agent-route replay.
 - SEC-02 role/approval: execute-route forged headers + agent-route replay.
