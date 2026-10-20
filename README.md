@@ -15,7 +15,7 @@ credited the student's tuition?**
 
 [Getting started](#getting-started-with-docker) · [Local development](#local-development) ·
 [Demo walkthrough](#demo-walkthrough) · [Tests](#testing-and-quality-checks) ·
-[Documentation](#documentation) · [Team](#team)
+[Project layout](#project-layout) · [Team](#team)
 
 ## What Rantau does
 
@@ -282,9 +282,9 @@ send `confirm revision`; valid replacements need fresh owner approval. Partial
 tuition payments and arbitrary recipients remain blocked by the agreed policy.
 
 The Scenarios page is a separate scripted preview with no API/model calls. It does
-not prove that authentication, approvals or financial execution work. See the
-[scenario checklist](docs/scenario-checklist.md) for reproducible steps, expected
-state, security cases and evidence requirements.
+not prove that authentication, approvals or financial execution work. The scenario
+table below describes the available fixtures. For connected journeys, verify the
+payment record and university credit independently in their respective workspaces.
 
 ### Available simulator scenarios
 
@@ -456,21 +456,20 @@ If changing host ports, update the browser origin and server-only relay origins
 consistently. Report reproducible issues through the repository without credentials,
 session cookies or private account information.
 
-## Documentation
+## Project layout
 
-| Reference | Purpose |
+| Location | Purpose |
 | --- | --- |
-| [Product specification](docs/product-spec.md) | Approved MVP scope, policy boundaries, data model and acceptance targets |
-| [Team roadmap](docs/roadmap.md) | Implementation scope and scenario-refinement/release work |
-| [Scenario checklist](docs/scenario-checklist.md) | Test procedures, expected effects and evidence requirements |
-| [Contribution guide](CONTRIBUTING.md) | Local commits, review, publication and quality workflow |
-| [Agent instructions](AGENTS.md) | Repository rules and ownership/security invariants |
-| [Progress records](docs/progress/) | Dated implementation, review evidence and unresolved gaps |
+| [Backend](backend/) | Agent, authentication, approvals, security, payment simulation and university services |
+| [API contracts](backend/contracts/) | Typed request, response and domain models; interactive API documentation is served at `/docs` |
+| [Frontend](frontend/app/) | Student, sponsor and demo workspaces |
+| [Database migrations](migrations/) | Versioned PostgreSQL schema changes applied by the explicit setup commands |
+| [Utility scripts](scripts/) | Schema export, repository hygiene and bounded local evidence capture |
+| [Tests](tests/) / [browser tests](frontend/tests/) | Automated checks described in the testing section |
 
-The implementation and versioned contracts are in `backend/` and
-`backend/contracts/`; frontend workspaces are in `frontend/app/`; database changes
-are versioned under `migrations/`. Temporary exports and test evidence belong in
-ignored `.generated/`, not in the source package.
+This README contains the product description, setup instructions, operating guide
+and known limitations. Temporary exports and test evidence belong in ignored
+`.generated/`, not in the source package.
 
 ## Team
 
@@ -484,9 +483,9 @@ ignored `.generated/`, not in the source package.
 | Nathaniel Jonathan Rusli | Team member |
 | Sebastian Enrico Nathanael | Team member |
 
-## Contributing and reuse
+## Support and reuse
 
-Follow [CONTRIBUTING.md](CONTRIBUTING.md) for changes and review. Keep credentials
-and generated artifacts out of commits, and retain the simulator boundary in demos
-and documentation. The repository currently has no license file; no open-source
-license grant is implied by this README.
+Report reproducible setup or product issues through the repository. Keep credentials,
+session cookies and private account information out of issue reports. All financial
+operations remain simulated. The repository currently has no license file; no
+open-source license grant is implied by this README.
